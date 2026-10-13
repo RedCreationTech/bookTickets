@@ -200,6 +200,15 @@ test("complete cross-surface lifecycle persists from booking to follow-up", asyn
   await page.getByRole("button", { name: "模拟识别并继续" }).click();
   await page.getByRole("button", { name: "确认签到", exact: true }).click();
   await page.goto("/#/exam");
+  await page
+    .getByLabel("分检业务日期")
+    .fill(
+      await page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!)
+            .appointments[0].date,
+      ),
+    );
   await page.getByRole("button", { name: "填入正常示例" }).click();
   await page
     .getByLabel("分检小结 / 医学建议（演示）")
@@ -301,6 +310,139 @@ test("five-dimension patient survey validates and persists its result", async ({
   ).toHaveCount(0);
   await page.screenshot({
     path: `test-results/satisfaction-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+});
+
+test("expanded report workspace creates an actual PDF download without recording a print", async ({
+  page,
+}) => {
+  await page.goto("/#/reports");
+  const identity = await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!);
+    return s.appointments.find((a: any) => a.status === "approved")
+      .id as string;
+  });
+  const before = await page.evaluate(
+    (id) =>
+      JSON.parse(
+        localStorage.getItem("hongchuang.health.demo.v1")!,
+      ).appointments.find((a: any) => a.id === id).printCount || 0,
+    identity,
+  );
+  await page.getByLabel("选择报告" + identity, { exact: true }).check();
+  await page.getByText("真实PDF生成与报告版式", { exact: true }).click();
+  await page.getByLabel("报告用途与版式").selectOption("vip");
+  await page
+    .getByRole("button", { name: "生成并预览PDF", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "下载 " + identity, exact: true }),
+  ).toBeVisible({ timeout: 60000 });
+  const promise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "下载 " + identity, exact: true })
+    .click();
+  const download = await promise;
+  expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+  await download.saveAs(
+    `test-results/actual-report-${test.info().project.name}.pdf`,
+  );
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  const bytes = Buffer.concat(chunks);
+  expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+  expect(
+    await page.evaluate(
+      (id) =>
+        JSON.parse(
+          localStorage.getItem("hongchuang.health.demo.v1")!,
+        ).appointments.find((a: any) => a.id === id).printCount || 0,
+      identity,
+    ),
+  ).toBe(before);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `test-results/real-pdf-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+});
+
+test("expanded specimen station generates barcode history for a started order", async ({
+  page,
+}) => {
+  await page.goto("/#/exam");
+  await page.getByRole("button", { name: "采样条码", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "采样与条码工作站 · 模拟" });
+  await expect(
+    modal.getByRole("heading", { name: "标本采样工作站" }),
+  ).toBeVisible();
+  await modal
+    .getByRole("button", { name: "生成并模拟打印条码", exact: true })
+    .click();
+  await modal
+    .getByRole("button", { name: "确认标本采集", exact: true })
+    .click();
+  await expect(
+    modal.getByRole("button", { name: "确认标本采集", exact: true }),
+  ).toBeDisabled();
+  await expect(modal.getByRole("img", { name: /CODE128条码/ })).toBeVisible();
+  const rows = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!).records
+        .specimenBarcodes,
+  );
+  expect(rows).toHaveLength(1);
+  expect(rows[0].prints).toHaveLength(1);
+  expect(rows[0].status).toBe("已采集");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `test-results/specimen-barcode-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+});
+
+test("expanded group report saves a population snapshot and downloads editable Word", async ({
+  page,
+}) => {
+  await page.goto("/#/reports");
+  await page.getByText("团体健康报告与Word导出", { exact: true }).click();
+  await page.getByLabel("团检报告单位").selectOption("远帆制造");
+  await page
+    .getByRole("button", { name: "归档当前人群报告", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "导出可编辑 Word", exact: true }),
+  ).toBeEnabled();
+  const promise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "导出可编辑 Word", exact: true })
+    .click();
+  const download = await promise;
+  expect(download.suggestedFilename()).toMatch(/\.docx$/);
+  await download.saveAs(
+    `test-results/actual-group-report-${test.info().project.name}.docx`,
+  );
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  expect(Buffer.concat(chunks).subarray(0, 2).toString()).toBe("PK");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `test-results/group-report-${test.info().project.name}.png`,
     fullPage: true,
   });
 });

@@ -3,7 +3,11 @@ import type { ReactNode } from "react";
 import { createInitialState, reducer } from "./model";
 import type { DemoState, Action } from "./model";
 export * from "./model";
-import { groupAppointmentCompany, normalizeBookingTime } from "./bookingRules";
+import {
+  groupAppointmentCompany,
+  normalizeBookingTime,
+  anonymizedBookingResourceUsage,
+} from "./bookingRules";
 const KEY = "hongchuang.health.demo.v1";
 const LEGACY_KEY = "qinghe.health.demo.v1";
 function validState(s: any) {
@@ -168,6 +172,7 @@ export function useDemo() {
       ...context.state.records,
       resourceUsage: anonymizedResourceUsage(context.state),
       bookingUsage: anonymizedBookingUsage(context.state),
+      bookingResourceUsage: anonymizedBookingResourceUsage(context.state),
     },
   };
   const role = (state.records.roles || []).find(

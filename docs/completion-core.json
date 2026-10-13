@@ -1,0 +1,708 @@
+{
+  "scope": "核心63项减已委派20项，本receipt覆盖43项",
+  "verification": {
+    "clinicalCompletion": "26/26通过，患者worker独立编写",
+    "clinicalTemplates": "4/4通过",
+    "clinicalIntegration": "7/7通过，含科室消费/医生等级/背景/影像/单项打印/元数据",
+    "appointmentCompletion": "6/6通过",
+    "coreFlowRegression": "64/64通过：Core7+advancedCore7+独立QA50；原独立测试随真实日期/历史订单/柜位流转更新，不减少状态断言",
+    "browser": "待本轮最终CI，不使用9014截图证明新工作区"
+  },
+  "items": [
+    {
+      "id": "T0050",
+      "originalText": "支持微信小程序、电话等多种预约方式。",
+      "gapClosed": "补电话预约来源的登记入口/标记及订单查询区分；不要求真实呼叫中心。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/Core.tsx",
+        "src/modules/AppointmentActions.tsx"
+      ],
+      "tests": [
+        "tests/appointment-completion.test.tsx :: T0050"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0072",
+      "originalText": "对预约人员进行取消预约、发送短信、设置或取消黑名单、修改预约日期等操作。",
+      "gapClosed": "预约人员操作处联动取消、改期、通知、黑名单设置/解除，或提供带当前患者的准确跳转；现配置/通知分散且未带上下文。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/AppointmentActions.tsx",
+        "src/bookingRules.ts"
+      ],
+      "tests": [
+        "tests/appointment-completion.test.tsx :: T0072"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0078",
+      "originalText": "预约日志列表：记录预约时间、预约方式、取消预约时间、修改预约时间、是否答问卷、问卷内容、系统推荐项目及选择项目等一系列操作，并支持可视化查询；原文“可以选择了哪些项目一些列操作”语义不完整。",
+      "gapClosed": "补面向预约的专用追踪视图：创建/改期/取消时间、渠道、问卷回答、推荐及最终项目可连贯查询。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/AppointmentActions.tsx",
+        "src/model.ts"
+      ],
+      "tests": [
+        "tests/appointment-completion.test.tsx :: T0078"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0205",
+      "originalText": "支持采血、尿粪、碳呼吸、妇科等多种工作站。",
+      "gapClosed": "补粪便和碳呼吸工作站类型，按工作站展示适用待采项目并登记采集。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/SpecimenStation.tsx",
+        "src/clinicalRules.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C21 / C22 / C23 / C24 / C25"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0207",
+      "originalText": "订单开始体检后，可在各工作站窗口刷体检号打印条码。",
+      "gapClosed": "增加工作站合成扫码/体检号输入，校验已到检后自动定位客户并列出当前站待打印条码。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/SpecimenStation.tsx",
+        "src/clinicalRules.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C21 / C22 / C23 / C24 / C25"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0209",
+      "originalText": "刷体检号可显示待打印条码信息。",
+      "gapClosed": "增加工作站合成扫码/体检号输入，校验已到检后自动定位客户并列出当前站待打印条码。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/SpecimenStation.tsx",
+        "src/clinicalRules.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C21 / C22 / C23 / C24 / C25"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0210",
+      "originalText": "支持显示打印状态、打印时间、操作人等。",
+      "gapClosed": "在条码任务详情显示每次打印状态、时间、操作者以及目标，支持历史展开。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/SpecimenStation.tsx",
+        "src/clinicalRules.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C21 / C22 / C23 / C24 / C25"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0212",
+      "originalText": "支持自动、手动合并检查条码。",
+      "gapClosed": "实现按同订单标本类型自动归并和手动勾选项目合并，生成一个稳定条码并保留项目映射。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/SpecimenStation.tsx",
+        "src/clinicalRules.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C21 / C22 / C23 / C24 / C25"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0213",
+      "originalText": "支持刷体检号获取当前体检客户检查信息，自动带出客户在当前科室检查项目信息。",
+      "gapClosed": "加体检号定位和项目所属科室映射，切当前科室只加载该客户该科室检查项。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/Core.tsx",
+        "src/modules/ReviewWorkflow.tsx"
+      ],
+      "tests": [
+        "tests/clinical-integration.test.tsx :: T0213/0220/0221 / T0221"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0215",
+      "originalText": "支持科室检查过程中声音录制。",
+      "gapClosed": "新增浏览器录音开始/暂停/结束并关联保存的前端流程（可选合成录音演练，真实麦克风需授权）；导入不能代替录制。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C10 / C11"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0217",
+      "originalText": "支持检中加项，可缴费完成后继续检查。",
+      "gapClosed": "在分检内加项并创建差额待缴，模拟支付成功前阻止该新增项检查/完成。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/model.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C12 / C13 / C14"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0218",
+      "originalText": "支持查看检前问卷相关信息。",
+      "gapClosed": "在分检展示当前患者实际本地问卷及 preExamHistory 内容、来源和时间。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx"
+      ],
+      "tests": [
+        "tests/clinical-integration.test.tsx :: T0218/0293"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0220",
+      "originalText": "支持查看当日体检患者列表查询，可查看当日未检、已检客户信息，方便医生查看当日需要接待客户数量。",
+      "gapClosed": "按当日过滤并支持未检/已检切换、查询及人数，保留日期选择用于演示。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/Core.tsx",
+        "src/modules/ReviewWorkflow.tsx"
+      ],
+      "tests": [
+        "tests/clinical-integration.test.tsx :: T0213/0220/0221 / T0221"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0221",
+      "originalText": "医生存在多科室权限时，支持医生自由选择当前所属检查科室。",
+      "gapClosed": "配置医生允许科室并只在该清单内切换，切换同步项目范围；前端权限演示即可。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/Core.tsx",
+        "src/modules/ReviewWorkflow.tsx"
+      ],
+      "tests": [
+        "tests/clinical-integration.test.tsx :: T0213/0220/0221 / T0221"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0222",
+      "originalText": "支持分检模版选择。",
+      "gapClosed": "建立分检模板/结果字典的选择与编辑，按录入所见匹配并生成可编辑项目小结及结论。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C08"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0223",
+      "originalText": "内置检查结果模板（内置字典，可自定义修改）。所见（看到的信息）--->小结(主观判断)--->结论",
+      "gapClosed": "建立分检模板/结果字典的选择与编辑，按录入所见匹配并生成可编辑项目小结及结论。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C08"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0224",
+      "originalText": "支持查看当前体检客户的历次检查结果、历次异常。",
+      "gapClosed": "按当前客户关联历史订单、按日期选择查看真实本地结果/异常，并从选定上次记录带入草稿。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/clinicalRules.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C07"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0225",
+      "originalText": "支持根据体检日期选择订单查看。",
+      "gapClosed": "按当前客户关联历史订单、按日期选择查看真实本地结果/异常，并从选定上次记录带入草稿。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/clinicalRules.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C07"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0226",
+      "originalText": "支持一键使用上次检查结果。",
+      "gapClosed": "按当前客户关联历史订单、按日期选择查看真实本地结果/异常，并从选定上次记录带入草稿。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/clinicalRules.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C07"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0227",
+      "originalText": "支持自动生成项目小结（内置字典）。",
+      "gapClosed": "建立分检模板/结果字典的选择与编辑，按录入所见匹配并生成可编辑项目小结及结论。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C08"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0240",
+      "originalText": "支持结果指控提醒，针对子项目可设置结果类型为数值型还是描述型。",
+      "gapClosed": "新增按子项目配置数值/描述结果类型，输入控件与提交验证读取该配置。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C01 / C02 / C05 / C06"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0244",
+      "originalText": "支持自定义设置危急值规则，可根据自定义危急值规则判断检验、检查相关危急值，并自动进入异常上报机制中上报。是否删除",
+      "gapClosed": "增加危急规则列表的项目、比较符/上下界、等级与启停配置，并供提交判定/上报使用；条末“是否删除”需确认，但明确规则子动作仍可实现。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C01 / C02 / C05 / C06"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0246",
+      "originalText": "支持妇科检查页面打印病理检查条码。",
+      "gapClosed": "增加病理条码打印确认动作，保存打印次数/时间/操作者并允许补打；可复用PrintDesk。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/SpecimenStation.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C21 / C23"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0251",
+      "originalText": "支持按照选择单项结果进行打印。",
+      "gapClosed": "将选定项目结果渲染为单项打印预览并提供本地打印/模拟任务执行；CSV导出不能替代打印。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx"
+      ],
+      "tests": [
+        "tests/clinical-integration.test.tsx :: T0251"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0284",
+      "originalText": "支持三级审核结构，支持初审、主检、总检三级审核，可自由配置流程。",
+      "gapClosed": "将可配置审核流程建成明确节点序列：当前reviewStages=2仍按初审/主检命名和推进，不能演示关闭初审后主检/总检两级。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/ReviewWorkflow.tsx",
+        "src/model.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C15 / C16 / C17 / C18 / C19 / C20"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0290",
+      "originalText": "不同级别报告分配不同级别医生进行主检。",
+      "gapClosed": "新增医生等级和报告难度级别区间映射，在分配时筛出/校验匹配等级医生。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/ReviewWorkflow.tsx",
+        "src/modules/ReviewTools.tsx"
+      ],
+      "tests": [
+        "tests/clinical-integration.test.tsx :: T0290"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0293",
+      "originalText": "支持查看检前问卷、一般检查、物理检查、实验室检查、辅助检查等项目结果。",
+      "gapClosed": "在审核加入当前客户已保存检前问卷面板，并按检查类别展示现有结果。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-integration.test.tsx :: T0218/0293"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0294",
+      "originalText": "支持仅查看异常结果。",
+      "gapClosed": "异常筛选需消费可维护的多项目异常结果，而非仅血糖/关键词有限表达。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ReviewWorkflow.tsx",
+        "src/clinicalRules.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C02 / C09",
+        "tests/clinical-integration.test.tsx :: T0319"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0297",
+      "originalText": "可实现多种抓取方式，按照异常一元化汇总或按照医生小结描述汇总。",
+      "gapClosed": "提供异常统一汇总与医生小结汇总两种明确抓取模式，并展示各自来源。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ReviewWorkflow.tsx",
+        "src/clinicalRules.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C02 / C09",
+        "tests/clinical-integration.test.tsx :: T0319"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0305",
+      "originalText": "医生诊台，医生能快速调出体检者历次检查结果，可与本次异常进行对比，协助医生书写综合医学指导意见。（在检查结果处，增加上次检查结果展示）",
+      "gapClosed": "从同一患者真实存储的历次订单按日期/订单ID选择比较，不用固定2025/24/23 history数组替代。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C07",
+        "tests/core.test.tsx :: U05",
+        "tests/independent-qa.test.tsx :: T0342"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0311",
+      "originalText": "可配置是否开启初审环节。",
+      "gapClosed": "明确开启/关闭初审后改变审核首节点及显示标签；当前2/3次数配置未完整对应初审可选流程。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/ReviewWorkflow.tsx",
+        "src/model.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C15 / C16 / C17 / C18 / C19 / C20"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0312",
+      "originalText": "医生撤销功能，当审核后未被下一级审核时，可以撤销已通过的订单，继续审核，可权限配置。",
+      "gapClosed": "已审核但下级尚未审核时可按权限撤销当前级通过，保留原审核轨迹。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/ReviewWorkflow.tsx",
+        "src/model.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C15 / C16 / C17 / C18 / C19 / C20"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0314",
+      "originalText": "主检医生可驳回分检并书写驳回项目，驳回原因等。",
+      "gapClosed": "主检驳回需选择具体分检项目并记录原因，与相应待重做项目关联。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/ReviewWorkflow.tsx",
+        "src/model.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C15 / C16 / C17 / C18 / C19 / C20"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0315",
+      "originalText": "总检医生可将报告驳回主检，并书写驳回原因。",
+      "gapClosed": "总检驳回应退回主检而不是统一回分检。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/ReviewWorkflow.tsx",
+        "src/model.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C15 / C16 / C17 / C18 / C19 / C20"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0319",
+      "originalText": "支持相关影像图片查看（需PACS 接口支持）。",
+      "gapClosed": "总检页消费订单已上传/模拟回传影像，提供查看；真实PACS拉取另验。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ReviewWorkflow.tsx",
+        "src/clinicalRules.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C02 / C09",
+        "tests/clinical-integration.test.tsx :: T0319"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0342",
+      "originalText": "支持体检报告展示历次检查结果对比，可自定义选择需要展示的历次结果订单及需要展示结果次数。",
+      "gapClosed": "从同一患者真实存储的历次订单按日期/订单ID选择比较，不用固定2025/24/23 history数组替代。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C07",
+        "tests/core.test.tsx :: U05",
+        "tests/independent-qa.test.tsx :: T0342"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0403",
+      "originalText": "后续的采血、分检过程中均可见前台登记照片信息，可对人员信息进行核实。",
+      "gapClosed": "除分检抽象双图外，采血工作流应显示同订单登记核验资料；真实照片采集仍外部。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/SpecimenStation.tsx",
+        "src/modules/ControlCenter.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C25",
+        "tests/control-center.test.tsx"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0404",
+      "originalText": "分检支持对数值、文字结果进行纠错提示。",
+      "gapClosed": "按不同数值/描述项目配置纠错规则并实际提示，不能只有血糖单字段。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C01 / C05 / C06"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0405",
+      "originalText": "针对数值型结果，可自定义设置阈值，超出阈值给出警示，避免分检手工出错的概率。",
+      "gapClosed": "按不同数值/描述项目配置纠错规则并实际提示，不能只有血糖单字段。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/clinicalRules.ts",
+        "src/modules/Core.tsx"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C01 / C05 / C06"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0466",
+      "originalText": "支持维护开单项目及其报告项目。",
+      "gapClosed": "明确维护开单项目与报告项目的映射并在分检/报告消费，现orderingRules只定义检查条目和价格。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/modules/ClinicalTemplates.tsx",
+        "src/modules/SpecimenStation.tsx",
+        "src/reportPdf.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C03 / C04 / C05 / C21",
+        "tests/clinical-templates.test.tsx :: T0469 / T0474",
+        "tests/pdf-delivery.test.tsx"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0467",
+      "originalText": "支持维护检验、检查条码信息。",
+      "gapClosed": "条码设置应有标本/项目关联及码制/编号模板并实际生成预览，现通用资源记录不足。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/modules/ClinicalTemplates.tsx",
+        "src/modules/SpecimenStation.tsx",
+        "src/reportPdf.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C03 / C04 / C05 / C21",
+        "tests/clinical-templates.test.tsx :: T0469 / T0474",
+        "tests/pdf-delivery.test.tsx"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0469",
+      "originalText": "支持维护分检三级小结模板。",
+      "gapClosed": "维护分检三级小结/驳回意见模板后，在对应编辑动作中选择套用并保存内容。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/modules/ClinicalTemplates.tsx",
+        "src/modules/SpecimenStation.tsx",
+        "src/reportPdf.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C03 / C04 / C05 / C21",
+        "tests/clinical-templates.test.tsx :: T0469 / T0474",
+        "tests/pdf-delivery.test.tsx"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    },
+    {
+      "id": "T0474",
+      "originalText": "支持维护驳回意见模板。",
+      "gapClosed": "维护分检三级小结/驳回意见模板后，在对应编辑动作中选择套用并保存内容。",
+      "implementationOwner": "core",
+      "status": "implemented_pending_independent_audit",
+      "evidence": [
+        "src/modules/ClinicalWorkbench.tsx",
+        "src/modules/ClinicalTemplates.tsx",
+        "src/modules/SpecimenStation.tsx",
+        "src/reportPdf.ts"
+      ],
+      "tests": [
+        "tests/clinical-completion.test.tsx :: C03 / C04 / C05 / C21",
+        "tests/clinical-templates.test.tsx :: T0469 / T0474",
+        "tests/pdf-delivery.test.tsx"
+      ],
+      "boundary": "仅本地合成业务演示；真实诊疗规则、医学结论、身份核验、录音权限、硬件打印、医院接口及服务端安全另验。历史比较只读取当前浏览器实际存储订单，未补造缺失结果。"
+    }
+  ],
+  "auditClosureAddendum": {
+    "tests": [
+      "tests/audit-closure.test.tsx",
+      "tests/devices.test.tsx :: 问卷可跳过、关闭不拦截，开启推荐会选入对应参考项目",
+      "tests/pdf-delivery.test.tsx :: invalidates downloaded bytes and iframe when approved report content changes without changing status"
+    ],
+    "changes": [
+      "H5实际预约存推荐快照；按groupOrderId独立排期检查",
+      "审核撤销岗位复选真实写入权限配置",
+      "历史只读早于本次日期，同日不推断先后",
+      "检中加项差额进入统一项目实付及逐笔账本",
+      "团检个人付款不把单位挂账算实收",
+      "PDF内容变更失效旧文件与预览链接"
+    ],
+    "verification": "待本轮统一全仓验证及独立回归，不将中途数字冒充最终"
+  }
+}

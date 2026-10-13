@@ -29,5 +29,19 @@
     "chromiumSkipped": 1,
     "chromiumFailed": 1,
     "failure": "Mobile queue tables without overflow wrappers expanded the layout viewport to 744px; pause-modal click was intercepted. Fixed local table scrolling, min-width, portal and scroll lock; corresponding replacement run pending."
+  },
+  "viewportFixedSnapshot": {
+    "commit": "9014e7600c199ff9366687d50d18826023da04ed",
+    "run": "https://github.com/RedCreationTech/bookTickets/actions/runs/38338053301",
+    "jobId": 115102548285,
+    "conclusion": "success",
+    "vitest": 337,
+    "chromiumPassed": 21,
+    "chromiumSkipped": 1,
+    "skipReason": "Mobile project does not repeat desktop-only role screenshots",
+    "artifactId": 11785661051,
+    "screenshotCount": 29,
+    "screenshotsActuallyOpened": 29,
+    "visualReview": "Checked all role/phone/kiosk/report-machine/waiting-screen/finance/pause-slip/survey screenshots. Queue mobile layout viewport regression is fixed; administrative tables use local horizontal scrolling. This is a runnable staged snapshot while remaining frontend business depth is being completed."
   }
 }

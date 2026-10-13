@@ -1,0 +1,1268 @@
+{
+  "owner": "health",
+  "brand": "红创",
+  "generatedAt": "2026-10-13T03:33:20.721001+00:00",
+  "scope": "冻结 FRONTEND_COMPLETION_WORKLIST health 50项及已约定随访4项证据；未修改原审计矩阵状态",
+  "verification": {
+    "command": "npx vitest run tests/completion-health.test.tsx tests/operations.test.tsx tests/followup-allocation.test.tsx tests/research-reminders.test.tsx tests/settlement-details.test.tsx",
+    "testFiles": 5,
+    "passedTests": 92,
+    "failedTests": 0,
+    "newCompletionTests": 31,
+    "checks": [
+      "我的10个Health/Operations/专域模块 eslint 通过",
+      "全仓 npx tsc --noEmit 通过"
+    ],
+    "type": "React DOM 行为回归与纯规则单测；不是浏览器E2E或生产验收"
+  },
+  "integrations": [
+    "Health FollowupDatePlanner/RiskSortedOrders + sortByRisk 使用 Queue owner 组件",
+    "Operations settings 患者预约规则挂 PatientBookingSettings，support 共享留言挂 MessageWorkbench",
+    "App菜单展示由parent接入 resolveMenuPresentation"
+  ],
+  "items": [
+    {
+      "id": "T0439",
+      "requirement": "CRM 个人看板：查看年度订单完成情况",
+      "route": "/services",
+      "originalGap": "年度订单完成看板关联实际体检订单状态，不仅合同状态/金额。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/CrmProgress.tsx :: crmOrderProgress, CrmProgress",
+        "/services → 客户订单进度：crmOrderLinks 显式关联 customerId/contractId/appointmentId；按订单日期年度、业务员、客户筛选；批准/打印为完成，逐人逐项目结果/弃检/未完与 CSV 同源。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "links CRM contracts to actual orders and calculates annual personal completion and per-item progress",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers links CRM contracts to actual orders and calculates annual personal completion and per-item progress",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅对已显式关联且当前权限可见的本地体检订单统计；未关联显示缺失，不补造订单或真实跨系统财务数据。"
+    },
+    {
+      "id": "T0458",
+      "requirement": "业务管理：体检进度查询等",
+      "route": "/services",
+      "originalGap": "CRM客户/合同关联体检订单，显示逐人逐项目进度并可查询。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/CrmProgress.tsx :: crmOrderProgress, CrmProgress",
+        "/services → 客户订单进度：crmOrderLinks 显式关联 customerId/contractId/appointmentId；按订单日期年度、业务员、客户筛选；批准/打印为完成，逐人逐项目结果/弃检/未完与 CSV 同源。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "links CRM contracts to actual orders and calculates annual personal completion and per-item progress",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers links CRM contracts to actual orders and calculates annual personal completion and per-item progress",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅对已显式关联且当前权限可见的本地体检订单统计；未关联显示缺失，不补造订单或真实跨系统财务数据。"
+    },
+    {
+      "id": "T0575",
+      "requirement": "发信息",
+      "route": "/health",
+      "originalGap": "客户档案短信/邮件目前只有草稿元数据；补对象/正文预览、显式模拟发送和结果历史，复用本地通知能力。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: LocalMessages",
+        "/health 客户档案 → 短信与邮件；/content → 已发短信邮件。先草稿/正文与收件对象预览，确认后生成 localMessages 与 controlNotifications；同批双击只记录一次；已发列表按渠道排除草稿。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "sends 短信 only after explicit preview, once, and separates sent history from drafts",
+          "fullName": "Health completion: ID relations and actual local messages sends 短信 only after explicit preview, once, and separates sent history from drafts",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "sends 邮件 only after explicit preview, once, and separates sent history from drafts",
+          "fullName": "Health completion: ID relations and actual local messages sends 邮件 only after explicit preview, once, and separates sent history from drafts",
+          "result": "passed"
+        }
+      ],
+      "boundary": "只产生本地模拟发送日志和通知，没有短信/邮箱供应商、后台调度或实际外发；邮箱使用 demo.invalid。"
+    },
+    {
+      "id": "T0576",
+      "requirement": "发邮件",
+      "route": "/health",
+      "originalGap": "客户档案短信/邮件目前只有草稿元数据；补对象/正文预览、显式模拟发送和结果历史，复用本地通知能力。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: LocalMessages",
+        "/health 客户档案 → 短信与邮件；/content → 已发短信邮件。先草稿/正文与收件对象预览，确认后生成 localMessages 与 controlNotifications；同批双击只记录一次；已发列表按渠道排除草稿。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "sends 短信 only after explicit preview, once, and separates sent history from drafts",
+          "fullName": "Health completion: ID relations and actual local messages sends 短信 only after explicit preview, once, and separates sent history from drafts",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "sends 邮件 only after explicit preview, once, and separates sent history from drafts",
+          "fullName": "Health completion: ID relations and actual local messages sends 邮件 only after explicit preview, once, and separates sent history from drafts",
+          "result": "passed"
+        }
+      ],
+      "boundary": "只产生本地模拟发送日志和通知，没有短信/邮箱供应商、后台调度或实际外发；邮箱使用 demo.invalid。"
+    },
+    {
+      "id": "T0578",
+      "requirement": "设置家庭账号等等相关操作",
+      "route": "/health",
+      "originalGap": "家庭账户需关联已有患者ID并可维护/查看具体成员，当前members只是任意文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: FamilyRelations",
+        "/health → 家庭成员；/enterprise → 家庭账户：已有患者 ID 多选建家庭、查看成员档案、移除关系；memberIds/patientIds 同步维护。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "links real patient IDs into a family, opens a member and removes only the relationship",
+          "fullName": "Health completion: ID relations and actual local messages links real patient IDs into a family, opens a member and removes only the relationship",
+          "result": "passed"
+        }
+      ],
+      "boundary": "本地关系管理，不创建独立登录、真实家庭成员共享授权或服务端隔离；个人档案不随移除关系删除。"
+    },
+    {
+      "id": "T0579",
+      "requirement": "创建单位分组",
+      "route": "/enterprise",
+      "originalGap": "单位/子单位以parentId形成可选择的层级关联，展示子组并防自循环；当前parent仅文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: CompanyHierarchy",
+        "src/modules/AdminDomains.tsx :: wouldCreateCycle",
+        "/enterprise → 工作单位：parentId 选择真实父级、创建子单位、显示子级；改名保留 ID；拒绝自己或子孙作为父级。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "preserves child IDs on company rename and rejects cycles",
+          "fullName": "Health completion: ID relations and actual local messages preserves child IDs on company rename and rejects cycles",
+          "result": "passed"
+        }
+      ],
+      "boundary": "本地组织层级；不代表真实多租户权限、企业认证或服务端组织管理。"
+    },
+    {
+      "id": "T0580",
+      "requirement": "新建子单位分组",
+      "route": "/enterprise",
+      "originalGap": "单位/子单位以parentId形成可选择的层级关联，展示子组并防自循环；当前parent仅文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: CompanyHierarchy",
+        "src/modules/AdminDomains.tsx :: wouldCreateCycle",
+        "/enterprise → 工作单位：parentId 选择真实父级、创建子单位、显示子级；改名保留 ID；拒绝自己或子孙作为父级。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "preserves child IDs on company rename and rejects cycles",
+          "fullName": "Health completion: ID relations and actual local messages preserves child IDs on company rename and rejects cycles",
+          "result": "passed"
+        }
+      ],
+      "boundary": "本地组织层级；不代表真实多租户权限、企业认证或服务端组织管理。"
+    },
+    {
+      "id": "T0582",
+      "requirement": "创建维护家庭账户",
+      "route": "/health",
+      "originalGap": "家庭账户需关联已有患者ID并可维护/查看具体成员，当前members只是任意文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: FamilyRelations",
+        "/health → 家庭成员；/enterprise → 家庭账户：已有患者 ID 多选建家庭、查看成员档案、移除关系；memberIds/patientIds 同步维护。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "links real patient IDs into a family, opens a member and removes only the relationship",
+          "fullName": "Health completion: ID relations and actual local messages links real patient IDs into a family, opens a member and removes only the relationship",
+          "result": "passed"
+        }
+      ],
+      "boundary": "本地关系管理，不创建独立登录、真实家庭成员共享授权或服务端隔离；个人档案不随移除关系删除。"
+    },
+    {
+      "id": "T0594",
+      "requirement": "查看及维护设备慢病评估套餐",
+      "route": "/health",
+      "originalGap": "设备慢病评估“套餐”应配置关联评估指标/项目并可选择套用；当前主要是设备类型问卷/报告记录。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: AssessmentPackages",
+        "src/modules/Health.tsx :: Assessments activePackage/assessmentPackageSnapshot/metricSnapshot/reportSections",
+        "clinicalConfig 的评估报告套餐保存 assessmentType/metricKeys/sections/version；选择后实际改变录入指标和报告章节，保存可复核副本。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "applies two structured assessment packages to different metric inputs and saved report sections",
+          "fullName": "Health completion: ID relations and actual local messages applies two structured assessment packages to different metric inputs and saved report sections",
+          "result": "passed"
+        }
+      ],
+      "boundary": "合成教育指标套餐与演示计分，不是获批设备检测套餐、医学模型、诊断或临床报告认证。"
+    },
+    {
+      "id": "T0610",
+      "requirement": "通过时间查看客户的干预计划详情，时间节点30 天、60 天、90 天、1 年时间",
+      "route": "/health",
+      "originalGap": "30/60/90/1年节点应显示该客户对应计划详情/任务时间，当前主要任务数量汇总。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: OutcomeTimeline, outcomeDate",
+        "/health → 干预随访 → 干预时间与指标效果：按患者/真实 planId 显示对应任务、期限；基线与30/60/90/365天指标实际录入、目标/差值比较、未来节点禁止录入、缺失不当正常。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "compares real baseline and distinct 30/60 day observations while preserving missing and future nodes",
+          "fullName": "Health completion: ID relations and actual local messages compares real baseline and distinct 30/60 day observations while preserving missing and future nodes",
+          "result": "passed"
+        }
+      ],
+      "boundary": "结果是合成记录的数值变化，不推断干预因果效果或诊疗有效性；不存在的数据明确未记录。"
+    },
+    {
+      "id": "T0611",
+      "requirement": "通过时间查看客户的干预效果，时间节点30 天、60 天、90 天、1 年时间",
+      "route": "/health",
+      "originalGap": "干预效果须比较对应时间节点实际合成指标/目标变化，不能只以完成任务数当效果。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: OutcomeTimeline, outcomeDate",
+        "/health → 干预随访 → 干预时间与指标效果：按患者/真实 planId 显示对应任务、期限；基线与30/60/90/365天指标实际录入、目标/差值比较、未来节点禁止录入、缺失不当正常。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "compares real baseline and distinct 30/60 day observations while preserving missing and future nodes",
+          "fullName": "Health completion: ID relations and actual local messages compares real baseline and distinct 30/60 day observations while preserving missing and future nodes",
+          "result": "passed"
+        }
+      ],
+      "boundary": "结果是合成记录的数值变化，不推断干预因果效果或诊疗有效性；不存在的数据明确未记录。"
+    },
+    {
+      "id": "T0625",
+      "requirement": "批量进行服务维护管理",
+      "route": "/services",
+      "originalGap": "批量维护应能选择并更新服务实质字段（负责人/价格/类别等），目前仅批量状态流转。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: ServiceBatch",
+        "/services → 服务批量维护：选择 serviceCatalog 记录批改负责人/价格/类别；全批先校验再保存，保留未选择行与变更历史；受 services.batch.update 权限消费。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "validates a whole service batch before updating selected material fields",
+          "fullName": "Health completion: source finance, batch editing and aftercare validates a whole service batch before updating selected material fields",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "blocks actual service batch and commerce creation controls under element denial",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers blocks actual service batch and commerce creation controls under element denial",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅本地服务目录批量维护，不证明服务端并发事务或真实人员操作权限。"
+    },
+    {
+      "id": "T0635",
+      "requirement": "查看、维护本账户下建立的医生团队",
+      "route": "/services",
+      "originalGap": "医生团队列表需按当前演示账户创建归属筛选，不只是全部团队表与owner文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: DoctorTeamRelations",
+        "/services → 我的团队关系：config.demoAccountId 按 createdById 展示本人创建团队；memberIds 增删真实已通过 staff；teamId 关联活动，从团队创建和管理。",
+        "src/modules/Operations.tsx :: LoyaltyCenter 通过 teamId 展示当前团队名，改名不破坏关系。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "isolates created teams by account and preserves linked members and activities on rename",
+          "fullName": "Health completion: ID relations and actual local messages isolates created teams by account and preserves linked members and activities on rename",
+          "result": "passed"
+        }
+      ],
+      "boundary": "演示账户切换不是登录认证；本地团队活动报名容量复用既有匿名全局占用，未对接真实组织或活动通知。"
+    },
+    {
+      "id": "T0672",
+      "requirement": "查看、操作订单退换货情况",
+      "route": "/commerce",
+      "originalGap": "新增换货申请、审核、退回/重发及库存占用闭环；当前只有退款分支。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/CommerceAftercare.tsx :: ExchangeWorkbench",
+        "/commerce → 换货库存处理：源已签收订单申请、审批替换库存预留、原商品退回入库、模拟重发；退回前取消释放；稳定ID/动作锁防重复，多单同批审批仍不能超占匿名全局库存。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "completes exchange reservation, return and reship without creating refunds or negative inventory",
+          "fullName": "Health completion: source finance, batch editing and aftercare completes exchange reservation, return and reship without creating refunds or negative inventory",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "cancels an approved exchange by releasing its reservation and permits a new application",
+          "fullName": "Health completion: source finance, batch editing and aftercare cancels an approved exchange by releasing its reservation and permits a new application",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "protects global replacement capacity when two different exchange approvals are batched",
+          "fullName": "Health completion: source finance, batch editing and aftercare protects global replacement capacity when two different exchange approvals are batched",
+          "result": "passed"
+        }
+      ],
+      "boundary": "本地模拟仓储流转，不代表真实退货收货或承运商发货；换货不伪造退款流水。"
+    },
+    {
+      "id": "T0679",
+      "requirement": "新建、维护团队成员",
+      "route": "/services",
+      "originalGap": "团队成员需可增删实际人员关系而不只是团队members文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: DoctorTeamRelations",
+        "/services → 我的团队关系：config.demoAccountId 按 createdById 展示本人创建团队；memberIds 增删真实已通过 staff；teamId 关联活动，从团队创建和管理。",
+        "src/modules/Operations.tsx :: LoyaltyCenter 通过 teamId 展示当前团队名，改名不破坏关系。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "isolates created teams by account and preserves linked members and activities on rename",
+          "fullName": "Health completion: ID relations and actual local messages isolates created teams by account and preserves linked members and activities on rename",
+          "result": "passed"
+        }
+      ],
+      "boundary": "演示账户切换不是登录认证；本地团队活动报名容量复用既有匿名全局占用，未对接真实组织或活动通知。"
+    },
+    {
+      "id": "T0688",
+      "requirement": "查看已发送邮件",
+      "route": "/content",
+      "originalGap": "已发邮件/短信列表要从实际本地发送日志派生并区分草稿，当前通用消息可手填已归档不代表已发。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: LocalMessages",
+        "/health 客户档案 → 短信与邮件；/content → 已发短信邮件。先草稿/正文与收件对象预览，确认后生成 localMessages 与 controlNotifications；同批双击只记录一次；已发列表按渠道排除草稿。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "sends 短信 only after explicit preview, once, and separates sent history from drafts",
+          "fullName": "Health completion: ID relations and actual local messages sends 短信 only after explicit preview, once, and separates sent history from drafts",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "sends 邮件 only after explicit preview, once, and separates sent history from drafts",
+          "fullName": "Health completion: ID relations and actual local messages sends 邮件 only after explicit preview, once, and separates sent history from drafts",
+          "result": "passed"
+        }
+      ],
+      "boundary": "只产生本地模拟发送日志和通知，没有短信/邮箱供应商、后台调度或实际外发；邮箱使用 demo.invalid。"
+    },
+    {
+      "id": "T0689",
+      "requirement": "查看已发送短信",
+      "route": "/content",
+      "originalGap": "已发邮件/短信列表要从实际本地发送日志派生并区分草稿，当前通用消息可手填已归档不代表已发。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: LocalMessages",
+        "/health 客户档案 → 短信与邮件；/content → 已发短信邮件。先草稿/正文与收件对象预览，确认后生成 localMessages 与 controlNotifications；同批双击只记录一次；已发列表按渠道排除草稿。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "sends 短信 only after explicit preview, once, and separates sent history from drafts",
+          "fullName": "Health completion: ID relations and actual local messages sends 短信 only after explicit preview, once, and separates sent history from drafts",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "sends 邮件 only after explicit preview, once, and separates sent history from drafts",
+          "fullName": "Health completion: ID relations and actual local messages sends 邮件 only after explicit preview, once, and separates sent history from drafts",
+          "result": "passed"
+        }
+      ],
+      "boundary": "只产生本地模拟发送日志和通知，没有短信/邮箱供应商、后台调度或实际外发；邮箱使用 demo.invalid。"
+    },
+    {
+      "id": "T0700",
+      "requirement": "在团队中创建活动，管理活动",
+      "route": "/content",
+      "originalGap": "活动需关联真实本地团队ID并从团队进入管理，当前team文字不足以保证团队归属。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: DoctorTeamRelations",
+        "/services → 我的团队关系：config.demoAccountId 按 createdById 展示本人创建团队；memberIds 增删真实已通过 staff；teamId 关联活动，从团队创建和管理。",
+        "src/modules/Operations.tsx :: LoyaltyCenter 通过 teamId 展示当前团队名，改名不破坏关系。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "isolates created teams by account and preserves linked members and activities on rename",
+          "fullName": "Health completion: ID relations and actual local messages isolates created teams by account and preserves linked members and activities on rename",
+          "result": "passed"
+        }
+      ],
+      "boundary": "演示账户切换不是登录认证；本地团队活动报名容量复用既有匿名全局占用，未对接真实组织或活动通知。"
+    },
+    {
+      "id": "T0702",
+      "requirement": "查看、维护待付款的服务订单",
+      "route": "/commerce",
+      "originalGap": "待付款服务订单财务视图应来自真实本地serviceOrders，而非手填settlements记录。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: AccountsFinance, sourceFinanceRows",
+        "源 serviceOrders/shopOrders 按账户、月份、待付款筛选，展开源交易；已审核目录可建真实本地待付服务单；余额足额支付或取消未付单；同批支付/取消互斥，两个不同订单不能透支。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "fullName": "Health completion: source finance, batch editing and aftercare pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "fullName": "Health completion: source finance, batch editing and aftercare does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "cancels only unpaid source orders and guards a batched pay versus cancel",
+          "fullName": "Health completion: source finance, batch editing and aftercare cancels only unpaid source orders and guards a batched pay versus cancel",
+          "result": "passed"
+        }
+      ],
+      "boundary": "只消费当前作用域本地订单与本地模拟余额；无真实收款，也不将旧订单的状态文字冒充收款。"
+    },
+    {
+      "id": "T0703",
+      "requirement": "充值操作",
+      "route": "/commerce",
+      "originalGap": "建立本地模拟账户充值流水和可计算余额，充值确认后余额增加/历史可查，当前仅账单名与200元说明。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: AccountsFinance, postWalletEntry, walletBalance",
+        "/services 或 /commerce → 财务与余额：accountLedgers 不可变流水推导余额；充值预览取消/显式确认、一次入账、刷新保持；撤销充值附反向流水且不得透支。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "derives wallet balance from confirmed entries, supports cancellation/reversal and deduplicates submissions",
+          "fullName": "Health completion: source finance, batch editing and aftercare derives wallet balance from confirmed entries, supports cancellation/reversal and deduplicates submissions",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "fullName": "Health completion: source finance, batch editing and aftercare does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅演示记账，无真实储值、账户开户、支付渠道或金融服务；不能把本地余额视为资金。"
+    },
+    {
+      "id": "T0704",
+      "requirement": "查看余额",
+      "route": "/commerce",
+      "originalGap": "建立本地模拟账户充值流水和可计算余额，充值确认后余额增加/历史可查，当前仅账单名与200元说明。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: AccountsFinance, postWalletEntry, walletBalance",
+        "/services 或 /commerce → 财务与余额：accountLedgers 不可变流水推导余额；充值预览取消/显式确认、一次入账、刷新保持；撤销充值附反向流水且不得透支。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "derives wallet balance from confirmed entries, supports cancellation/reversal and deduplicates submissions",
+          "fullName": "Health completion: source finance, batch editing and aftercare derives wallet balance from confirmed entries, supports cancellation/reversal and deduplicates submissions",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "fullName": "Health completion: source finance, batch editing and aftercare does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅演示记账，无真实储值、账户开户、支付渠道或金融服务；不能把本地余额视为资金。"
+    },
+    {
+      "id": "T0705",
+      "requirement": "查看充值记录",
+      "route": "/commerce",
+      "originalGap": "建立本地模拟账户充值流水和可计算余额，充值确认后余额增加/历史可查，当前仅账单名与200元说明。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: AccountsFinance, postWalletEntry, walletBalance",
+        "/services 或 /commerce → 财务与余额：accountLedgers 不可变流水推导余额；充值预览取消/显式确认、一次入账、刷新保持；撤销充值附反向流水且不得透支。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "derives wallet balance from confirmed entries, supports cancellation/reversal and deduplicates submissions",
+          "fullName": "Health completion: source finance, batch editing and aftercare derives wallet balance from confirmed entries, supports cancellation/reversal and deduplicates submissions",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "fullName": "Health completion: source finance, batch editing and aftercare does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅演示记账，无真实储值、账户开户、支付渠道或金融服务；不能把本地余额视为资金。"
+    },
+    {
+      "id": "T0707",
+      "requirement": "查看待付款订单",
+      "route": "/commerce",
+      "originalGap": "财务待付款/退款视图需按对应订单状态派生并可跳转，不以通用账单状态代替。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: AccountsFinance, sourceFinanceRows",
+        "源 serviceOrders/shopOrders 按账户、月份、待付款筛选，展开源交易；已审核目录可建真实本地待付服务单；余额足额支付或取消未付单；同批支付/取消互斥，两个不同订单不能透支。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "fullName": "Health completion: source finance, batch editing and aftercare pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "fullName": "Health completion: source finance, batch editing and aftercare does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "cancels only unpaid source orders and guards a batched pay versus cancel",
+          "fullName": "Health completion: source finance, batch editing and aftercare cancels only unpaid source orders and guards a batched pay versus cancel",
+          "result": "passed"
+        }
+      ],
+      "boundary": "只消费当前作用域本地订单与本地模拟余额；无真实收款，也不将旧订单的状态文字冒充收款。"
+    },
+    {
+      "id": "T0708",
+      "requirement": "查看退款订单",
+      "route": "/commerce",
+      "originalGap": "财务待付款/退款视图需按对应订单状态派生并可跳转，不以通用账单状态代替。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: AccountsFinance 退款筛选、申请及原路本地退款",
+        "退款必须存在同源订单本地支付流水；金额不超过已收未退，只登记一次；无来源历史单拒绝虚构退款余额。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "fullName": "Health completion: source finance, batch editing and aftercare pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "fullName": "Health completion: source finance, batch editing and aftercare does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "result": "passed"
+        }
+      ],
+      "boundary": "本地模拟原路记账，不发起支付渠道退款；真实争议/税务仍需服务端与授权流程。"
+    },
+    {
+      "id": "T0709",
+      "requirement": "查看平台财务结算情况",
+      "route": "/commerce",
+      "originalGap": "平台交易/报告结算须关联源交易及报告服务，汇总并展示可追溯明细；当前可编辑账单不是实际交易列表。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: sourceFinanceRows, AccountsFinance",
+        "按交易日期汇总实收/退款/净额并导出；生成 platformSettlements 月度快照，追溯订单、transactionIds、assessmentId/reportSource；无源交易为0笔而不是伪造收入，跨月订单按本月交易计入。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "fullName": "Health completion: source finance, batch editing and aftercare pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "fullName": "Health completion: source finance, batch editing and aftercare does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "result": "passed"
+        }
+      ],
+      "boundary": "当前权限可见的本地交易对账和报告服务关联；不是全平台财务账簿、真实清算、报税或到账确认。"
+    },
+    {
+      "id": "T0710",
+      "requirement": "查看交易记录",
+      "route": "/commerce",
+      "originalGap": "平台交易/报告结算须关联源交易及报告服务，汇总并展示可追溯明细；当前可编辑账单不是实际交易列表。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: sourceFinanceRows, AccountsFinance",
+        "按交易日期汇总实收/退款/净额并导出；生成 platformSettlements 月度快照，追溯订单、transactionIds、assessmentId/reportSource；无源交易为0笔而不是伪造收入，跨月订单按本月交易计入。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "fullName": "Health completion: source finance, batch editing and aftercare pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "fullName": "Health completion: source finance, batch editing and aftercare does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "result": "passed"
+        }
+      ],
+      "boundary": "当前权限可见的本地交易对账和报告服务关联；不是全平台财务账簿、真实清算、报税或到账确认。"
+    },
+    {
+      "id": "T0711",
+      "requirement": "查看报告结算情况",
+      "route": "/commerce",
+      "originalGap": "平台交易/报告结算须关联源交易及报告服务，汇总并展示可追溯明细；当前可编辑账单不是实际交易列表。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/ServiceFinance.tsx :: sourceFinanceRows, AccountsFinance",
+        "按交易日期汇总实收/退款/净额并导出；生成 platformSettlements 月度快照，追溯订单、transactionIds、assessmentId/reportSource；无源交易为0笔而不是伪造收入，跨月订单按本月交易计入。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "fullName": "Health completion: source finance, batch editing and aftercare pays and refunds source service orders with conserved ledger amounts and traceable report settlement",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "fullName": "Health completion: source finance, batch editing and aftercare does not fabricate refunds or lose earlier debits in a batched pair of distinct payments",
+          "result": "passed"
+        }
+      ],
+      "boundary": "当前权限可见的本地交易对账和报告服务关联；不是全平台财务账簿、真实清算、报税或到账确认。"
+    },
+    {
+      "id": "T0712",
+      "requirement": "查看、维护所有创建机构列表",
+      "route": "/settings",
+      "originalGap": "机构/团体与医生应保存机构ID归属并按当前机构查看管理；当前主要机构列表与人员部门文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: OrganizationWorkspace",
+        "/settings → 机构人员归属：组织类别机构/团体、currentOrganizationId 选择；staff.organizationId 真ID归属，同名人员不混入；doctorGroups 组/成员 ID 增删。",
+        "专家类型与 qualification、待审核/已通过/已驳回筛选、驳回原因及重新提交；只选择本机构已通过人员入组。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅此管理组件实际按机构过滤；演示账户和资质文本不构成真实医疗资质认证或服务端多租户鉴权。"
+    },
+    {
+      "id": "T0713",
+      "requirement": "查看、维护所有创建团体列表",
+      "route": "/settings",
+      "originalGap": "机构/团体与医生应保存机构ID归属并按当前机构查看管理；当前主要机构列表与人员部门文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: OrganizationWorkspace",
+        "/settings → 机构人员归属：组织类别机构/团体、currentOrganizationId 选择；staff.organizationId 真ID归属，同名人员不混入；doctorGroups 组/成员 ID 增删。",
+        "专家类型与 qualification、待审核/已通过/已驳回筛选、驳回原因及重新提交；只选择本机构已通过人员入组。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅此管理组件实际按机构过滤；演示账户和资质文本不构成真实医疗资质认证或服务端多租户鉴权。"
+    },
+    {
+      "id": "T0714",
+      "requirement": "管理本机构下医生的列表",
+      "route": "/settings",
+      "originalGap": "机构/团体与医生应保存机构ID归属并按当前机构查看管理；当前主要机构列表与人员部门文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: OrganizationWorkspace",
+        "/settings → 机构人员归属：组织类别机构/团体、currentOrganizationId 选择；staff.organizationId 真ID归属，同名人员不混入；doctorGroups 组/成员 ID 增删。",
+        "专家类型与 qualification、待审核/已通过/已驳回筛选、驳回原因及重新提交；只选择本机构已通过人员入组。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅此管理组件实际按机构过滤；演示账户和资质文本不构成真实医疗资质认证或服务端多租户鉴权。"
+    },
+    {
+      "id": "T0715",
+      "requirement": "建立、维护对本机构下医生分组情况",
+      "route": "/settings",
+      "originalGap": "医生分组需维护组及实际成员ID，现department自由文字没有组成员操作。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: OrganizationWorkspace",
+        "/settings → 机构人员归属：组织类别机构/团体、currentOrganizationId 选择；staff.organizationId 真ID归属，同名人员不混入；doctorGroups 组/成员 ID 增删。",
+        "专家类型与 qualification、待审核/已通过/已驳回筛选、驳回原因及重新提交；只选择本机构已通过人员入组。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅此管理组件实际按机构过滤；演示账户和资质文本不构成真实医疗资质认证或服务端多租户鉴权。"
+    },
+    {
+      "id": "T0720",
+      "requirement": "创健、维护专家管理列表",
+      "route": "/settings",
+      "originalGap": "专家需明确专家类型/资质与待审/驳回筛选，当前人员类型只有专业医生/管理师/客服/黑名单。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: OrganizationWorkspace",
+        "/settings → 机构人员归属：组织类别机构/团体、currentOrganizationId 选择；staff.organizationId 真ID归属，同名人员不混入；doctorGroups 组/成员 ID 增删。",
+        "专家类型与 qualification、待审核/已通过/已驳回筛选、驳回原因及重新提交；只选择本机构已通过人员入组。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅此管理组件实际按机构过滤；演示账户和资质文本不构成真实医疗资质认证或服务端多租户鉴权。"
+    },
+    {
+      "id": "T0721",
+      "requirement": "查看、维护待审专家列表",
+      "route": "/settings",
+      "originalGap": "专家需明确专家类型/资质与待审/驳回筛选，当前人员类型只有专业医生/管理师/客服/黑名单。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: OrganizationWorkspace",
+        "/settings → 机构人员归属：组织类别机构/团体、currentOrganizationId 选择；staff.organizationId 真ID归属，同名人员不混入；doctorGroups 组/成员 ID 增删。",
+        "专家类型与 qualification、待审核/已通过/已驳回筛选、驳回原因及重新提交；只选择本机构已通过人员入组。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅此管理组件实际按机构过滤；演示账户和资质文本不构成真实医疗资质认证或服务端多租户鉴权。"
+    },
+    {
+      "id": "T0722",
+      "requirement": "查看审核失败人员及原因",
+      "route": "/settings",
+      "originalGap": "专家需明确专家类型/资质与待审/驳回筛选，当前人员类型只有专业医生/管理师/客服/黑名单。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: OrganizationWorkspace",
+        "/settings → 机构人员归属：组织类别机构/团体、currentOrganizationId 选择；staff.organizationId 真ID归属，同名人员不混入；doctorGroups 组/成员 ID 增删。",
+        "专家类型与 qualification、待审核/已通过/已驳回筛选、驳回原因及重新提交；只选择本机构已通过人员入组。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers keeps same-name doctors in their actual organization, reviews experts and maintains ID-based groups",
+          "result": "passed"
+        }
+      ],
+      "boundary": "仅此管理组件实际按机构过滤；演示账户和资质文本不构成真实医疗资质认证或服务端多租户鉴权。"
+    },
+    {
+      "id": "T0724",
+      "requirement": "设置、维护评估报告的套餐",
+      "route": "/settings",
+      "originalGap": "评估套餐/报告模板需结构化指标/章节配置并在评估或报告中选择渲染，只有名称/分类/说明不足。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/HealthDomains.tsx :: AssessmentPackages",
+        "src/modules/Health.tsx :: Assessments activePackage/assessmentPackageSnapshot/metricSnapshot/reportSections",
+        "clinicalConfig 的评估报告套餐保存 assessmentType/metricKeys/sections/version；选择后实际改变录入指标和报告章节，保存可复核副本。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "applies two structured assessment packages to different metric inputs and saved report sections",
+          "fullName": "Health completion: ID relations and actual local messages applies two structured assessment packages to different metric inputs and saved report sections",
+          "result": "passed"
+        }
+      ],
+      "boundary": "合成教育指标套餐与演示计分，不是获批设备检测套餐、医学模型、诊断或临床报告认证。"
+    },
+    {
+      "id": "T0725",
+      "requirement": "设置、维护评估报告的模板",
+      "route": "/settings",
+      "originalGap": "评估套餐/报告模板需结构化指标/章节配置并在评估或报告中选择渲染，只有名称/分类/说明不足。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AssessmentTemplates.tsx :: validateAssessmentTemplate, renderAssessmentTemplate, AssessmentTemplateEditor",
+        "src/modules/Health.tsx :: Assessments；配置模板实际应用于报告预览、归档、文本导出；必需字段说明、安全文本插值、类型匹配、版本快照；修改模板不改变旧报告。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "applies two structured assessment packages to different metric inputs and saved report sections",
+          "fullName": "Health completion: ID relations and actual local messages applies two structured assessment packages to different metric inputs and saved report sections",
+          "result": "passed"
+        },
+        {
+          "file": "tests/followup-allocation.test.tsx",
+          "name": "validates required placeholders and keeps dangerous-looking content as inert text",
+          "fullName": "T0725 applied assessment template rendering validates required placeholders and keeps dangerous-looking content as inert text",
+          "result": "passed"
+        },
+        {
+          "file": "tests/followup-allocation.test.tsx",
+          "name": "saves a configured template, applies it to preview/archive/export, and preserves old snapshots when edited",
+          "fullName": "T0725 applied assessment template rendering saves a configured template, applies it to preview/archive/export, and preserves old snapshots when edited",
+          "result": "passed"
+        },
+        {
+          "file": "tests/followup-allocation.test.tsx",
+          "name": "consumes a template already saved by settings and disables unrelated assessment types",
+          "fullName": "T0725 applied assessment template rendering consumes a template already saved by settings and disables unrelated assessment types",
+          "result": "passed"
+        }
+      ],
+      "boundary": "模板只生成可审查文本，不执行 HTML/脚本，不提供临床有效性或真实签章。"
+    },
+    {
+      "id": "T0733",
+      "requirement": "商品属性管理",
+      "route": "/commerce",
+      "originalGap": "商品属性需可维护的属性键值/选项并在商品详情展示，不能全部塞介绍文字。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/CommerceAftercare.tsx :: ProductAttributes, validateProductAttributes",
+        "/commerce → 商品属性选项：结构化属性键和多个选项增删、重复/空值校验；专域详情及 Operations 商品查看抽屉实际显示 attributeOptions。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "maintains explicit product attribute keys and options displayed in product details",
+          "fullName": "Health completion: source finance, batch editing and aftercare maintains explicit product attribute keys and options displayed in product details",
+          "result": "passed"
+        }
+      ],
+      "boundary": "提供属性和选项，不声明任意复杂 SKU 矩阵、真实商品主数据同步或供应链集成。"
+    },
+    {
+      "id": "T0735",
+      "requirement": "库存设备",
+      "route": "/settings",
+      "originalGap": "库存设备需本地数量/状态台账及入库出库动作，现只设备/接口名称配置。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: DeviceInventory, deviceBalance",
+        "/settings → 设备库存台账：型号、可用/维修/停用状态；整数入出库流水、理由/时间，计算余额、防重复和负库存，非可用状态禁止出库。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "posts integer inventory movements once, rejects negative stock and preserves history",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers posts integer inventory movements once, rejects negative stock and preserves history",
+          "result": "passed"
+        }
+      ],
+      "boundary": "演示库存账，不是设备在线状态、实物盘点或物联设备接入。"
+    },
+    {
+      "id": "T0751",
+      "requirement": "服务订单平台介入情况",
+      "route": "/support",
+      "originalGap": "服务/商城平台介入需关联具体订单及纠纷，当前独立工单文本未与订单ID/状态联动。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/CommerceAftercare.tsx :: OrderDisputes",
+        "/support → 订单关联介入：选择服务/商城具体订单发起、受理、必填结论结案；orderDisputes 与该源订单同步 ID/状态/结论，不修改其他订单。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "links serviceOrders intervention and resolution back to only its source order",
+          "fullName": "Health completion: source finance, batch editing and aftercare links serviceOrders intervention and resolution back to only its source order",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "links shopOrders intervention and resolution back to only its source order",
+          "fullName": "Health completion: source finance, batch editing and aftercare links shopOrders intervention and resolution back to only its source order",
+          "result": "passed"
+        }
+      ],
+      "boundary": "本地演示处理记录，不做真实平台仲裁、付款争议裁定、外部通知或自动退款。"
+    },
+    {
+      "id": "T0752",
+      "requirement": "商城订单平台介入情况",
+      "route": "/support",
+      "originalGap": "服务/商城平台介入需关联具体订单及纠纷，当前独立工单文本未与订单ID/状态联动。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/CommerceAftercare.tsx :: OrderDisputes",
+        "/support → 订单关联介入：选择服务/商城具体订单发起、受理、必填结论结案；orderDisputes 与该源订单同步 ID/状态/结论，不修改其他订单。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "links serviceOrders intervention and resolution back to only its source order",
+          "fullName": "Health completion: source finance, batch editing and aftercare links serviceOrders intervention and resolution back to only its source order",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "links shopOrders intervention and resolution back to only its source order",
+          "fullName": "Health completion: source finance, batch editing and aftercare links shopOrders intervention and resolution back to only its source order",
+          "result": "passed"
+        }
+      ],
+      "boundary": "本地演示处理记录，不做真实平台仲裁、付款争议裁定、外部通知或自动退款。"
+    },
+    {
+      "id": "T0753",
+      "requirement": "管理、维护系统菜单项",
+      "route": "/settings",
+      "originalGap": "菜单/页面元素及按钮字段权限配置应实际改变已知页面导航/显隐/操作守卫；现部分只记录资源或角色路径，非全体页面元素消费。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/UiResources.tsx :: knownUiElements, uiElementAllowed, resolveMenuPresentation, UiResourceSettings",
+        "src/App.tsx（parent集成）消费真实导航名/顺序/隐藏；/settings → 实际页面权限 维护已知菜单及字段/按钮，角色 elementPermissions 实际消费。",
+        "src/modules/Health.tsx 档案编辑/电话字段；Operations.tsx 商城创建与导出；ServiceFinance.tsx 服务批改均有真实显隐与动作守卫。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "saves menu presentation and resource policy, then actual profile controls consume denials",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers saves menu presentation and resource policy, then actual profile controls consume denials",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "blocks actual service batch and commerce creation controls under element denial",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers blocks actual service batch and commerce creation controls under element denial",
+          "result": "passed"
+        }
+      ],
+      "boundary": "已知路由/元素的前端可见性与本地守卫；不创建任意页面，不等于服务端权限或浏览器原始数据保密。"
+    },
+    {
+      "id": "T0754",
+      "requirement": "设置、维护页面元素",
+      "route": "/settings",
+      "originalGap": "菜单/页面元素及按钮字段权限配置应实际改变已知页面导航/显隐/操作守卫；现部分只记录资源或角色路径，非全体页面元素消费。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/UiResources.tsx :: knownUiElements, uiElementAllowed, resolveMenuPresentation, UiResourceSettings",
+        "src/App.tsx（parent集成）消费真实导航名/顺序/隐藏；/settings → 实际页面权限 维护已知菜单及字段/按钮，角色 elementPermissions 实际消费。",
+        "src/modules/Health.tsx 档案编辑/电话字段；Operations.tsx 商城创建与导出；ServiceFinance.tsx 服务批改均有真实显隐与动作守卫。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "saves menu presentation and resource policy, then actual profile controls consume denials",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers saves menu presentation and resource policy, then actual profile controls consume denials",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "blocks actual service batch and commerce creation controls under element denial",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers blocks actual service batch and commerce creation controls under element denial",
+          "result": "passed"
+        }
+      ],
+      "boundary": "已知路由/元素的前端可见性与本地守卫；不创建任意页面，不等于服务端权限或浏览器原始数据保密。"
+    },
+    {
+      "id": "T0755",
+      "requirement": "设置、管理权限列表",
+      "route": "/settings",
+      "originalGap": "菜单/页面元素及按钮字段权限配置应实际改变已知页面导航/显隐/操作守卫；现部分只记录资源或角色路径，非全体页面元素消费。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/UiResources.tsx :: knownUiElements, uiElementAllowed, resolveMenuPresentation, UiResourceSettings",
+        "src/App.tsx（parent集成）消费真实导航名/顺序/隐藏；/settings → 实际页面权限 维护已知菜单及字段/按钮，角色 elementPermissions 实际消费。",
+        "src/modules/Health.tsx 档案编辑/电话字段；Operations.tsx 商城创建与导出；ServiceFinance.tsx 服务批改均有真实显隐与动作守卫。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "saves menu presentation and resource policy, then actual profile controls consume denials",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers saves menu presentation and resource policy, then actual profile controls consume denials",
+          "result": "passed"
+        },
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "blocks actual service batch and commerce creation controls under element denial",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers blocks actual service batch and commerce creation controls under element denial",
+          "result": "passed"
+        }
+      ],
+      "boundary": "已知路由/元素的前端可见性与本地守卫；不创建任意页面，不等于服务端权限或浏览器原始数据保密。"
+    },
+    {
+      "id": "T0756",
+      "requirement": "设置字典分类",
+      "route": "/settings",
+      "originalGap": "字典分类本身需独立新增/改名/停用并可在条目中选用；当前category是硬编码枚举，只有条目CRUD。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: DictionaryCategories",
+        "/settings → 字典分类管理 → 系统：独立分类ID创建/改名/停用；条目通过 categoryId 选用和关联，改名保留条目，停用不能添加新条目；重复值/空值校验。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "maintains 系统 category IDs through rename and blocks new entries after disabling",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers maintains 系统 category IDs through rename and blocks new entries after disabling",
+          "result": "passed"
+        }
+      ],
+      "boundary": "合成分类和条目，不声称完整国家标准编码；已有民族/职业/婚姻/教育档案选项消费保留，未强制更改历史档案值。"
+    },
+    {
+      "id": "T0759",
+      "requirement": "分类设置",
+      "route": "/settings",
+      "originalGap": "字典分类本身需独立新增/改名/停用并可在条目中选用；当前category是硬编码枚举，只有条目CRUD。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: DictionaryCategories",
+        "/settings → 字典分类管理 → 标准：独立分类ID创建/改名/停用；条目通过 categoryId 选用和关联，改名保留条目，停用不能添加新条目；重复值/空值校验。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "maintains 标准 category IDs through rename and blocks new entries after disabling",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers maintains 标准 category IDs through rename and blocks new entries after disabling",
+          "result": "passed"
+        }
+      ],
+      "boundary": "合成分类和条目，不声称完整国家标准编码；已有民族/职业/婚姻/教育档案选项消费保留，未强制更改历史档案值。"
+    },
+    {
+      "id": "T0762",
+      "requirement": "分类设置",
+      "route": "/settings",
+      "originalGap": "字典分类本身需独立新增/改名/停用并可在条目中选用；当前category是硬编码枚举，只有条目CRUD。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: DictionaryCategories",
+        "/settings → 字典分类管理 → 民族：独立分类ID创建/改名/停用；条目通过 categoryId 选用和关联，改名保留条目，停用不能添加新条目；重复值/空值校验。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "maintains 民族 category IDs through rename and blocks new entries after disabling",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers maintains 民族 category IDs through rename and blocks new entries after disabling",
+          "result": "passed"
+        }
+      ],
+      "boundary": "合成分类和条目，不声称完整国家标准编码；已有民族/职业/婚姻/教育档案选项消费保留，未强制更改历史档案值。"
+    },
+    {
+      "id": "T0765",
+      "requirement": "分类设置",
+      "route": "/settings",
+      "originalGap": "字典分类本身需独立新增/改名/停用并可在条目中选用；当前category是硬编码枚举，只有条目CRUD。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: DictionaryCategories",
+        "/settings → 字典分类管理 → 企业：独立分类ID创建/改名/停用；条目通过 categoryId 选用和关联，改名保留条目，停用不能添加新条目；重复值/空值校验。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "maintains 企业 category IDs through rename and blocks new entries after disabling",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers maintains 企业 category IDs through rename and blocks new entries after disabling",
+          "result": "passed"
+        }
+      ],
+      "boundary": "合成分类和条目，不声称完整国家标准编码；已有民族/职业/婚姻/教育档案选项消费保留，未强制更改历史档案值。"
+    },
+    {
+      "id": "T0768",
+      "requirement": "分类设置",
+      "route": "/settings",
+      "originalGap": "字典分类本身需独立新增/改名/停用并可在条目中选用；当前category是硬编码枚举，只有条目CRUD。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: DictionaryCategories",
+        "/settings → 字典分类管理 → 职业：独立分类ID创建/改名/停用；条目通过 categoryId 选用和关联，改名保留条目，停用不能添加新条目；重复值/空值校验。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "maintains 职业 category IDs through rename and blocks new entries after disabling",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers maintains 职业 category IDs through rename and blocks new entries after disabling",
+          "result": "passed"
+        }
+      ],
+      "boundary": "合成分类和条目，不声称完整国家标准编码；已有民族/职业/婚姻/教育档案选项消费保留，未强制更改历史档案值。"
+    },
+    {
+      "id": "T0771",
+      "requirement": "分类设置",
+      "route": "/settings",
+      "originalGap": "字典分类本身需独立新增/改名/停用并可在条目中选用；当前category是硬编码枚举，只有条目CRUD。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: DictionaryCategories",
+        "/settings → 字典分类管理 → 婚姻状况：独立分类ID创建/改名/停用；条目通过 categoryId 选用和关联，改名保留条目，停用不能添加新条目；重复值/空值校验。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "maintains 婚姻状况 category IDs through rename and blocks new entries after disabling",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers maintains 婚姻状况 category IDs through rename and blocks new entries after disabling",
+          "result": "passed"
+        }
+      ],
+      "boundary": "合成分类和条目，不声称完整国家标准编码；已有民族/职业/婚姻/教育档案选项消费保留，未强制更改历史档案值。"
+    },
+    {
+      "id": "T0774",
+      "requirement": "分类设置",
+      "route": "/settings",
+      "originalGap": "字典分类本身需独立新增/改名/停用并可在条目中选用；当前category是硬编码枚举，只有条目CRUD。",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/AdminDomains.tsx :: DictionaryCategories",
+        "/settings → 字典分类管理 → 教育程度：独立分类ID创建/改名/停用；条目通过 categoryId 选用和关联，改名保留条目，停用不能添加新条目；重复值/空值校验。"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "maintains 教育程度 category IDs through rename and blocks new entries after disabling",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers maintains 教育程度 category IDs through rename and blocks new entries after disabling",
+          "result": "passed"
+        }
+      ],
+      "boundary": "合成分类和条目，不声称完整国家标准编码；已有民族/职业/婚姻/教育档案选项消费保留，未强制更改历史档案值。"
+    }
+  ],
+  "additionalEvidence": [
+    {
+      "id": "T0277",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/FollowupAllocation.tsx",
+        "基于实际开放任务负载，确定性自动分配，保留锁定/完成任务"
+      ],
+      "tests": [
+        {
+          "file": "tests/followup-allocation.test.tsx",
+          "name": "balances real open load and evenly allocates batch counts using stable ordering",
+          "fullName": "T0277–278 deterministic visible followup allocation balances real open load and evenly allocates batch counts using stable ordering",
+          "result": "passed"
+        }
+      ],
+      "boundary": "浏览器本地规则，保留作用域外任务；不证明服务端权限或多用户分布式锁。"
+    },
+    {
+      "id": "T0278",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/FollowupAllocation.tsx",
+        "平均分配按批次人数稳定均分，预览/手动排除/取消/二次确认并持久化"
+      ],
+      "tests": [
+        {
+          "file": "tests/followup-allocation.test.tsx",
+          "name": "cancels without writes, permits manual row exclusion, confirms once and persists after remount",
+          "fullName": "T0277–278 deterministic visible followup allocation cancels without writes, permits manual row exclusion, confirms once and persists after remount",
+          "result": "passed"
+        }
+      ],
+      "boundary": "浏览器本地规则，保留作用域外任务；不证明服务端权限或多用户分布式锁。"
+    },
+    {
+      "id": "T0283",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/FollowupAllocation.tsx",
+        "统一客户类型字典与客户/状态过滤叠加，仅当前权限可见任务参与"
+      ],
+      "tests": [
+        {
+          "file": "tests/followup-allocation.test.tsx",
+          "name": "uses the shared customer type dictionary and retains scoped invisible tasks unchanged",
+          "fullName": "T0277–278 deterministic visible followup allocation uses the shared customer type dictionary and retains scoped invisible tasks unchanged",
+          "result": "passed"
+        }
+      ],
+      "boundary": "浏览器本地规则，保留作用域外任务；不证明服务端权限或多用户分布式锁。"
+    },
+    {
+      "id": "T0281",
+      "status": "implemented-and-behavior-tested-local-demo",
+      "implementationEvidence": [
+        "src/modules/FollowupAllocation.tsx",
+        "责任人总任务/待办/进行中/完成/完成率按当前作用域真实任务聚合"
+      ],
+      "tests": [
+        {
+          "file": "tests/completion-health.test.tsx",
+          "name": "aggregates actual responsibility workload with pending, active, complete and rate",
+          "fullName": "Health completion: organization, taxonomy, inventory, CRM and UI consumers aggregates actual responsibility workload with pending, active, complete and rate",
+          "result": "passed"
+        }
+      ],
+      "boundary": "浏览器本地规则，保留作用域外任务；不证明服务端权限或多用户分布式锁。"
+    }
+  ]
+}

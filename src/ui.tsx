@@ -173,21 +173,35 @@ export function Bars({
     </div>
   );
 }
-export function Trend() {
+export function Trend({
+  labels,
+  booked,
+  checked,
+}: {
+  labels: string[];
+  booked: number[];
+  checked: number[];
+}) {
+  const max = Math.max(4, ...booked, ...checked),
+    points = (values: number[]) =>
+      values
+        .map(
+          (v, i) =>
+            `${i === 0 ? "M" : "L"}${(i * 690) / Math.max(1, values.length - 1)} ${170 - (v / max) * 160}`,
+        )
+        .join(" ");
   return (
     <div className="trend">
       <div className="chart-y">
-        <span>120</span>
-        <span>90</span>
-        <span>60</span>
-        <span>30</span>
-        <span>0</span>
+        {[1, 0.75, 0.5, 0.25, 0].map((f) => (
+          <span key={f}>{Math.round(max * f)}</span>
+        ))}
       </div>
       <svg
         viewBox="0 0 690 180"
         preserveAspectRatio="none"
         role="img"
-        aria-label="最近七日预约与到检合成趋势"
+        aria-label="最近七日实际本地预约与到检趋势"
       >
         <defs>
           <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
@@ -203,18 +217,10 @@ export function Trend() {
             strokeDasharray="3 5"
           />
         ))}
+        <path d={points(booked) + " V180 H0Z"} fill="url(#area)" />
+        <path d={points(booked)} fill="none" stroke="#208576" strokeWidth="3" />
         <path
-          d="M0 130 C50 140 60 90 115 91 S200 150 230 115 S300 85 345 97 S420 38 460 54 S535 89 575 58 S635 26 690 35 V180 H0Z"
-          fill="url(#area)"
-        />
-        <path
-          d="M0 130 C50 140 60 90 115 91 S200 150 230 115 S300 85 345 97 S420 38 460 54 S535 89 575 58 S635 26 690 35"
-          fill="none"
-          stroke="#208576"
-          strokeWidth="3"
-        />
-        <path
-          d="M0 156 C50 160 60 124 115 127 S200 170 230 141 S300 125 345 129 S420 82 460 98 S535 117 575 100 S635 75 690 88"
+          d={points(checked)}
           fill="none"
           stroke="#c3a66a"
           strokeWidth="2"
@@ -222,7 +228,7 @@ export function Trend() {
         />
       </svg>
       <div className="chart-x">
-        {["周一", "周二", "周三", "周四", "周五", "周六", "周日"].map((x) => (
+        {labels.map((x) => (
           <span key={x}>{x}</span>
         ))}
       </div>

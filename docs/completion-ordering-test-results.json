@@ -1,0 +1,289 @@
+{
+  "command": "npx vitest run tests/batch-ordering.test.tsx tests/ordering-completion.test.tsx tests/order-finance-completion.test.tsx",
+  "passed": 66,
+  "failed": 0,
+  "files": [
+    {
+      "path": "tests/batch-ordering.test.tsx",
+      "status": "passed",
+      "tests": [
+        {
+          "name": "guarded batch order editing BO01 / T0168 T0183 previews item additions, reuses dependency/pricing rules and atomically audits each success",
+          "status": "passed"
+        },
+        {
+          "name": "guarded batch order editing BO02 / T0168 mixed locked, paid and examined orders are skipped individually without modifying charges or results",
+          "status": "passed"
+        },
+        {
+          "name": "guarded batch order editing BO03 / T0168 rejects removal of required/dependency items and preserves source state",
+          "status": "passed"
+        },
+        {
+          "name": "guarded batch order editing BO04 / T0168 legal item removals recompute the amount using quoteOrder",
+          "status": "passed"
+        },
+        {
+          "name": "guarded batch order editing BO05 / T0169 replacement previews item differences and recalculates group/personal allocations",
+          "status": "passed"
+        },
+        {
+          "name": "guarded batch order editing BO06 / T0169 enforces campus, patient applicability, group contract and booking restrictions",
+          "status": "passed"
+        },
+        {
+          "name": "guarded batch order editing BO07 / T0168 T0169 stale previews never overwrite changed orders or changed price catalogs",
+          "status": "passed"
+        },
+        {
+          "name": "guarded batch order editing BO08 / T0168 duplicate execution IDs and duplicate selected IDs do not repeat mutations or audit",
+          "status": "passed"
+        },
+        {
+          "name": "guarded batch order editing BO09 / T0168 reducer enforces custom role, customer and campus scope even for crafted payloads",
+          "status": "passed"
+        },
+        {
+          "name": "guarded batch order editing BO10 / T0183 UI cancel does not persist; confirmed visual batch shows per-order results",
+          "status": "passed"
+        },
+        {
+          "name": "batch guard configuration and provider integration BO11 / T0168 respects disabled add/remove configuration and rejects non-finite stored pricing",
+          "status": "passed"
+        },
+        {
+          "name": "batch guard configuration and provider integration BO12 / T0168 T0183 actual DemoProvider dispatch persists guarded batch results and before/after audit",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA01 / T0109 request is pending and does not alter the order; repeat IDs and duplicate pending requests are no-ops",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA02 / T0109 unauthorized approval, self-approval and missing rejection reasons are rejected",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA03 / T0109 approval then bound consumption updates price exactly once and preserves non-discountable items",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA04 / T0109 rejection is traceable and can never be consumed",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA05 / T0109 order/price changes and paid status invalidate old authorization before approval or consumption",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA06 / T0109 invalid percentages, missing reason, in-permission requests and checked orders cannot request approval",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA07 / T0109 requester can withdraw pending approval with reason and later submit a new one",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA08 / T0109 JSON persistence preserves approval state and consumed one-time guard",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA09 / T0109 UI exposes request preview/cancel, authorized decision reason and one-time application",
+          "status": "passed"
+        },
+        {
+          "name": "bound one-time discount approval DA10 / T0109 UI rejection cancellation does not decide; confirmed reason is displayed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "tests/order-finance-completion.test.tsx",
+      "status": "passed",
+      "tests": [
+        {
+          "name": "channel/item finance completion OF01 / T0184 persists 现金 simulated charge and full refund with exact ledger and replay protection",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF01 / T0184 persists 银联 simulated charge and full refund with exact ledger and replay protection",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF01 / T0184 persists 微信 simulated charge and full refund with exact ledger and replay protection",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF01 / T0184 persists 支付宝 simulated charge and full refund with exact ledger and replay protection",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF02 / T0185 item charges preserve remaining balances and offset appended item against real paid refund",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF03 / T0185 full-refund/recharge retains two gross legs even when net is zero; invalid/stale/scope changes do not apply",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF04 / T0185 financial extra-item edit cannot bypass locked/examined orders or item resource capacity",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF05 / T0184 T0185 UI preview cancellation has no mutation; confirmation records chosen channel",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF06 / T0197 three-card batch has unique IDs; repeated batch and invalid count cannot issue again",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF07 / T0198 incorrect code changes no balance, successful code atomically debits card/order once",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF08 / T0198 challenge locks after three failures and expired/stale/bound-card challenge cannot debit",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF09 / T0199 two card consumptions preserve order IDs, times and balances for ledger filtering/export",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF10 / T0200 package card binds compatible order and expires only after all actual results saved",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF11 / T0190 six settlement bases produce explainable snapshots and exclude personal/waived/unexamined lines",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF12 / T0197 batch creation preview can be cancelled without creating cards",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF13 legacy price reconstruction preserves saved total to the cent",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF14 / T0200 ordinary SAVE_RESULTS transition invokes package-card lifecycle in the integrated reducer",
+          "status": "passed"
+        },
+        {
+          "name": "channel/item finance completion OF15 actual shared provider persists chosen-channel transaction and project balances",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "tests/ordering-completion.test.tsx",
+      "status": "passed",
+      "tests": [
+        {
+          "name": "ordering fixed completion scope OC01 / T0087 T0148 exact and fuzzy search cover campus, name, certificate, initials, company and order IDs",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC02 / T0088 item campus restrictions apply to direct validation and batch submit",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC03 / T0093 every required independent certificate type persists and initials are saved",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC04 / T0095 preset and custom reader selection persists in shared config",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC05 / T0102 new customer/order types and rename update mapping while preserving identities",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC06 / T0108 synthetic password activation is exact, bounded, order-bound and consumed once",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC07 / T0131 importer auto matches personnel group/package and reports cross-group error with line",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC08 / T0133 synthetic identity checks shape, date and independently known checksum without real IDs",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC09 / T0135 special blank identity creates stable synthetic personnel key and normal mode rejects",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC10 / T0137 internal swap recalculates exact quote and unit budget/personal difference",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC11 / T0143 third-party synthetic import creates real booked source and rejects duplicate/capacity/stale payload",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC12 / T0152 T0249 result-driven project state distinguishes unstarted, in-progress, registered and received report",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC13 / T0177 per-item reschedule and confirmation do not move other items/order or create result",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC14 / T0177 locked, reviewed, already resulted and required projects cannot be waived or rescheduled",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC15 / T0154 T0170 range uses selected real date field and lists only missing projects",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC16 / T0182 configured unlock permission is checked with role/scope and structured audit",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC17 / T0479 unit packages first and explicit all view marks outside package fully personal",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC18 / T0483 same-company contracts keep separate schedule dates/times and capacity",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC19 / T0177 preview cancel leaves state intact, confirmed single item change persists",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC20 / T0162 simulated identity fills saved bounded history search with no physical reader",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC21 / T0153 real four-node review events cover starts/passes/returns and never fabricate unvisited nodes",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC22 / T0143 third-party import UI cancellation does not create order",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC23 final resource capacity is rechecked sequentially for batch and changed resource config invalidates quote",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC24 / T0153 retains completed review events after the live history is reset by rejection",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC25 / T0152 manual received-report evidence distinguishes unreturned from unfinished and preserves reschedule date",
+          "status": "passed"
+        },
+        {
+          "name": "ordering fixed completion scope OC26 / T0153 respects disabled global initial review when order has no node snapshot",
+          "status": "passed"
+        }
+      ]
+    }
+  ]
+}

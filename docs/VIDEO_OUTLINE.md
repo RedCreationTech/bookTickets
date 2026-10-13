@@ -1,5 +1,7 @@
 # 红创 · 智慧体检一体化平台 —— 功能介绍视频大纲
 
+> 版本说明：此大纲保留远端并行提交 a401d469 的录制策划，对应 9014 阶段页面。后续真实 PDF/Word、实际历史订单、报告柜流转、财务及采样工作区已扩展，录制新版请同时参照 README 与 docs/TEST_REPORT.md，旧按钮名称和固定样例描述不作为新版本断言。
+
 > 用途：面向产品演示与招标讲解的录屏脚本，覆盖**管理后台、微信小程序移动端（H5 仿真）、体检自助机、报告打印装订自助机**四端操作说明。
 > 本文件不是验收证据。旁白不得把演示状态说成真实医疗、支付、接口或硬件能力，边界见 [docs/BOUNDARIES.md](BOUNDARIES.md) 与逐项矩阵 [docs/coverage-matrix.md](coverage-matrix.md)。
 
@@ -188,3 +190,4 @@
 
 - `public/media/workflow-guide.mp4` / `workflow-poster.png` / `workflow-captions.vtt`：6 步 36 秒静音流程示意（入口：后台左下「演示指南」）。
 - `scripts/create_training_video.py`：重新生成上述示意短片与字幕（`CJK_FONT` 可指定字体）。它是流程示意，**不是 UI 录屏**，正片仍需实机录制。
+

@@ -24,14 +24,16 @@ describe("core frontend interactions", () => {
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "确认预约" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    const saved = JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!);
+    const saved = JSON.parse(
+      localStorage.getItem("hongchuang.health.demo.v1")!,
+    );
     expect(saved.appointments).toHaveLength(9);
     expect(saved.appointments[0].status).toBe("booked");
     const payments = screen.getAllByRole("button", { name: "模拟收款" });
     fireEvent.click(payments[0]);
     expect(
-      JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!).appointments[0]
-        .status,
+      JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!)
+        .appointments[0].status,
     ).toBe("paid");
   });
   it("U02 closes booking without creating it", () => {
@@ -41,7 +43,8 @@ describe("core frontend interactions", () => {
       within(screen.getByRole("dialog")).getByRole("button", { name: "取消" }),
     );
     expect(
-      JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!).appointments,
+      JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!)
+        .appointments,
     ).toHaveLength(8);
   });
   it("U03 blocks nonnumeric clinical results and incomplete submissions", () => {
@@ -78,14 +81,45 @@ describe("core frontend interactions", () => {
       data.appointments.find((x: any) => x.patientId === "P003").status,
     ).toBe("approved");
   });
-  it("U05 report exposes selectable synthetic history years and records issuance", () => {
+  it("U05 report compares actual same-patient stored orders and records issuance", () => {
+    const state = createInitialState(),
+      report = state.appointments.find((a) => a.status === "approved")!;
+    state.appointments.push({
+      ...report,
+      id: "HISTORY-U05",
+      date: "2025-10-13",
+      status: "approved",
+      results: { ...report.results, 空腹血糖: "5.3" },
+    });
+    localStorage.setItem("hongchuang.health.demo.v1", JSON.stringify(state));
     wrap(<Reports />);
     fireEvent.click(screen.getAllByRole("button", { name: "预览 / 管理" })[0]);
-    expect(screen.getByLabelText("2025 年订单")).toBeChecked();
-    fireEvent.click(screen.getByLabelText("2025 年订单"));
-    expect(screen.getByLabelText("2025 年订单")).not.toBeChecked();
+    fireEvent.click(screen.getByText("选择实际历史订单对比"));
+    const choice = screen.getByLabelText("对比历史订单HISTORY-U05");
+    fireEvent.click(choice);
+    expect(choice).toBeChecked();
+    expect(
+      screen.getByRole("columnheader", { name: "2025-10-13 · HISTORY-U05" }),
+    ).toBeInTheDocument();
+    fireEvent.click(choice);
+    expect(choice).not.toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "登记领取" }));
-    expect(screen.getByRole("button", { name: "登记领取" })).toBeDisabled();
+    const issue = screen.getByRole("dialog", { name: "报告发放登记" });
+    fireEvent.change(within(issue).getByLabelText("合成报告领取人"), {
+      target: { value: "演示本人" },
+    });
+    fireEvent.change(within(issue).getByLabelText("本次领取方式"), {
+      target: { value: "线上查询" },
+    });
+    fireEvent.click(
+      within(issue).getByRole("button", { name: "预览本次报告流转" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "确认登记本次流转" }));
+    expect(
+      JSON.parse(
+        localStorage.getItem("hongchuang.health.demo.v1")!,
+      ).appointments.find((a: any) => a.id === report.id).delivered,
+    ).toBe(true);
   });
   it("U06 role switching changes workbench and denies direct unauthorized route", async () => {
     wrap(<App />);

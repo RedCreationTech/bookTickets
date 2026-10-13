@@ -1,3 +1,4 @@
+import { ClinicalTemplatePicker } from "./ClinicalTemplates";
 import { useState, useRef } from "react";
 import { useDemo, exportCsv } from "../store";
 import type { Appointment } from "../model";
@@ -67,6 +68,16 @@ export function ExamExtras({ appointmentId }: { appointmentId: string }) {
           )}
         </select>
       </label>
+      <ClinicalTemplatePicker
+        state={state}
+        appointment={a}
+        kind="summary"
+        disabled={!!a.locked}
+        onApply={(text, nextLevel) => {
+          setSummary(text);
+          setLevel(nextLevel);
+        }}
+      />
       <label>
         新增分级小结
         <input value={summary} onChange={(e) => setSummary(e.target.value)} />

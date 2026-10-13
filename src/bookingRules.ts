@@ -61,6 +61,8 @@ export interface BookingContext {
   kind?: "individual" | "group";
   time?: string;
   checkQuestionnaire?: boolean;
+  packageIds?: string[];
+  items?: string[];
 }
 export interface GroupBookingSchedule {
   id: string;
@@ -198,6 +200,168 @@ const applies = (schedule: GroupBookingSchedule, date: string) =>
       date >= schedule.startDate &&
       date <= schedule.endDate));
 
+export interface BookingResourceLimit {
+  id: string;
+  kind: "package" | "item";
+  resourceId: string;
+  dailyCapacity?: number | null;
+  slotCapacity?: number | null;
+  time?: string;
+  date?: string;
+  enabled?: boolean;
+}
+/** Anonymous usage must be computed before role-based appointment filtering. */
+export function anonymizedBookingResourceUsage(state: DemoState) {
+  const totals = new Map<
+    string,
+    {
+      id: string;
+      kind: string;
+      resourceId: string;
+      date: string;
+      time: string;
+      used: number;
+    }
+  >();
+  for (const order of state.appointments.filter(
+    (a) => a.status !== "cancelled",
+  )) {
+    const resources = [
+      ...[...new Set<string>(order.packageIds || [order.packageId])]
+        .filter(Boolean)
+        .map((resourceId) => ({ kind: "package", resourceId })),
+      ...[...new Set(order.items)].map((resourceId) => ({
+        kind: "item",
+        resourceId,
+      })),
+    ];
+    for (const resource of resources) {
+      const time = normalizeBookingTime(order.time);
+      const id = JSON.stringify([
+        resource.kind,
+        resource.resourceId,
+        order.date,
+        time,
+      ]);
+      const row = totals.get(id) || {
+        id,
+        ...resource,
+        date: order.date,
+        time,
+        used: 0,
+      };
+      row.used += 1;
+      totals.set(id, row);
+    }
+  }
+  return [...totals.values()];
+}
+export function getBookingResourceAvailability(
+  state: DemoState,
+  date: string,
+  context: BookingContext,
+  ignoreAppointmentId?: string,
+) {
+  const usage =
+    state.records.bookingResourceUsage || anonymizedBookingResourceUsage(state);
+  const ignored = state.appointments.find(
+    (a) =>
+      a.id === ignoreAppointmentId &&
+      a.date === date &&
+      a.status !== "cancelled",
+  );
+  const limits = (state.records.bookingResourceLimits ||
+    []) as BookingResourceLimit[];
+  return limits
+    .filter(
+      (rule) =>
+        rule.enabled !== false &&
+        (!rule.date || rule.date === date) &&
+        (rule.kind === "package"
+          ? context.packageIds || []
+          : context.items || []
+        ).includes(rule.resourceId),
+    )
+    .map((rule) => {
+      const count = (time?: string) =>
+        Math.max(
+          0,
+          usage
+            .filter(
+              (row) =>
+                row.date === date &&
+                row.kind === rule.kind &&
+                row.resourceId === rule.resourceId &&
+                (!time ||
+                  normalizeBookingTime(row.time) ===
+                    normalizeBookingTime(time)),
+            )
+            .reduce((n, row) => n + Number(row.used || 0), 0) -
+            (ignored &&
+            (rule.kind === "package"
+              ? ignored.packageIds || [ignored.packageId]
+              : ignored.items
+            ).includes(rule.resourceId) &&
+            (!time ||
+              normalizeBookingTime(ignored.time) === normalizeBookingTime(time))
+              ? 1
+              : 0),
+        );
+      const dailyCapacity =
+        rule.dailyCapacity == null
+          ? undefined
+          : finiteCapacity(rule.dailyCapacity, 0);
+      const slotCapacity =
+        rule.slotCapacity == null
+          ? undefined
+          : finiteCapacity(rule.slotCapacity, 0);
+      const used = count();
+      const slotApplies =
+        !!context.time &&
+        (!rule.time ||
+          normalizeBookingTime(rule.time) ===
+            normalizeBookingTime(context.time));
+      const slotUsed = slotApplies ? count(context.time) : 0;
+      const name =
+        rule.kind === "package"
+          ? state.packages.find((p) => p.id === rule.resourceId)?.name ||
+            rule.resourceId
+          : rule.resourceId;
+      const prefix = `${rule.kind === "package" ? "套餐" : "项目"}「${name}」`;
+      const error =
+        dailyCapacity !== undefined && used >= dailyCapacity
+          ? `${prefix}当日名额已满（${dailyCapacity}人）`
+          : slotApplies &&
+              slotCapacity !== undefined &&
+              slotUsed >= slotCapacity
+            ? `${prefix}该时段名额已满（${slotCapacity}人）`
+            : "";
+      return {
+        ...rule,
+        name,
+        used,
+        slotUsed,
+        remaining:
+          dailyCapacity === undefined
+            ? undefined
+            : Math.max(0, dailyCapacity - used),
+        slotRemaining:
+          slotCapacity === undefined || !slotApplies
+            ? undefined
+            : Math.max(0, slotCapacity - slotUsed),
+        error,
+      };
+    });
+}
+export function bookingDateSelectionError(state: DemoState, date: string) {
+  if (
+    state.config.weekendAllowed !== true &&
+    [0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay())
+  )
+    return "周末不开放预约，该日期不可选，请选择工作日";
+  return "";
+}
+
 /** Frontend policy with an explicit UTC demo clock. Production quota allocation requires server transactions. */
 export function getBookingAvailability(
   state: DemoState,
@@ -308,6 +472,12 @@ export function getBookingAvailability(
       state.patients.some(
         (p) => p.id === context.patientId && p.blacklisted === true,
       ));
+  const resources = getBookingResourceAvailability(
+    state,
+    date,
+    context,
+    ignoreAppointmentId,
+  );
   let error = "";
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
@@ -356,6 +526,8 @@ export function getBookingAvailability(
       .includes(normalizeBookingTime(context.time))
   )
     error = "该时段不在单位可预约时段内";
+  else if (resources.some((row) => row.error))
+    error = resources.find((row) => row.error)!.error;
   else if (
     context.patientId &&
     context.checkQuestionnaire !== false &&
@@ -381,6 +553,7 @@ export function getBookingAvailability(
     reservedForGroups,
     released,
     slotRemaining,
+    resources,
   };
 }
 export function getBookingDates(state: DemoState, days = 14) {

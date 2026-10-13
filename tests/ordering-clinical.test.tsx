@@ -305,7 +305,7 @@ describe("atomic ordering and clinical details", () => {
     expect(screen.queryByText("林知远")).not.toBeInTheDocument();
     expect(read().patients).toHaveLength(8);
     fireEvent.click(screen.getByRole("button", { name: "退出自定义权限" }));
-    expect(screen.getByText("林知远")).toBeInTheDocument();
+    expect(screen.getAllByText("林知远").length).toBeGreaterThan(0);
   });
   it("O16 disabling a rule differs from retiring an item and retired selections cannot submit", () => {
     const s = createInitialState();

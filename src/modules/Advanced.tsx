@@ -1,3 +1,11 @@
+import { getBookingAvailability } from "../bookingRules";
+import { AnalyticsHub } from "./AnalyticsHub";
+import {
+  resolveGroupImportRow,
+  validateCampusItems,
+  validateGroupOrderBooking,
+  type ImportIdentityMode,
+} from "../groupImportRules";
 import { ReportOperations } from "./ReviewTools";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -57,6 +65,9 @@ const kinds = [
   "其他操作",
 ];
 export function Analytics() {
+  return <AnalyticsHub audit={<AuditAnalytics />} />;
+}
+function AuditAnalytics() {
   const { state } = useDemo() as any;
   const [from, setFrom] = useState(() => {
     const d = new Date();
@@ -473,10 +484,16 @@ export type ValidatedImport = {
   amount?: number;
   key?: string;
   errors: string[];
+  [key: string]: any;
 };
 export function validateGroupCsv(
   text: string,
   state: Row,
+  options: {
+    identityMode?: ImportIdentityMode;
+    company?: string;
+    groupOrderId?: string;
+  } = {},
 ): { rows: ValidatedImport[]; error?: string } {
   const parsed = parseCsvText(text);
   if (parsed.error) return { rows: [], error: parsed.error };
@@ -510,24 +527,29 @@ export function validateGroupCsv(
       errors: [],
     };
     if (raw.cells.length !== header.length) row.errors.push("列数与表头不一致");
-    if (!/^DEMO-[A-Za-z0-9_-]+$/.test(row.identity))
-      row.errors.push("证件标识必须使用 DEMO-患者编号，禁止真实证件号");
-    const patient = state.patients.find(
-      (p: Row) => `DEMO-${p.id}` === row.identity,
-    );
-    if (!patient) row.errors.push("证件标识未匹配现有演示客户");
-    else {
-      row.patientId = patient.id;
-      if (patient.name !== row.name)
-        row.errors.push(`姓名与演示档案不一致（应为 ${patient.name}）`);
+    if ((options.identityMode || "demo") === "demo") {
+      if (!/^DEMO-[A-Za-z0-9_-]+$/.test(row.identity))
+        row.errors.push("证件标识必须使用 DEMO-患者编号，禁止真实证件号");
+      if (
+        !state.patients.some(
+          (p: Row) =>
+            `DEMO-${p.id}` === row.identity || p.certificate === row.identity,
+        )
+      )
+        row.errors.push("证件标识未匹配现有演示客户");
     }
-    const pack = state.packages.find(
-      (p: Row) => p.id === row.packageName || p.name === row.packageName,
-    );
+    const resolved = resolveGroupImportRow(state as any, row, options);
+    const structuralErrors = [...row.errors];
+    Object.assign(row, resolved);
+    row.errors = [...structuralErrors, ...resolved.errors];
+    const patient =
+      resolved.newPatient ||
+      state.patients.find((p: Row) => p.id === resolved.patientId);
+    const pack = state.packages.find((p: Row) => p.id === resolved.packageId);
     if (!pack) row.errors.push("套餐编号或名称不存在");
-    else {
-      row.packageId = pack.id;
+    if (pack) {
       row.amount = pack.price;
+      row.packageName = pack.name;
       if (
         patient &&
         ((pack.sex && pack.sex !== "不限" && pack.sex !== patient.sex) ||
@@ -535,8 +557,17 @@ export function validateGroupCsv(
           (pack.maxAge && patient.age > pack.maxAge))
       )
         row.errors.push("套餐不适用于该客户的性别或年龄");
+      row.errors.push(
+        ...validateCampusItems(state as any, pack.items, row.campus),
+      );
     }
-    if (!groupNames.has(row.group))
+    if (
+      row.group &&
+      !groupNames.has(row.group) &&
+      !(state.records.groupPersonnelGroups || []).some(
+        (g: Row) => g.id === row.group || g.name === row.group,
+      )
+    )
       row.errors.push("分组不存在，请使用现有工作单位或健康分组");
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(row.date) ||
@@ -600,6 +631,50 @@ export function validateGroupCsv(
     )
       row.errors.push("批量提交将超过该日预约容量");
   }
+  const simulated = {
+    ...state,
+    patients: [...state.patients],
+    appointments: [...state.appointments],
+  };
+  for (const row of rows) {
+    if (row.errors.length) continue;
+    if (row.newPatient) simulated.patients.push(row.newPatient);
+    const pack = state.packages.find((p: Row) => p.id === row.packageId);
+    if (row.groupOrderId)
+      row.errors.push(
+        ...validateGroupOrderBooking(simulated as any, row.groupOrderId, {
+          patientId: row.patientId!,
+          date: row.date,
+          time: row.time,
+          packageIds: [row.packageId!],
+          items: pack?.items,
+        }),
+      );
+    else {
+      const available = getBookingAvailability(
+        simulated as any,
+        row.date,
+        undefined,
+        {
+          patientId: row.patientId,
+          company: row.company,
+          kind: "group",
+          time: row.time,
+          checkQuestionnaire: false,
+          packageIds: [row.packageId!],
+          items: pack?.items,
+        },
+      );
+      if (!available.allowed) row.errors.push(available.error);
+    }
+    if (!row.errors.length)
+      simulated.appointments.push({
+        ...row,
+        id: "IMPORT-PREVIEW-" + row.line,
+        items: pack?.items || [],
+        status: "booked",
+      });
+  }
   return { rows };
 }
 function futureDate() {
@@ -620,6 +695,15 @@ export function GroupImport({
   const [preview, setPreview] = useState<ReturnType<
     typeof validateGroupCsv
   > | null>(null);
+  const [identityMode, setIdentityMode] = useState<ImportIdentityMode>("demo");
+  const [groupOrderId, setGroupOrderId] = useState("");
+  const importOptions = {
+    identityMode,
+    groupOrderId,
+    company: (state.records.groupOrders || []).find(
+      (g: Row) => g.id === groupOrderId,
+    )?.company,
+  };
   const [confirmed, setConfirmed] = useState(false);
   const [done, setDone] = useState(false);
   const [message, setMessage] = useState("");
@@ -644,7 +728,7 @@ export function GroupImport({
   };
   const submit = () => {
     if (submitted.current || !confirmed || !preview || done) return;
-    const checked = validateGroupCsv(text, state);
+    const checked = validateGroupCsv(text, state, importOptions);
     setPreview(checked);
     if (checked.error || checked.rows.some((r) => r.errors.length)) {
       setMessage("提交前复核未通过，未创建任何预约。");
@@ -652,6 +736,8 @@ export function GroupImport({
     }
     submitted.current = true;
     for (const row of checked.rows) {
+      if (row.newPatient)
+        act({ type: "UPSERT_PATIENT", payload: row.newPatient });
       act({
         type: "CREATE_APPOINTMENT",
         payload: {
@@ -665,6 +751,8 @@ export function GroupImport({
           identity: row.identity,
           source: "团检 CSV 导入",
           importKey: row.key,
+          groupOrderId: row.groupOrderId,
+          groupPersonnelId: row.groupPersonnelId,
         },
       });
     }
@@ -683,9 +771,43 @@ export function GroupImport({
   return (
     <div className="ops-page ops-group-import">
       <Banner>
-        仅导入现有虚构客户。证件标识必须为 DEMO-患者编号，例如
-        DEMO-P001。不会校验或保存真实证件号码。
+        仅限合成客户。普通模式使用DEMO标识；合成身份证使用虚构地区999999；特殊团检允许免证件建档。禁止录入真实证件。
       </Banner>
+      <div className="form-grid">
+        <label>
+          合成身份校验模式
+          <select
+            value={identityMode}
+            onChange={(e) => {
+              setIdentityMode(e.target.value as ImportIdentityMode);
+              setPreview(null);
+              setConfirmed(false);
+            }}
+          >
+            <option value="demo">普通DEMO标识</option>
+            <option value="synthetic-id">合成身份证结构校验</option>
+            <option value="special-empty">特殊团检免证件</option>
+          </select>
+        </label>
+        <label>
+          导入单位订单
+          <select
+            value={groupOrderId}
+            onChange={(e) => {
+              setGroupOrderId(e.target.value);
+              setPreview(null);
+              setConfirmed(false);
+            }}
+          >
+            <option value="">按名单自动匹配</option>
+            {(state.records.groupOrders || []).map((g: Row) => (
+              <option key={g.id} value={g.id}>
+                {g.company} · {g.name || g.title || "单位订单"} · {g.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       <div className="ops-import-steps">
         <span className="active">1 填写 / 选择 CSV</span>
         <i />
@@ -751,7 +873,7 @@ export function GroupImport({
       <button
         className="btn btn-primary"
         onClick={() => {
-          setPreview(validateGroupCsv(text, state));
+          setPreview(validateGroupCsv(text, state, importOptions));
           setConfirmed(false);
           setMessage("");
         }}

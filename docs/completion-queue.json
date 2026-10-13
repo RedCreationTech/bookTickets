@@ -1,0 +1,474 @@
+{
+  "scope": "固定冻结工作集 implementationOwner=queue，24项；不修改主审计状态",
+  "ownerFiles": [
+    "src/modules/Queue.tsx",
+    "src/modules/QueueAutomation.tsx",
+    "src/modules/queueAutomationRules.ts",
+    "tests/queue-automation.test.tsx",
+    "docs/completion-queue.json"
+  ],
+  "verification": {
+    "newTests": 23,
+    "queueAndNewTests": 40,
+    "relatedSuiteTests": 74,
+    "commands": [
+      "npx vitest run tests/queue-automation.test.tsx tests/queue-controls.test.tsx",
+      "npx vitest run tests/queue-automation.test.tsx tests/queue-controls.test.tsx tests/control-center.test.tsx tests/research-reminders.test.tsx tests/followup-allocation.test.tsx",
+      "npx eslint src/modules/Queue.tsx src/modules/QueueAutomation.tsx src/modules/queueAutomationRules.ts"
+    ],
+    "result": "所有上述Vitest用例通过；owner文件eslint通过。全局tsc当时仅有并行其他owner文件错误，未外推全仓通过。",
+    "browserVerification": "本owner未执行Chromium视觉验收；父任务统一执行。",
+    "typecheck": "npx tsc --noEmit 于报告归档集成后实际通过（2026-10-13本轮快照）；不外推后续并行修改",
+    "finalRelatedSuite": "6个关联文件91例实际通过；之后权限只读显示与主检完成状态过滤小修，报告17例另行复测。"
+  },
+  "items": [
+    {
+      "id": "T0010",
+      "implementationOwner": "queue",
+      "originalText": "提示下一站检查科室及等待时长。",
+      "gapClosed": "下一站和等待分钟应从患者待检项目、区域及现有队列计算，替换固定楼层/6分钟展示。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: recommendNextStation, QUEUE_RECOMMENDED_ENQUEUE",
+        "src/modules/Queue.tsx :: QueueRecommendationPanel, 业务队列配置（瓶颈/平均服务分钟/性别/前置项目/区域）"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0010/T0504/T0505 scores load/service/area/bottleneck and excludes unmet dependency, sex and disabled zones",
+        "tests/queue-automation.test.tsx :: T0503 first station and bottleneck prearrangement create unique tickets; locked/cancelled/unauthorized do not",
+        "tests/queue-automation.test.tsx :: persists bottleneck/sex/dependency parameters and immediately uses them in next-station exclusion"
+      ],
+      "boundary": "本地可解释启发式评分与排队估算；不是临床最优算法、真实定位或服务端实时预测。",
+      "integrationEvidence": [
+        "src/modules/Patient.tsx :: recommendNextStation / customerQueueSummary消费，共享患者订单身份"
+      ]
+    },
+    {
+      "id": "T0044",
+      "implementationOwner": "queue",
+      "originalText": "微信小程序预约成功后进行短信提醒。",
+      "gapClosed": "预约创建成功应关联生成一次本地短信记录，包含对象/模板/状态；目前仅成功提示模拟短信文字。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: augmentBusinessEvents, previewBusinessClock, addNotice, invalidatePlannedNotices, AUTOMATION_*",
+        "src/modules/QueueAutomation.tsx :: BusinessAutomationPanel；业务时钟预览/执行、复查计划编辑/取消、已读/处理",
+        "src/model.ts :: reducer成功状态统一augmentBusinessEvents",
+        "src/modules/ControlCenter.tsx :: BusinessAutomationPanel集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0044/T0488 only a successful appointment creation gets one local SMS; duplicate and unchanged transitions do not",
+        "tests/queue-automation.test.tsx :: T0489/T0491 checkin, exam submission and report approval notify once; rejection withdraws and never claims a ready report",
+        "tests/queue-automation.test.tsx :: T0045/T0493 pre-exam matches exactly next day, contains date/time/preparations, deduplicates and excludes cancellation",
+        "tests/queue-automation.test.tsx :: T0490 schedules two projects on separate dates; edits invalidate old version, cancellation and repeat scans never send stale plans",
+        "tests/queue-automation.test.tsx :: notification rules, preview/commit, recheck save/edit/cancel, followup dates and handling all mutate shared data"
+      ],
+      "boundary": "仅本地待模拟发送→模拟送达记录，含对象/模板/时间/事件来源；没有真实SMS网关/送达证据。日期事件需显式推进时钟，页面关闭不运行后台调度。"
+    },
+    {
+      "id": "T0045",
+      "implementationOwner": "queue",
+      "originalText": "体检前进行短信提醒，内容包含体检时间及体检注意事项。",
+      "gapClosed": "补检前一天匹配预约日期及体检注意事项的本地时钟触发/预览/去重记录；真实SMS仍外部。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: augmentBusinessEvents, previewBusinessClock, addNotice, invalidatePlannedNotices, AUTOMATION_*",
+        "src/modules/QueueAutomation.tsx :: BusinessAutomationPanel；业务时钟预览/执行、复查计划编辑/取消、已读/处理",
+        "src/model.ts :: reducer成功状态统一augmentBusinessEvents",
+        "src/modules/ControlCenter.tsx :: BusinessAutomationPanel集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0044/T0488 only a successful appointment creation gets one local SMS; duplicate and unchanged transitions do not",
+        "tests/queue-automation.test.tsx :: T0489/T0491 checkin, exam submission and report approval notify once; rejection withdraws and never claims a ready report",
+        "tests/queue-automation.test.tsx :: T0045/T0493 pre-exam matches exactly next day, contains date/time/preparations, deduplicates and excludes cancellation",
+        "tests/queue-automation.test.tsx :: T0490 schedules two projects on separate dates; edits invalidate old version, cancellation and repeat scans never send stale plans",
+        "tests/queue-automation.test.tsx :: notification rules, preview/commit, recheck save/edit/cancel, followup dates and handling all mutate shared data"
+      ],
+      "boundary": "仅本地待模拟发送→模拟送达记录，含对象/模板/时间/事件来源；没有真实SMS网关/送达证据。日期事件需显式推进时钟，页面关闭不运行后台调度。"
+    },
+    {
+      "id": "T0264",
+      "implementationOwner": "queue",
+      "originalText": "支持自动发送短信通知。",
+      "gapClosed": "增加异常短信自动触发开关/规则及本地待发记录，在产生新异常时自动生成并模拟送达且去重；真实短信仍为接口边界。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: 新alerts差分、abnormalSms规则与风险命中、BUSINESS-ABNORMAL事件去重",
+        "src/modules/QueueAutomation.tsx :: 新异常自动模拟短信开关、异常等级范围和本地事件记录"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0264/T0272/T0282 new matched alerts create SMS and deduplicated sourced tasks; tasks and orders sort by highest risk",
+        "tests/queue-automation.test.tsx :: accepts VIP dictionary names independently of dictionary IDs and rejects mismatched alert identities"
+      ],
+      "boundary": "新异常仅在已启用且等级命中时本地模拟发送；排除取消、身份不匹配、锁定订单，不发送真实医学数据或外网短信。"
+    },
+    {
+      "id": "T0272",
+      "implementationOwner": "queue",
+      "originalText": "支持自动生成待回访记录并根据异常等级自动排序。（订单和任务按等级排序）",
+      "gapClosed": "在异常产生时按配置生成待回访任务，并按等级优先级稳定排序订单及任务；去重不丢来源。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: autoFollowup新异常建任务、sourceAlertId/alertIds、sortByRisk、锁定延期、到期时钟去重",
+        "src/modules/QueueAutomation.tsx :: FollowupDatePlanner、RiskSortedOrders、BusinessAutomationPanel规则/已读/处理",
+        "src/modules/Health.tsx :: sortByRisk与FollowupDatePlanner/RiskSortedOrders集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0264/T0272/T0282 new matched alerts create SMS and deduplicated sourced tasks; tasks and orders sort by highest risk",
+        "tests/queue-automation.test.tsx :: automatic rules default off for abnormal/tasks, and locked events defer until unlock without overwriting existing tasks",
+        "tests/queue-automation.test.tsx :: T0275 due dates trigger once; rescheduling cancels prior reminders; completed and locked tasks do not notify; read and handled states persist",
+        "tests/queue-automation.test.tsx :: withdraws unread due reminders on reschedule and completion, and preserves same-priority task order"
+      ],
+      "boundary": "四色等级为合成业务标签，不作医疗风险判定；本地规则开关、来源保留、稳定排序与显式时钟提醒，不是后台推送服务。"
+    },
+    {
+      "id": "T0275",
+      "implementationOwner": "queue",
+      "originalText": "支持建立随访任务提醒，选择下次回访日期，到达指定日期后自动进行任务提醒。",
+      "gapClosed": "记录下次回访日期，并在模拟时钟到达时生成可见提醒及已读/处理状态，重复检查不重复生成。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: autoFollowup新异常建任务、sourceAlertId/alertIds、sortByRisk、锁定延期、到期时钟去重",
+        "src/modules/QueueAutomation.tsx :: FollowupDatePlanner、RiskSortedOrders、BusinessAutomationPanel规则/已读/处理",
+        "src/modules/Health.tsx :: sortByRisk与FollowupDatePlanner/RiskSortedOrders集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0264/T0272/T0282 new matched alerts create SMS and deduplicated sourced tasks; tasks and orders sort by highest risk",
+        "tests/queue-automation.test.tsx :: automatic rules default off for abnormal/tasks, and locked events defer until unlock without overwriting existing tasks",
+        "tests/queue-automation.test.tsx :: T0275 due dates trigger once; rescheduling cancels prior reminders; completed and locked tasks do not notify; read and handled states persist",
+        "tests/queue-automation.test.tsx :: withdraws unread due reminders on reschedule and completion, and preserves same-priority task order"
+      ],
+      "boundary": "四色等级为合成业务标签，不作医疗风险判定；本地规则开关、来源保留、稳定排序与显式时钟提醒，不是后台推送服务。"
+    },
+    {
+      "id": "T0282",
+      "implementationOwner": "queue",
+      "originalText": "支持自动建立随访任务。",
+      "gapClosed": "配置异常/等级等自动创建触发规则，命中时创建去重随访任务并保存来源。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: autoFollowup新异常建任务、sourceAlertId/alertIds、sortByRisk、锁定延期、到期时钟去重",
+        "src/modules/QueueAutomation.tsx :: FollowupDatePlanner、RiskSortedOrders、BusinessAutomationPanel规则/已读/处理",
+        "src/modules/Health.tsx :: sortByRisk与FollowupDatePlanner/RiskSortedOrders集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0264/T0272/T0282 new matched alerts create SMS and deduplicated sourced tasks; tasks and orders sort by highest risk",
+        "tests/queue-automation.test.tsx :: automatic rules default off for abnormal/tasks, and locked events defer until unlock without overwriting existing tasks",
+        "tests/queue-automation.test.tsx :: T0275 due dates trigger once; rescheduling cancels prior reminders; completed and locked tasks do not notify; read and handled states persist",
+        "tests/queue-automation.test.tsx :: withdraws unread due reminders on reschedule and completion, and preserves same-priority task order"
+      ],
+      "boundary": "四色等级为合成业务标签，不作医疗风险判定；本地规则开关、来源保留、稳定排序与显式时钟提醒，不是后台推送服务。"
+    },
+    {
+      "id": "T0488",
+      "implementationOwner": "queue",
+      "originalText": "预约体检提示服务；",
+      "gapClosed": "把预约成功、体检节点和报告可领取事件关联到相应客户本地提醒；模板手选发送不等于事件提示服务。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: augmentBusinessEvents, previewBusinessClock, addNotice, invalidatePlannedNotices, AUTOMATION_*",
+        "src/modules/QueueAutomation.tsx :: BusinessAutomationPanel；业务时钟预览/执行、复查计划编辑/取消、已读/处理",
+        "src/model.ts :: reducer成功状态统一augmentBusinessEvents",
+        "src/modules/ControlCenter.tsx :: BusinessAutomationPanel集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0044/T0488 only a successful appointment creation gets one local SMS; duplicate and unchanged transitions do not",
+        "tests/queue-automation.test.tsx :: T0489/T0491 checkin, exam submission and report approval notify once; rejection withdraws and never claims a ready report",
+        "tests/queue-automation.test.tsx :: T0045/T0493 pre-exam matches exactly next day, contains date/time/preparations, deduplicates and excludes cancellation",
+        "tests/queue-automation.test.tsx :: T0490 schedules two projects on separate dates; edits invalidate old version, cancellation and repeat scans never send stale plans",
+        "tests/queue-automation.test.tsx :: notification rules, preview/commit, recheck save/edit/cancel, followup dates and handling all mutate shared data"
+      ],
+      "boundary": "仅本地待模拟发送→模拟送达记录，含对象/模板/时间/事件来源；没有真实SMS网关/送达证据。日期事件需显式推进时钟，页面关闭不运行后台调度。"
+    },
+    {
+      "id": "T0489",
+      "implementationOwner": "queue",
+      "originalText": "体检提示服务：",
+      "gapClosed": "把预约成功、体检节点和报告可领取事件关联到相应客户本地提醒；模板手选发送不等于事件提示服务。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: augmentBusinessEvents, previewBusinessClock, addNotice, invalidatePlannedNotices, AUTOMATION_*",
+        "src/modules/QueueAutomation.tsx :: BusinessAutomationPanel；业务时钟预览/执行、复查计划编辑/取消、已读/处理",
+        "src/model.ts :: reducer成功状态统一augmentBusinessEvents",
+        "src/modules/ControlCenter.tsx :: BusinessAutomationPanel集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0044/T0488 only a successful appointment creation gets one local SMS; duplicate and unchanged transitions do not",
+        "tests/queue-automation.test.tsx :: T0489/T0491 checkin, exam submission and report approval notify once; rejection withdraws and never claims a ready report",
+        "tests/queue-automation.test.tsx :: T0045/T0493 pre-exam matches exactly next day, contains date/time/preparations, deduplicates and excludes cancellation",
+        "tests/queue-automation.test.tsx :: T0490 schedules two projects on separate dates; edits invalidate old version, cancellation and repeat scans never send stale plans",
+        "tests/queue-automation.test.tsx :: notification rules, preview/commit, recheck save/edit/cancel, followup dates and handling all mutate shared data"
+      ],
+      "boundary": "仅本地待模拟发送→模拟送达记录，含对象/模板/时间/事件来源；没有真实SMS网关/送达证据。日期事件需显式推进时钟，页面关闭不运行后台调度。"
+    },
+    {
+      "id": "T0490",
+      "implementationOwner": "queue",
+      "originalText": "复查项目时间提醒服务；",
+      "gapClosed": "复查提醒保存具体复查项目和日期，显式模拟时钟到日匹配提醒并去重。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: augmentBusinessEvents, previewBusinessClock, addNotice, invalidatePlannedNotices, AUTOMATION_*",
+        "src/modules/QueueAutomation.tsx :: BusinessAutomationPanel；业务时钟预览/执行、复查计划编辑/取消、已读/处理",
+        "src/model.ts :: reducer成功状态统一augmentBusinessEvents",
+        "src/modules/ControlCenter.tsx :: BusinessAutomationPanel集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0044/T0488 only a successful appointment creation gets one local SMS; duplicate and unchanged transitions do not",
+        "tests/queue-automation.test.tsx :: T0489/T0491 checkin, exam submission and report approval notify once; rejection withdraws and never claims a ready report",
+        "tests/queue-automation.test.tsx :: T0045/T0493 pre-exam matches exactly next day, contains date/time/preparations, deduplicates and excludes cancellation",
+        "tests/queue-automation.test.tsx :: T0490 schedules two projects on separate dates; edits invalidate old version, cancellation and repeat scans never send stale plans",
+        "tests/queue-automation.test.tsx :: notification rules, preview/commit, recheck save/edit/cancel, followup dates and handling all mutate shared data"
+      ],
+      "boundary": "仅本地待模拟发送→模拟送达记录，含对象/模板/时间/事件来源；没有真实SMS网关/送达证据。日期事件需显式推进时钟，页面关闭不运行后台调度。"
+    },
+    {
+      "id": "T0491",
+      "implementationOwner": "queue",
+      "originalText": "领取报告提示：",
+      "gapClosed": "把预约成功、体检节点和报告可领取事件关联到相应客户本地提醒；模板手选发送不等于事件提示服务。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: augmentBusinessEvents, previewBusinessClock, addNotice, invalidatePlannedNotices, AUTOMATION_*",
+        "src/modules/QueueAutomation.tsx :: BusinessAutomationPanel；业务时钟预览/执行、复查计划编辑/取消、已读/处理",
+        "src/model.ts :: reducer成功状态统一augmentBusinessEvents",
+        "src/modules/ControlCenter.tsx :: BusinessAutomationPanel集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0044/T0488 only a successful appointment creation gets one local SMS; duplicate and unchanged transitions do not",
+        "tests/queue-automation.test.tsx :: T0489/T0491 checkin, exam submission and report approval notify once; rejection withdraws and never claims a ready report",
+        "tests/queue-automation.test.tsx :: T0045/T0493 pre-exam matches exactly next day, contains date/time/preparations, deduplicates and excludes cancellation",
+        "tests/queue-automation.test.tsx :: T0490 schedules two projects on separate dates; edits invalidate old version, cancellation and repeat scans never send stale plans",
+        "tests/queue-automation.test.tsx :: notification rules, preview/commit, recheck save/edit/cancel, followup dates and handling all mutate shared data"
+      ],
+      "boundary": "仅本地待模拟发送→模拟送达记录，含对象/模板/时间/事件来源；没有真实SMS网关/送达证据。日期事件需显式推进时钟，页面关闭不运行后台调度。"
+    },
+    {
+      "id": "T0493",
+      "implementationOwner": "queue",
+      "originalText": "体检前一天短信提醒",
+      "gapClosed": "补检前一天匹配预约日期及体检注意事项的本地时钟触发/预览/去重记录；真实SMS仍外部。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: augmentBusinessEvents, previewBusinessClock, addNotice, invalidatePlannedNotices, AUTOMATION_*",
+        "src/modules/QueueAutomation.tsx :: BusinessAutomationPanel；业务时钟预览/执行、复查计划编辑/取消、已读/处理",
+        "src/model.ts :: reducer成功状态统一augmentBusinessEvents",
+        "src/modules/ControlCenter.tsx :: BusinessAutomationPanel集成"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0044/T0488 only a successful appointment creation gets one local SMS; duplicate and unchanged transitions do not",
+        "tests/queue-automation.test.tsx :: T0489/T0491 checkin, exam submission and report approval notify once; rejection withdraws and never claims a ready report",
+        "tests/queue-automation.test.tsx :: T0045/T0493 pre-exam matches exactly next day, contains date/time/preparations, deduplicates and excludes cancellation",
+        "tests/queue-automation.test.tsx :: T0490 schedules two projects on separate dates; edits invalidate old version, cancellation and repeat scans never send stale plans",
+        "tests/queue-automation.test.tsx :: notification rules, preview/commit, recheck save/edit/cancel, followup dates and handling all mutate shared data"
+      ],
+      "boundary": "仅本地待模拟发送→模拟送达记录，含对象/模板/时间/事件来源；没有真实SMS网关/送达证据。日期事件需显式推进时钟，页面关闭不运行后台调度。"
+    },
+    {
+      "id": "T0503",
+      "implementationOwner": "queue",
+      "originalText": "支持登记台提示体检者第一站检查科室到检排队（支持预排瓶颈科室的队列）",
+      "gapClosed": "登记提示实际可行第一站并支持瓶颈队列预排，不是固定空腹流程文本。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: recommendNextStation, QUEUE_RECOMMENDED_ENQUEUE",
+        "src/modules/Queue.tsx :: QueueRecommendationPanel, 业务队列配置（瓶颈/平均服务分钟/性别/前置项目/区域）"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0010/T0504/T0505 scores load/service/area/bottleneck and excludes unmet dependency, sex and disabled zones",
+        "tests/queue-automation.test.tsx :: T0503 first station and bottleneck prearrangement create unique tickets; locked/cancelled/unauthorized do not",
+        "tests/queue-automation.test.tsx :: persists bottleneck/sex/dependency parameters and immediately uses them in next-station exclusion"
+      ],
+      "boundary": "本地可解释启发式评分与排队估算；不是临床最优算法、真实定位或服务端实时预测。",
+      "integrationEvidence": [
+        "src/modules/Core.tsx :: 已到检订单详情挂QueueRecommendationPanel appointmentId，登记台直接展示首站与预排"
+      ]
+    },
+    {
+      "id": "T0504",
+      "implementationOwner": "queue",
+      "originalText": "支持推荐最优队列：推荐当前最优检查科室队列。",
+      "gapClosed": "实现并解释结合瓶颈、服务均时、性别、依赖和区域的候选队列评分/推荐，现仅简单排序估时。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: recommendNextStation, QUEUE_RECOMMENDED_ENQUEUE",
+        "src/modules/Queue.tsx :: QueueRecommendationPanel, 业务队列配置（瓶颈/平均服务分钟/性别/前置项目/区域）"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0010/T0504/T0505 scores load/service/area/bottleneck and excludes unmet dependency, sex and disabled zones",
+        "tests/queue-automation.test.tsx :: T0503 first station and bottleneck prearrangement create unique tickets; locked/cancelled/unauthorized do not",
+        "tests/queue-automation.test.tsx :: persists bottleneck/sex/dependency parameters and immediately uses them in next-station exclusion"
+      ],
+      "boundary": "本地可解释启发式评分与排队估算；不是临床最优算法、真实定位或服务端实时预测。"
+    },
+    {
+      "id": "T0505",
+      "implementationOwner": "queue",
+      "originalText": "支持包含多参数最优队列推荐算法的设计与实现，具体参数如下：是否瓶颈队列，单位客户平均服务时间，检查项目适用性别，检查项目的依赖关系，队列所在区域；",
+      "gapClosed": "实现并解释结合瓶颈、服务均时、性别、依赖和区域的候选队列评分/推荐，现仅简单排序估时。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: recommendNextStation, QUEUE_RECOMMENDED_ENQUEUE",
+        "src/modules/Queue.tsx :: QueueRecommendationPanel, 业务队列配置（瓶颈/平均服务分钟/性别/前置项目/区域）"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0010/T0504/T0505 scores load/service/area/bottleneck and excludes unmet dependency, sex and disabled zones",
+        "tests/queue-automation.test.tsx :: T0503 first station and bottleneck prearrangement create unique tickets; locked/cancelled/unauthorized do not",
+        "tests/queue-automation.test.tsx :: persists bottleneck/sex/dependency parameters and immediately uses them in next-station exclusion"
+      ],
+      "boundary": "本地可解释启发式评分与排队估算；不是临床最优算法、真实定位或服务端实时预测。"
+    },
+    {
+      "id": "T0512",
+      "implementationOwner": "queue",
+      "originalText": "支持当日过检人次统计",
+      "gapClosed": "当日过号/待检统计需按业务日期过滤，现当前队列票据可含其他日期。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: queueBusinessDay, ticketBusinessDay, queueDayCounts",
+        "src/modules/Queue.tsx :: 队列统计业务日期、按日候检/过号/完成列表与计数"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0512/T0513 uses actual business dates for pending, missed and complete counts",
+        "tests/queue-automation.test.tsx :: changes business date and recomputes visible waiting list and daily totals from mixed-date tickets"
+      ],
+      "boundary": "票据按businessDate，旧票据回退创建/到检/预约日期；本地浏览器统计，不宣称院内实时统计。"
+    },
+    {
+      "id": "T0513",
+      "implementationOwner": "queue",
+      "originalText": "支持当日待检人次统计",
+      "gapClosed": "当日过号/待检统计需按业务日期过滤，现当前队列票据可含其他日期。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: queueBusinessDay, ticketBusinessDay, queueDayCounts",
+        "src/modules/Queue.tsx :: 队列统计业务日期、按日候检/过号/完成列表与计数"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0512/T0513 uses actual business dates for pending, missed and complete counts",
+        "tests/queue-automation.test.tsx :: changes business date and recomputes visible waiting list and daily totals from mixed-date tickets"
+      ],
+      "boundary": "票据按businessDate，旧票据回退创建/到检/预约日期；本地浏览器统计，不宣称院内实时统计。"
+    },
+    {
+      "id": "T0530",
+      "implementationOwner": "queue",
+      "originalText": "支持客户查询：支持按照姓名、体检号、身份证号查询客户",
+      "gapClosed": "按客户姓名、体检号、DEMO证件号定位队列客户，非仅队列名称查询。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: searchQueueCustomers, customerQueueSummary, queueCustomerType",
+        "src/modules/Queue.tsx :: QueueCustomerLookup、未检/已检/历史全部队列、客户VIP标签及大屏"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0530/T0531/T0532/T0559 searches exact DEMO identities and aggregates pending/completed across queues without identity bleed",
+        "tests/queue-automation.test.tsx :: T0540 displays patient VIP/ordinary independently of queue type and name masking",
+        "tests/queue-automation.test.tsx :: recommendation button creates ticket and customer query clears stale detail when query changes"
+      ],
+      "boundary": "只读取共享合成订单/DEMO证件/本地票据；无微信绑定、真实患者查询或身份鉴权。未登记字段明确展示缺失。"
+    },
+    {
+      "id": "T0531",
+      "implementationOwner": "queue",
+      "originalText": "支持客户展示功能：展示客户基本信息，包括姓名、体检号、体检开始时间、身份证号等信息。",
+      "gapClosed": "展示当前客户体检开始时间与DEMO证件标识等基本信息，缺值明确；目前名单主要姓名/编号。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: searchQueueCustomers, customerQueueSummary, queueCustomerType",
+        "src/modules/Queue.tsx :: QueueCustomerLookup、未检/已检/历史全部队列、客户VIP标签及大屏"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0530/T0531/T0532/T0559 searches exact DEMO identities and aggregates pending/completed across queues without identity bleed",
+        "tests/queue-automation.test.tsx :: T0540 displays patient VIP/ordinary independently of queue type and name masking",
+        "tests/queue-automation.test.tsx :: recommendation button creates ticket and customer query clears stale detail when query changes"
+      ],
+      "boundary": "只读取共享合成订单/DEMO证件/本地票据；无微信绑定、真实患者查询或身份鉴权。未登记字段明确展示缺失。"
+    },
+    {
+      "id": "T0532",
+      "implementationOwner": "queue",
+      "originalText": "展示客户队列信息，包括客户所有未检队列信息和已检队列信息",
+      "gapClosed": "提供某客户所有未检/已检队列清单，现以当前科室或活动票据为主。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: searchQueueCustomers, customerQueueSummary, queueCustomerType",
+        "src/modules/Queue.tsx :: QueueCustomerLookup、未检/已检/历史全部队列、客户VIP标签及大屏"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0530/T0531/T0532/T0559 searches exact DEMO identities and aggregates pending/completed across queues without identity bleed",
+        "tests/queue-automation.test.tsx :: T0540 displays patient VIP/ordinary independently of queue type and name masking",
+        "tests/queue-automation.test.tsx :: recommendation button creates ticket and customer query clears stale detail when query changes"
+      ],
+      "boundary": "只读取共享合成订单/DEMO证件/本地票据；无微信绑定、真实患者查询或身份鉴权。未登记字段明确展示缺失。"
+    },
+    {
+      "id": "T0540",
+      "implementationOwner": "queue",
+      "originalText": "支持展示客户类型（VIP 客户、普通）",
+      "gapClosed": "候检、叫号及大屏展示患者VIP/普通等类型，不以队列类型代替客户类型。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: searchQueueCustomers, customerQueueSummary, queueCustomerType",
+        "src/modules/Queue.tsx :: QueueCustomerLookup、未检/已检/历史全部队列、客户VIP标签及大屏"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0530/T0531/T0532/T0559 searches exact DEMO identities and aggregates pending/completed across queues without identity bleed",
+        "tests/queue-automation.test.tsx :: T0540 displays patient VIP/ordinary independently of queue type and name masking",
+        "tests/queue-automation.test.tsx :: recommendation button creates ticket and customer query clears stale detail when query changes"
+      ],
+      "boundary": "只读取共享合成订单/DEMO证件/本地票据；无微信绑定、真实患者查询或身份鉴权。未登记字段明确展示缺失。"
+    },
+    {
+      "id": "T0554",
+      "implementationOwner": "queue",
+      "originalText": "支持多诊室、单诊室模式切换",
+      "gapClosed": "提供单/多诊室工作模式及共享池派发，当前手选roomId没有模式或自动负载均衡。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: previewRoomDispatch, QUEUE_SET_ROOM_MODE, QUEUE_DISPATCH, QUEUE_REBALANCE_CLOSED_ROOMS",
+        "src/modules/Queue.tsx :: 诊室工作模式、容量/负载表、多诊室正在呼叫、停用诊室回收"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: balances two rooms without duplicate service, respects capacity, and single mode takes only its room",
+        "tests/queue-automation.test.tsx :: reclaims disabled room into shared pool then assigns to the remaining room; rejects stale, cancelled, locked and unauthorized tickets",
+        "tests/queue-automation.test.tsx :: runs shared-room UI calls into two actual rooms and switches a persisted single-room mode"
+      ],
+      "boundary": "原手动分配保留为明确手动模式；主动切换单/多诊室后应用持久化共享池规则。仅浏览器原子状态转移，无实体终端或分布式并发保证。"
+    },
+    {
+      "id": "T0555",
+      "implementationOwner": "queue",
+      "originalText": "支持多个诊室共享一个队列池，通过将诊室自助终端切换为多诊室工作模式，从而有效避免各诊室队列负载不平衡的问题；",
+      "gapClosed": "提供单/多诊室工作模式及共享池派发，当前手选roomId没有模式或自动负载均衡。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: previewRoomDispatch, QUEUE_SET_ROOM_MODE, QUEUE_DISPATCH, QUEUE_REBALANCE_CLOSED_ROOMS",
+        "src/modules/Queue.tsx :: 诊室工作模式、容量/负载表、多诊室正在呼叫、停用诊室回收"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: balances two rooms without duplicate service, respects capacity, and single mode takes only its room",
+        "tests/queue-automation.test.tsx :: reclaims disabled room into shared pool then assigns to the remaining room; rejects stale, cancelled, locked and unauthorized tickets",
+        "tests/queue-automation.test.tsx :: runs shared-room UI calls into two actual rooms and switches a persisted single-room mode"
+      ],
+      "boundary": "原手动分配保留为明确手动模式；主动切换单/多诊室后应用持久化共享池规则。仅浏览器原子状态转移，无实体终端或分布式并发保证。"
+    },
+    {
+      "id": "T0559",
+      "implementationOwner": "queue",
+      "originalText": "支持客户队列信息查询：未检、已检队列查询功能",
+      "gapClosed": "提供某客户所有未检/已检队列清单，现以当前科室或活动票据为主。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/queueAutomationRules.ts :: searchQueueCustomers, customerQueueSummary, queueCustomerType",
+        "src/modules/Queue.tsx :: QueueCustomerLookup、未检/已检/历史全部队列、客户VIP标签及大屏"
+      ],
+      "tests": [
+        "tests/queue-automation.test.tsx :: T0530/T0531/T0532/T0559 searches exact DEMO identities and aggregates pending/completed across queues without identity bleed",
+        "tests/queue-automation.test.tsx :: T0540 displays patient VIP/ordinary independently of queue type and name masking",
+        "tests/queue-automation.test.tsx :: recommendation button creates ticket and customer query clears stale detail when query changes"
+      ],
+      "boundary": "只读取共享合成订单/DEMO证件/本地票据；无微信绑定、真实患者查询或身份鉴权。未登记字段明确展示缺失。",
+      "integrationEvidence": [
+        "src/modules/Patient.tsx :: recommendNextStation / customerQueueSummary消费，共享患者订单身份"
+      ]
+    }
+  ]
+}

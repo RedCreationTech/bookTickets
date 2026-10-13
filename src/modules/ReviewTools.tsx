@@ -1,3 +1,4 @@
+import { reviewNodes, reviewDoctorEligible } from "../clinicalRules";
 import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useDemo, today, exportCsv, download } from "../store";
@@ -802,7 +803,9 @@ export function ReviewTools({ appointmentId }: { appointmentId?: string }) {
               const stageMatches =
                 s.stage === "全部环节" ||
                 s.stage ===
-                  ["初审", "主检", "总检"][appointment?.reviewStage || 0];
+                  reviewNodes(state, appointment)[
+                    appointment?.reviewStage || 0
+                  ];
               return (
                 <tr key={s.id}>
                   <td>
@@ -829,6 +832,12 @@ export function ReviewTools({ appointmentId }: { appointmentId?: string }) {
                         !canEdit ||
                         s.status !== "scheduled" ||
                         !stageMatches ||
+                        (!!appointment &&
+                          !reviewDoctorEligible(
+                            state,
+                            appointment,
+                            s.doctor,
+                          )) ||
                         already
                       }
                       onClick={() => {
@@ -836,7 +845,8 @@ export function ReviewTools({ appointmentId }: { appointmentId?: string }) {
                           !appointment ||
                           already ||
                           s.status !== "scheduled" ||
-                          !stageMatches
+                          !stageMatches ||
+                          !reviewDoctorEligible(state, appointment, s.doctor)
                         )
                           return;
                         update(act, appointment.id, {

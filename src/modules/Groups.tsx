@@ -1,7 +1,12 @@
 import { useState, useRef } from "react";
 import { useDemo, today, exportCsv } from "../store";
 import type { DemoState, Appointment } from "../model";
-import { Empty } from "../ui";
+import { Empty, Modal } from "../ui";
+import {
+  previewGroupAccountSettlement,
+  previewGroupAccountReversal,
+  actualOrderCollections,
+} from "../orderFinanceRules";
 export const groupOrders = (s: DemoState) => s.records.groupOrders || [];
 export function applicableGroup(
   s: DemoState,
@@ -94,6 +99,7 @@ export function splitGroupAmount(
 }
 export function GroupContractWorkbench() {
   const { state, act } = useDemo();
+  const [pendingSettlement, setPendingSettlement] = useState<any>(null);
   const [id, setId] = useState("");
   const [name, setName] = useState("2026年度团检");
   const [company, setCompany] = useState("星辰科技");
@@ -573,71 +579,100 @@ export function GroupContractWorkbench() {
             模拟预付款入账
           </button>
           <h3>单位/个人分摊明细</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>客户 / 订单</th>
-                <th>分组 / 套餐 / 项目</th>
-                <th>单位</th>
-                <th>个人</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((a) => {
-                const charge = settlement(a);
-                return (
-                  <tr key={a.id}>
-                    <td>
-                      {state.patients.find((p) => p.id === a.patientId)?.name}
-                      <small>{a.id}</small>
-                    </td>
-                    <td>
-                      <strong>{a.groupPersonnelName || "未分组"}</strong>
-                      {a.items.join("、")}
-                      <small>弃检：{(a.waived || []).join("、") || "无"}</small>
-                    </td>
-                    <td>¥{charge.unit.toFixed(2)}</td>
-                    <td>¥{charge.personal.toFixed(2)}</td>
-                    <td>
-                      <button
-                        className="btn"
-                        disabled={account.settledIds.includes(a.id)}
-                        onClick={() => {
-                          if (account.settledIds.includes(a.id)) return;
-                          if (account.balance < charge.unit)
-                            return setMessage("预付款余额不足，不能透支结算");
-                          upsert("groupAccounts", {
-                            ...account,
-                            balance:
-                              Math.round(
-                                (account.balance - charge.unit) * 100,
-                              ) / 100,
-                            settledIds: [...account.settledIds, a.id],
-                            ledger: [
-                              ...account.ledger,
-                              {
-                                id: "SET-" + a.id,
-                                type: "单位体检结算",
-                                amount: -charge.unit,
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>客户 / 订单</th>
+                  <th>分组 / 套餐 / 项目</th>
+                  <th>单位</th>
+                  <th>个人</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((a) => {
+                  const charge = settlement(a);
+                  return (
+                    <tr key={a.id}>
+                      <td>
+                        {state.patients.find((p) => p.id === a.patientId)?.name}
+                        <small>{a.id}</small>
+                      </td>
+                      <td>
+                        <strong>{a.groupPersonnelName || "未分组"}</strong>
+                        {a.items.join("、")}
+                        <small>
+                          弃检：{(a.waived || []).join("、") || "无"}
+                        </small>
+                      </td>
+                      <td>
+                        ¥{charge.unit.toFixed(2)}
+                        <small>
+                          实收：¥
+                          {(
+                            actualOrderCollections(state, a).unitPaid ?? 0
+                          ).toFixed(2)}
+                        </small>
+                      </td>
+                      <td>¥{charge.personal.toFixed(2)}</td>
+                      <td>
+                        <button
+                          className="btn"
+                          disabled={account.settledIds.includes(a.id)}
+                          onClick={() => {
+                            const preview = previewGroupAccountSettlement(
+                              state,
+                              a.id,
+                            );
+                            if (preview.errors.length)
+                              return setMessage(preview.errors.join("；"));
+                            setPendingSettlement({
+                              id: `GROUP-SETTLE-${crypto.randomUUID()}`,
+                              operation: "settle",
+                              appointmentId: a.id,
+                              expected: preview.signature,
+                              amount: preview.amount,
+                              balance: preview.account!.balance,
+                            });
+                          }}
+                        >
+                          {account.settledIds.includes(a.id)
+                            ? "已结算"
+                            : "预付款扣减"}
+                        </button>
+                        {account.settledIds.includes(a.id) && (
+                          <button
+                            className="btn"
+                            onClick={() => {
+                              const preview = previewGroupAccountReversal(
+                                state,
+                                a.id,
+                              );
+                              if (preview.errors.length)
+                                return setMessage(preview.errors.join("；"));
+                              setPendingSettlement({
+                                id: `GROUP-REVERSE-${crypto.randomUUID()}`,
+                                operation: "reverse",
                                 appointmentId: a.id,
-                                at: new Date().toISOString(),
-                              },
-                            ],
-                          });
-                          setMessage("单位承担已扣减，本地交易已关联订单。");
-                        }}
-                      >
-                        {account.settledIds.includes(a.id)
-                          ? "已结算"
-                          : "预付款扣减"}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                                originalAllocationId: preview.original!.id,
+                                expected: preview.signature,
+                                amount: preview.amount,
+                                balance: preview.account!.balance,
+                                reason: "合成单位预付款结算更正",
+                              });
+                            }}
+                          >
+                            撤销单位预付款结算
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           {!orders.length && (
             <Empty text="请在预约开单中使用此单位的合成客户建单" />
           )}
@@ -669,6 +704,74 @@ export function GroupContractWorkbench() {
             ))}
           </ul>
         </>
+      )}
+      {pendingSettlement && (
+        <Modal
+          title={
+            pendingSettlement.operation === "reverse"
+              ? "确认单位预付款原路冲销"
+              : "确认单位预付款结算"
+          }
+          onClose={() => setPendingSettlement(null)}
+        >
+          <p>
+            订单 {pendingSettlement.appointmentId}{" "}
+            {pendingSettlement.operation === "reverse"
+              ? "冲销原单位分配"
+              : "未付单位份额"}{" "}
+            ¥{pendingSettlement.amount.toFixed(2)}；账户余额 ¥
+            {pendingSettlement.balance.toFixed(2)} → ¥
+            {(
+              pendingSettlement.balance +
+              (pendingSettlement.operation === "reverse"
+                ? pendingSettlement.amount
+                : -pendingSettlement.amount)
+            ).toFixed(2)}
+          </p>
+          <p>
+            此为既有预付款分配或原路冲销，不新增现金收入。账户与订单项目实收同时更新，个人收款、临床结果和进度保留。
+          </p>
+          {pendingSettlement.operation === "reverse" && (
+            <label>
+              单位冲销原因
+              <input
+                aria-label="单位冲销原因"
+                value={pendingSettlement.reason}
+                onChange={(e) =>
+                  setPendingSettlement({
+                    ...pendingSettlement,
+                    reason: e.target.value,
+                  })
+                }
+              />
+            </label>
+          )}
+          <div className="actions">
+            <button className="btn" onClick={() => setPendingSettlement(null)}>
+              取消单位预付款结算
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                act({
+                  type:
+                    pendingSettlement.operation === "reverse"
+                      ? "GROUP_ACCOUNT_REVERSE"
+                      : "GROUP_ACCOUNT_SETTLE",
+                  payload: pendingSettlement,
+                });
+                setPendingSettlement(null);
+                setMessage(
+                  "已提交单位预付款结算；请核对账户流水与订单实际收款。",
+                );
+              }}
+            >
+              {pendingSettlement.operation === "reverse"
+                ? "确认原路冲销单位款"
+                : "确认单位预付款扣减"}
+            </button>
+          </div>
+        </Modal>
       )}
       {message && <p role="status">{message}</p>}
     </div>
@@ -776,56 +879,58 @@ export function InvoiceLedger() {
       >
         确认模拟合并/拆分开票
       </button>
-      <table>
-        <thead>
-          <tr>
-            <th>模拟编号 / 订单</th>
-            <th>金额 / 拆分</th>
-            <th>业务员</th>
-            <th>状态</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoices.map((r) => (
-            <tr key={r.id}>
-              <td>
-                {r.id}
-                <small>{r.appointmentIds.join("、")}</small>
-              </td>
-              <td>
-                ¥{r.amount.toFixed(2)}
-                <small>
-                  {r.parts.map((n: number) => n.toFixed(2)).join(" + ")}
-                </small>
-              </td>
-              <td>{r.seller}</td>
-              <td>{r.status}</td>
-              <td>
-                <button
-                  className="text-btn"
-                  disabled={r.status === "已作废"}
-                  onClick={() =>
-                    act({
-                      type: "UPSERT_RECORD",
-                      payload: {
-                        collection: "invoiceLedger",
-                        record: {
-                          ...r,
-                          status: "已作废",
-                          voidedAt: new Date().toISOString(),
-                        },
-                      },
-                    })
-                  }
-                >
-                  模拟作废
-                </button>
-              </td>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>模拟编号 / 订单</th>
+              <th>金额 / 拆分</th>
+              <th>业务员</th>
+              <th>状态</th>
+              <th>操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {invoices.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  {r.id}
+                  <small>{r.appointmentIds.join("、")}</small>
+                </td>
+                <td>
+                  ¥{r.amount.toFixed(2)}
+                  <small>
+                    {r.parts.map((n: number) => n.toFixed(2)).join(" + ")}
+                  </small>
+                </td>
+                <td>{r.seller}</td>
+                <td>{r.status}</td>
+                <td>
+                  <button
+                    className="text-btn"
+                    disabled={r.status === "已作废"}
+                    onClick={() =>
+                      act({
+                        type: "UPSERT_RECORD",
+                        payload: {
+                          collection: "invoiceLedger",
+                          record: {
+                            ...r,
+                            status: "已作废",
+                            voidedAt: new Date().toISOString(),
+                          },
+                        },
+                      })
+                    }
+                  >
+                    模拟作废
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <button
         className="btn"
         onClick={() =>

@@ -1,0 +1,205 @@
+{
+  "scope": "父任务明确转交的固定8项报告归档/查询，不扩范围",
+  "ownerFiles": [
+    "src/modules/ReportArchive.tsx",
+    "src/modules/reportArchiveRules.ts",
+    "tests/report-archive.test.tsx",
+    "docs/completion-report-archive.json"
+  ],
+  "integrationAPI": {
+    "components": [
+      "ReportArchive({appointmentIds, initialOperation?})",
+      "ReportSearchControls({onChange})"
+    ],
+    "pure": [
+      "filterReports(state,appointments,filters)",
+      "defaultReportFilters",
+      "reduceReportArchiveAction(state,action)",
+      "augmentReportArchiveEvents(previous,next,action)"
+    ],
+    "events": "REPORT_ARCHIVE_APPLY整批原子动作，唯一requestId与expected版本快照；REPORT_ARCHIVE_SAVE_CATEGORY/SAVE_SLOT/DELETE_LOCATION维护稳定配置ID",
+    "deviceBoundary": "成功PRINT且payload.bound===true && source===kiosk时记录该次独立装订事件；没有这些显式事实不推断装订"
+  },
+  "verification": {
+    "newTests": 17,
+    "reportAndQueueTests": 57,
+    "passed": [
+      "npx vitest run tests/report-archive.test.tsx tests/queue-automation.test.tsx tests/queue-controls.test.tsx",
+      "npx eslint src/modules/ReportArchive.tsx src/modules/reportArchiveRules.ts",
+      "npx tsc --noEmit"
+    ],
+    "browserVerification": "本owner未执行Chromium视觉验收；由父任务统一执行。",
+    "finalRelatedSuite": "6个关联文件91例实际通过；之后权限只读显示与主检完成状态过滤小修，报告17例另行复测。"
+  },
+  "items": [
+    {
+      "id": "T0336",
+      "implementationOwner": "queue (parent delegated report sub-scope)",
+      "originalText": "支持姓名、体检号、身份证号、单位等条件检索，支持模糊检索、精准检索。",
+      "gapClosed": "增加报告身份证/单位/主检医生条件以及精准/模糊查询组合；当前主要姓名/体检号。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/reportArchiveRules.ts :: filterReports, reportMainDoctor, reportAccessible",
+        "src/modules/ReportArchive.tsx :: ReportSearchControls",
+        "src/modules/Core.tsx :: Reports列表实际filterReports组合过滤"
+      ],
+      "tests": [
+        "tests/report-archive.test.tsx :: combines name, exam ID, DEMO identity, company, genuine chief-review doctor and inclusive dates",
+        "tests/report-archive.test.tsx :: does not label a referring doctor as chief reviewer and applies custom scope to actual results",
+        "tests/report-archive.test.tsx :: search controls update a real list, clear filters and show invalid date ranges"
+      ],
+      "boundary": "仅共享合成数据本地交互；不接真实患者身份、打印装订设备、柜体、物流或真实交接签收。所有本次人时显式记录，旧缺失字段不补造；医学结果锁保持，独立archiveLocked阻止流转。"
+    },
+    {
+      "id": "T0340",
+      "implementationOwner": "queue (parent delegated report sub-scope)",
+      "originalText": "支持根据主检医生检索相关主检医生主检的报告。",
+      "gapClosed": "增加报告身份证/单位/主检医生条件以及精准/模糊查询组合；当前主要姓名/体检号。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/reportArchiveRules.ts :: filterReports, reportMainDoctor, reportAccessible",
+        "src/modules/ReportArchive.tsx :: ReportSearchControls",
+        "src/modules/Core.tsx :: Reports列表实际filterReports组合过滤"
+      ],
+      "tests": [
+        "tests/report-archive.test.tsx :: combines name, exam ID, DEMO identity, company, genuine chief-review doctor and inclusive dates",
+        "tests/report-archive.test.tsx :: does not label a referring doctor as chief reviewer and applies custom scope to actual results",
+        "tests/report-archive.test.tsx :: search controls update a real list, clear filters and show invalid date ranges"
+      ],
+      "boundary": "仅共享合成数据本地交互；不接真实患者身份、打印装订设备、柜体、物流或真实交接签收。所有本次人时显式记录，旧缺失字段不补造；医学结果锁保持，独立archiveLocked阻止流转。"
+    },
+    {
+      "id": "T0343",
+      "implementationOwner": "queue (parent delegated report sub-scope)",
+      "originalText": "支持报告档案管理，支持对所有报告打印、装订、交接情况进行记录管理，记录打印人、打印时间、装订人、装订时间、交接人、交接时间。",
+      "gapClosed": "分别记录打印、装订、交接的人/时，支持查询流转历史；目前状态/打印时间不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/reportArchiveRules.ts :: reduceReportArchiveAction, validateReportArchiveOperation, archiveVersion, getReportArchive, augmentReportArchiveEvents",
+        "src/modules/ReportArchive.tsx :: ReportArchive，柜类别/柜位维护、阶段选择、人时/领取数据、预览/确认/取消、完整历史",
+        "src/modules/Core.tsx :: ReportArchive主列表与issue领取入口接入；旧自由柜位与布尔领取捷径移除",
+        "src/model.ts :: REPORT_ARCHIVE_*纯状态钩子与成功PRINT事实归档"
+      ],
+      "tests": [
+        "tests/report-archive.test.tsx :: records distinct printing, binding and handoff people/time and preserves report medical lock/content",
+        "tests/report-archive.test.tsx :: batch stock-in, move and empty-cabinet stock-out update all shared positions and retain inventory timestamps",
+        "tests/report-archive.test.tsx :: uses stable category/slot IDs across rename and forbids deleting occupied slots, shrinking capacity or deleting nonempty categories",
+        "tests/report-archive.test.tsx :: records issuer, recipient, exact time and method; issuing clears inventory and cannot be duplicated",
+        "tests/report-archive.test.tsx :: creates and renames categories/slots, then previews, cancels and commits actual batch flow",
+        "tests/report-archive.test.tsx :: prevents duplicate request, stale preview, invalid times, disabled locations and unsaved stages",
+        "tests/report-archive.test.tsx :: only a successful current kiosk binding event records binding, while print-only and failed operations do not"
+      ],
+      "boundary": "仅共享合成数据本地交互；不接真实患者身份、打印装订设备、柜体、物流或真实交接签收。所有本次人时显式记录，旧缺失字段不补造；医学结果锁保持，独立archiveLocked阻止流转。"
+    },
+    {
+      "id": "T0344",
+      "implementationOwner": "queue (parent delegated report sub-scope)",
+      "originalText": "支持报告的出入库管理，可对报告进行报告柜入库管理，记录报告存放位置，存放时间等。",
+      "gapClosed": "明确出入库状态和位置/时间，支持批量入库、空柜出库；当前改cabinet文本不能区分出库。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/reportArchiveRules.ts :: reduceReportArchiveAction, validateReportArchiveOperation, archiveVersion, getReportArchive, augmentReportArchiveEvents",
+        "src/modules/ReportArchive.tsx :: ReportArchive，柜类别/柜位维护、阶段选择、人时/领取数据、预览/确认/取消、完整历史",
+        "src/modules/Core.tsx :: ReportArchive主列表与issue领取入口接入；旧自由柜位与布尔领取捷径移除",
+        "src/model.ts :: REPORT_ARCHIVE_*纯状态钩子与成功PRINT事实归档"
+      ],
+      "tests": [
+        "tests/report-archive.test.tsx :: records distinct printing, binding and handoff people/time and preserves report medical lock/content",
+        "tests/report-archive.test.tsx :: batch stock-in, move and empty-cabinet stock-out update all shared positions and retain inventory timestamps",
+        "tests/report-archive.test.tsx :: uses stable category/slot IDs across rename and forbids deleting occupied slots, shrinking capacity or deleting nonempty categories",
+        "tests/report-archive.test.tsx :: records issuer, recipient, exact time and method; issuing clears inventory and cannot be duplicated",
+        "tests/report-archive.test.tsx :: creates and renames categories/slots, then previews, cancels and commits actual batch flow",
+        "tests/report-archive.test.tsx :: prevents duplicate request, stale preview, invalid times, disabled locations and unsaved stages",
+        "tests/report-archive.test.tsx :: only a successful current kiosk binding event records binding, while print-only and failed operations do not"
+      ],
+      "boundary": "仅共享合成数据本地交互；不接真实患者身份、打印装订设备、柜体、物流或真实交接签收。所有本次人时显式记录，旧缺失字段不补造；医学结果锁保持，独立archiveLocked阻止流转。"
+    },
+    {
+      "id": "T0345",
+      "implementationOwner": "queue (parent delegated report sub-scope)",
+      "originalText": "报告柜可自定义分类。",
+      "gapClosed": "报告柜类别/柜位可创建维护并供入库选择，替代自由输入位置。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/reportArchiveRules.ts :: reduceReportArchiveAction, validateReportArchiveOperation, archiveVersion, getReportArchive, augmentReportArchiveEvents",
+        "src/modules/ReportArchive.tsx :: ReportArchive，柜类别/柜位维护、阶段选择、人时/领取数据、预览/确认/取消、完整历史",
+        "src/modules/Core.tsx :: ReportArchive主列表与issue领取入口接入；旧自由柜位与布尔领取捷径移除",
+        "src/model.ts :: REPORT_ARCHIVE_*纯状态钩子与成功PRINT事实归档"
+      ],
+      "tests": [
+        "tests/report-archive.test.tsx :: records distinct printing, binding and handoff people/time and preserves report medical lock/content",
+        "tests/report-archive.test.tsx :: batch stock-in, move and empty-cabinet stock-out update all shared positions and retain inventory timestamps",
+        "tests/report-archive.test.tsx :: uses stable category/slot IDs across rename and forbids deleting occupied slots, shrinking capacity or deleting nonempty categories",
+        "tests/report-archive.test.tsx :: records issuer, recipient, exact time and method; issuing clears inventory and cannot be duplicated",
+        "tests/report-archive.test.tsx :: creates and renames categories/slots, then previews, cancels and commits actual batch flow",
+        "tests/report-archive.test.tsx :: prevents duplicate request, stale preview, invalid times, disabled locations and unsaved stages",
+        "tests/report-archive.test.tsx :: only a successful current kiosk binding event records binding, while print-only and failed operations do not"
+      ],
+      "boundary": "仅共享合成数据本地交互；不接真实患者身份、打印装订设备、柜体、物流或真实交接签收。所有本次人时显式记录，旧缺失字段不补造；医学结果锁保持，独立archiveLocked阻止流转。"
+    },
+    {
+      "id": "T0346",
+      "implementationOwner": "queue (parent delegated report sub-scope)",
+      "originalText": "支持批量出入库管理。",
+      "gapClosed": "明确出入库状态和位置/时间，支持批量入库、空柜出库；当前改cabinet文本不能区分出库。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/reportArchiveRules.ts :: reduceReportArchiveAction, validateReportArchiveOperation, archiveVersion, getReportArchive, augmentReportArchiveEvents",
+        "src/modules/ReportArchive.tsx :: ReportArchive，柜类别/柜位维护、阶段选择、人时/领取数据、预览/确认/取消、完整历史",
+        "src/modules/Core.tsx :: ReportArchive主列表与issue领取入口接入；旧自由柜位与布尔领取捷径移除",
+        "src/model.ts :: REPORT_ARCHIVE_*纯状态钩子与成功PRINT事实归档"
+      ],
+      "tests": [
+        "tests/report-archive.test.tsx :: records distinct printing, binding and handoff people/time and preserves report medical lock/content",
+        "tests/report-archive.test.tsx :: batch stock-in, move and empty-cabinet stock-out update all shared positions and retain inventory timestamps",
+        "tests/report-archive.test.tsx :: uses stable category/slot IDs across rename and forbids deleting occupied slots, shrinking capacity or deleting nonempty categories",
+        "tests/report-archive.test.tsx :: records issuer, recipient, exact time and method; issuing clears inventory and cannot be duplicated",
+        "tests/report-archive.test.tsx :: creates and renames categories/slots, then previews, cancels and commits actual batch flow",
+        "tests/report-archive.test.tsx :: prevents duplicate request, stale preview, invalid times, disabled locations and unsaved stages",
+        "tests/report-archive.test.tsx :: only a successful current kiosk binding event records binding, while print-only and failed operations do not"
+      ],
+      "boundary": "仅共享合成数据本地交互；不接真实患者身份、打印装订设备、柜体、物流或真实交接签收。所有本次人时显式记录，旧缺失字段不补造；医学结果锁保持，独立archiveLocked阻止流转。"
+    },
+    {
+      "id": "T0348",
+      "implementationOwner": "queue (parent delegated report sub-scope)",
+      "originalText": "报告发放时可标记方法时间、发放人、领取人、领取方式等。",
+      "gapClosed": "补发放人、领取人和明确发放时间字段，记录领取方式；不以delivered布尔替代。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/reportArchiveRules.ts :: reduceReportArchiveAction, validateReportArchiveOperation, archiveVersion, getReportArchive, augmentReportArchiveEvents",
+        "src/modules/ReportArchive.tsx :: ReportArchive，柜类别/柜位维护、阶段选择、人时/领取数据、预览/确认/取消、完整历史",
+        "src/modules/Core.tsx :: ReportArchive主列表与issue领取入口接入；旧自由柜位与布尔领取捷径移除",
+        "src/model.ts :: REPORT_ARCHIVE_*纯状态钩子与成功PRINT事实归档"
+      ],
+      "tests": [
+        "tests/report-archive.test.tsx :: records distinct printing, binding and handoff people/time and preserves report medical lock/content",
+        "tests/report-archive.test.tsx :: batch stock-in, move and empty-cabinet stock-out update all shared positions and retain inventory timestamps",
+        "tests/report-archive.test.tsx :: uses stable category/slot IDs across rename and forbids deleting occupied slots, shrinking capacity or deleting nonempty categories",
+        "tests/report-archive.test.tsx :: records issuer, recipient, exact time and method; issuing clears inventory and cannot be duplicated",
+        "tests/report-archive.test.tsx :: creates and renames categories/slots, then previews, cancels and commits actual batch flow",
+        "tests/report-archive.test.tsx :: prevents duplicate request, stale preview, invalid times, disabled locations and unsaved stages",
+        "tests/report-archive.test.tsx :: only a successful current kiosk binding event records binding, while print-only and failed operations do not"
+      ],
+      "boundary": "仅共享合成数据本地交互；不接真实患者身份、打印装订设备、柜体、物流或真实交接签收。所有本次人时显式记录，旧缺失字段不补造；医学结果锁保持，独立archiveLocked阻止流转。原文“方法时间”含义仍待澄清，本地明确记录发放时间/发放人/领取人/方式。"
+    },
+    {
+      "id": "T0350",
+      "implementationOwner": "queue (parent delegated report sub-scope)",
+      "originalText": "支持多种检索条件。",
+      "gapClosed": "增加报告身份证/单位/主检医生条件以及精准/模糊查询组合；当前主要姓名/体检号。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/reportArchiveRules.ts :: filterReports, reportMainDoctor, reportAccessible",
+        "src/modules/ReportArchive.tsx :: ReportSearchControls",
+        "src/modules/Core.tsx :: Reports列表实际filterReports组合过滤"
+      ],
+      "tests": [
+        "tests/report-archive.test.tsx :: combines name, exam ID, DEMO identity, company, genuine chief-review doctor and inclusive dates",
+        "tests/report-archive.test.tsx :: does not label a referring doctor as chief reviewer and applies custom scope to actual results",
+        "tests/report-archive.test.tsx :: search controls update a real list, clear filters and show invalid date ranges"
+      ],
+      "boundary": "仅共享合成数据本地交互；不接真实患者身份、打印装订设备、柜体、物流或真实交接签收。所有本次人时显式记录，旧缺失字段不补造；医学结果锁保持，独立archiveLocked阻止流转。"
+    }
+  ]
+}

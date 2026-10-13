@@ -1,3 +1,9 @@
+import {
+  bookingPriceMode,
+  displayedPackagePrice,
+  displayedItemPrice,
+  getPackageType,
+} from "../bookingDisplay";
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -29,6 +35,7 @@ import { useDemo } from "../store";
 import "./devices.css";
 import {
   getBookingAvailability,
+  bookingDateSelectionError,
   getOnlineExtraCatalog,
   getGroupBookingSchedules,
   getBookingSlots,
@@ -83,6 +90,7 @@ export default function Kiosk() {
   const [countdown, setCountdown] = useState(120);
   const [fault, setFault] = useState<Fault>("normal");
   const [showTools, setShowTools] = useState(false);
+  const [selectionDateError, setSelectionDateError] = useState("");
   const [notice, setNotice] = useState("");
   const [printKind, setPrintKind] = useState<"guide" | "report">("guide");
   const [printStep, setPrintStep] = useState(0);
@@ -127,6 +135,7 @@ export default function Kiosk() {
         ?.onlineEnabled !== false &&
       p.onlineEnabled !== false,
   );
+  const [packageTypeFilter, setPackageTypeFilter] = useState("");
   const pack = applicablePackages.find((p) => p.id === packId);
   const requiredItems = getOrderRules(state)
     .filter((r) => r.required && r.enabled !== false && r.ruleEnabled !== false)
@@ -149,11 +158,31 @@ export default function Kiosk() {
     kioskExtras
       .filter((item) => activeExtras.includes(item.name))
       .reduce((sum, item) => sum + item.price, 0);
+  const displayedTotal =
+    bookingPriceMode(state) === "原价"
+      ? (pack ? displayedPackagePrice(state, pack) : 0) +
+        kioskExtras
+          .filter((item) => activeExtras.includes(item.name))
+          .reduce(
+            (sum, item) =>
+              sum + displayedItemPrice(state, item.name, item.price),
+            0,
+          )
+      : bookingTotal;
+  useEffect(() => {
+    const error = bookingDateSelectionError(state, date);
+    if (error) {
+      setDate("");
+      setSelectionDateError(error);
+    }
+  }, [state.config.weekendAllowed, date]);
   const availability = getBookingAvailability(state, date, undefined, {
     patientId,
     kind: bookingKind,
     company: groupCompany,
     time,
+    packageIds: pack ? [pack.id] : [],
+    items: [...new Set([...baseItems, ...activeExtras])],
   });
   useEffect(
     () =>
@@ -210,7 +239,16 @@ export default function Kiosk() {
         setPrintStep(printStep + 1);
       else {
         if (printKind === "report") {
-          act({ type: "PRINT", payload: { id: printId.current } });
+          act({
+            type: "PRINT",
+            payload: {
+              id: printId.current,
+              actor: "报告自助机（本地模拟）",
+              bound: binding,
+              boundAt: new Date().toISOString(),
+              source: "kiosk",
+            },
+          });
           act({
             type: "ADD_AUDIT",
             payload: {
@@ -622,28 +660,47 @@ export default function Kiosk() {
               )}
             </div>
             <div className="ks-package-grid">
-              {applicablePackages.map((p) => (
-                <button
-                  key={p.id}
-                  className={p.id === packId ? "selected" : ""}
-                  onClick={() => setPackId(p.id)}
+              <label>
+                筛选套餐类型
+                <select
+                  value={packageTypeFilter}
+                  onChange={(e) => setPackageTypeFilter(e.target.value)}
                 >
-                  <span className="ks-package-check">
-                    {p.id === packId ? (
-                      <CheckCircle2 size={23} />
-                    ) : (
-                      <HeartPulse size={23} />
-                    )}
-                  </span>
-                  <h3>{p.name}</h3>
-                  <p>
-                    {p.items.length} 项检查 · {p.tag}
-                  </p>
-                  <strong>
-                    {displayPrices ? `¥${p.price}` : "价格待咨询"}
-                  </strong>
-                </button>
-              ))}
+                  <option value="">全部类型</option>
+                  <option>固定套餐</option>
+                  <option>筛查套餐</option>
+                </select>
+              </label>
+              {applicablePackages
+                .filter(
+                  (p) =>
+                    !packageTypeFilter ||
+                    getPackageType(p) === packageTypeFilter,
+                )
+                .map((p) => (
+                  <button
+                    key={p.id}
+                    className={p.id === packId ? "selected" : ""}
+                    onClick={() => setPackId(p.id)}
+                  >
+                    <span className="ks-package-check">
+                      {p.id === packId ? (
+                        <CheckCircle2 size={23} />
+                      ) : (
+                        <HeartPulse size={23} />
+                      )}
+                    </span>
+                    <h3>{p.name}</h3>
+                    <p>
+                      {p.items.length} 项检查 · {p.tag}
+                    </p>
+                    <strong>
+                      {displayPrices
+                        ? `¥${displayedPackagePrice(state, p)}`
+                        : "价格待咨询"}
+                    </strong>
+                  </button>
+                ))}
             </div>
             <h3 className="ks-project-title">套餐检查项目</h3>
             <p className="ks-rule-note">
@@ -697,7 +754,11 @@ export default function Kiosk() {
                     }
                   />
                   {item.name}
-                  {displayPrices && <small>+ ¥{item.price}</small>}
+                  {displayPrices && (
+                    <small>
+                      + ¥{displayedItemPrice(state, item.name, item.price)}
+                    </small>
+                  )}
                 </label>
               ))}
             </div>
@@ -848,7 +909,10 @@ export default function Kiosk() {
                   key={day}
                   className="ks-secondary"
                   style={{ minHeight: 40, fontSize: 11, padding: "8px 12px" }}
-                  onClick={() => setDate(day)}
+                  onClick={() => {
+                    setSelectionDateError("");
+                    setDate(day);
+                  }}
                 >
                   {day.slice(5)}
                 </button>
@@ -871,7 +935,17 @@ export default function Kiosk() {
                   type="date"
                   min={bookingDateOffset(state)}
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => {
+                    const error = bookingDateSelectionError(
+                      state,
+                      e.target.value,
+                    );
+                    setSelectionDateError(error);
+                    if (error) {
+                      setDate("");
+                      setNotice(error);
+                    } else setDate(e.target.value);
+                  }}
                 />
               </label>
               <label>
@@ -887,14 +961,15 @@ export default function Kiosk() {
               className={`ks-capacity ${availability.allowed ? "" : "blocked"}`}
               role="note"
             >
-              {availability.error ||
+              {selectionDateError ||
+                availability.error ||
                 `当日全院剩余 ${availability.remaining} / ${availability.capacity} 个预约名额`}
             </div>
             <div className="ks-action-row">
               <p>
                 已选 {[...baseItems, ...activeExtras].length} 项{" "}
                 {displayPrices
-                  ? ` · 合计 ¥${bookingTotal}`
+                  ? ` · ${bookingPriceMode(state)}合计 ¥${displayedTotal}`
                   : " · 价格展示已关闭"}
               </p>
               <button

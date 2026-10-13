@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { validateGroupOrderBooking } from "../groupImportRules";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Activity,
@@ -44,12 +45,25 @@ import {
 } from "../orderingRules";
 import { deriveQueueDefinitions } from "./Queue";
 import {
+  customerQueueSummary,
+  recommendNextStation,
+} from "./queueAutomationRules";
+import { PatientConversation } from "./MessageWorkbench";
+import {
+  bookingPriceMode,
+  displayedPackagePrice,
+  displayedItemPrice,
+  getPackageType,
+  originalPricingState,
+} from "../bookingDisplay";
+import {
   groupForBooking,
   groupDiscountPercent,
   splitGroupAmount,
 } from "./Groups";
 import {
   getBookingAvailability,
+  bookingDateSelectionError,
   getOnlineExtraCatalog,
   getGroupBookingSchedules,
   getBookingNow,
@@ -61,6 +75,8 @@ import {
   recommendedBookingItems,
   QUESTIONNAIRE_OPTIONS,
 } from "../bookingRules";
+
+const ReportDelivery = lazy(() => import("./ReportDelivery"));
 
 type View =
   | "home"
@@ -227,6 +243,14 @@ export default function Patient() {
     ["approved", "printed"].includes(a.status),
   );
   const [date, setDate] = useState(upcomingDate());
+  const [selectionDateError, setSelectionDateError] = useState("");
+  useEffect(() => {
+    const error = bookingDateSelectionError(state, date);
+    if (error) {
+      setDate("");
+      setSelectionDateError(error);
+    }
+  }, [state.config.weekendAllowed, date]);
   const inGroupFlow =
     view === "group" ||
     (["compare", "questionnaire"].includes(view) && bookingReturn === "group");
@@ -256,6 +280,7 @@ export default function Patient() {
     inGroupFlow &&
     (state.records.groupOrders || []).some((g) => g.company === groupCompany) &&
     (!activeGroup || activeGroup.company !== groupCompany);
+  const [packageTypeFilter, setPackageTypeFilter] = useState("");
   const [packageId, setPackageId] = useState(state.packages[0]?.id || "");
   const [packageSelection, setPackageSelection] = useState<string[]>([
     state.packages[0]?.id || "",
@@ -399,6 +424,8 @@ export default function Patient() {
     company: groupCompany,
     kind: view === "group" ? "group" : "individual",
     time,
+    packageIds: simple ? [] : selectedPackageIds,
+    items: simple ? [] : submittedItems,
   });
   const questionnaireEnabled = state.config.questionnaireEnabled !== false;
   const questionnaireSkippable = state.config.questionnaireSkippable !== false;
@@ -421,6 +448,16 @@ export default function Patient() {
   const [cancelId, setCancelId] = useState("");
   const [editId, setEditId] = useState("");
   const [reportId, setReportId] = useState("");
+  const [reportDateFrom, setReportDateFrom] = useState("");
+  const [reportDateTo, setReportDateTo] = useState("");
+  const invalidReportRange =
+    !!reportDateFrom && !!reportDateTo && reportDateFrom > reportDateTo;
+  const filteredReports = reports.filter(
+    (r) =>
+      !invalidReportRange &&
+      (!reportDateFrom || r.date >= reportDateFrom) &&
+      (!reportDateTo || r.date <= reportDateTo),
+  );
   const [historyCount, setHistoryCount] = useState(3);
   const [answers, setAnswers] = useState<string[]>([]);
   const [questionContext, setQuestionContext] = useState({
@@ -440,8 +477,7 @@ export default function Patient() {
   );
   const [groupCode, setGroupCode] = useState("DEMO2026");
   const [groupMode, setGroupMode] = useState("定额自选");
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
+
   const [surveyOrderId, setSurveyOrderId] = useState("");
   const surveyOrders = orders.filter((order) => order.status !== "cancelled");
   const surveyAppointmentId = surveyOrders.some(
@@ -463,6 +499,13 @@ export default function Patient() {
   const [healthDays, setHealthDays] = useState<string[]>([]);
   const [cart, setCart] = useState(0);
   const [article, setArticle] = useState("体检前，这些准备请记好");
+  const [articleId, setArticleId] = useState("");
+  const publishedArticles = (state.records.articles || []).filter(
+    (row) =>
+      row.status === "已发布" &&
+      (!row.date || row.date <= bookingDateOffset(state)),
+  );
+  const selectedArticle = publishedArticles.find((row) => row.id === articleId);
   const [service, setService] = useState("");
   const [serviceDate, setServiceDate] = useState(upcomingDate());
   const [reminders, setReminders] = useState(true);
@@ -554,6 +597,39 @@ export default function Patient() {
   const total = groupQuote
     ? groupQuote.amount
     : (simple ? 0 : selectedPackage?.price || 0) + addPrice;
+  const priceDiscount = groupDiscountPercent(activeGroup, groupRelative);
+  const displayedTotal =
+    bookingPriceMode(state) !== "原价"
+      ? total
+      : simple
+        ? 0
+        : groupQuote
+          ? quoteOrder(
+              originalPricingState(state),
+              selectedPackageIds,
+              100,
+              {},
+              activeExtras,
+              mutuallyExcludedItems,
+            ).amount
+          : selectedPackages.reduce(
+              (sum, pack) => sum + displayedPackagePrice(state, pack),
+              0,
+            ) +
+            bookingExtras
+              .filter((e) => activeExtras.includes(e.name))
+              .reduce(
+                (sum, e) => sum + displayedItemPrice(state, e.name, e.price),
+                0,
+              );
+  const chooseDate = (value: string) => {
+    const error = bookingDateSelectionError(state, value);
+    setSelectionDateError(error);
+    if (error) {
+      setDate("");
+      tell(error);
+    } else setDate(value);
+  };
   const selectBookingPackage = (id: string) => {
     if (!multiPackageMode) {
       setPackageId(id);
@@ -650,6 +726,16 @@ export default function Patient() {
     if (!patient || (!simple && !selectedPackage))
       return tell("请选择体检人和套餐");
     if (!availability.allowed) return tell(availability.error);
+    if (isGroup && activeGroup) {
+      const issues = validateGroupOrderBooking(state, activeGroup.id, {
+        patientId: groupRelative ? effectiveSponsorId : patient.id,
+        date,
+        time,
+        packageIds: selectedPackageIds,
+        items: submittedItems,
+      });
+      if (issues.length) return tell(issues.join("；"));
+    }
     if (
       isGroup &&
       groupRelative &&
@@ -717,6 +803,11 @@ export default function Patient() {
         bookingKind: isGroup ? "group" : "individual",
         groupCompany: isGroup ? groupCompany : "",
         questionnaireCompleted,
+        recommendedItems: recommendationEnabled
+          ? state.records.bookingQuestionnaires?.find(
+              (row) => row.patientId === patient.id,
+            )?.recommended || []
+          : [],
         distributorId: state.patients.some((p) => `D-${p.id}` === distributorId)
           ? distributorId
           : "",
@@ -743,7 +834,11 @@ export default function Patient() {
   };
   const payOrder = state.appointments.find((a) => a.id === payId);
   const currentReport =
-    reports.find((r) => r.id === reportId) || reports[reports.length - 1];
+    filteredReports.find((r) => r.id === reportId) ||
+    filteredReports[filteredReports.length - 1];
+  const nextStation = upcoming
+    ? recommendNextStation(state, upcoming.id)
+    : null;
   const baseServices = [
     {
       icon: CalendarDays,
@@ -829,6 +924,9 @@ export default function Patient() {
   const selectedQueue =
     queueDefinitions.find((q) => q.id === queueDepartment) ||
     queueDefinitions[0];
+  const queueSummary = upcoming
+    ? customerQueueSummary(state, upcoming.id)
+    : null;
   const currentTickets = (state.records.queueTickets || []).filter(
     (t) =>
       t.appointmentId === upcoming?.id &&
@@ -1064,6 +1162,7 @@ export default function Patient() {
                       style={{ textAlign: "left", width: "100%" }}
                       onClick={() => {
                         if (row.kind === "新闻" || row.target === "健康科普") {
+                          setArticleId("");
                           setArticle(row.name);
                           go("article");
                         } else go(portalTarget(row.target));
@@ -1179,7 +1278,11 @@ export default function Patient() {
                           {displayPrices ? (
                             <>
                               <small>¥</small>
-                              {p.price.toLocaleString()}
+                              {displayedPackagePrice(
+                                state,
+                                p,
+                                priceDiscount,
+                              ).toLocaleString()}
                             </>
                           ) : (
                             <small>价格待咨询</small>
@@ -1198,16 +1301,42 @@ export default function Patient() {
                   <h2>健康课堂</h2>
                   <p>把专业知识，变成日常习惯</p>
                 </div>
-                <button onClick={() => go("article")}>
+                <button
+                  onClick={() => {
+                    setArticleId("");
+                    go("article");
+                  }}
+                >
                   更多内容 <ArrowRight size={16} />
                 </button>
               </div>
               <div className="pt-articles">
+                {publishedArticles.map((row) => (
+                  <button
+                    key={row.id}
+                    onClick={() => {
+                      setArticleId(row.id);
+                      go("article");
+                    }}
+                  >
+                    <span className="pt-article-art">
+                      <Heart size={30} />
+                    </span>
+                    <div>
+                      <small>
+                        {row.category} · {row.date}
+                      </small>
+                      <h3>{row.name}</h3>
+                      <p>{row.owner || "体检中心"} · 已发布</p>
+                    </div>
+                  </button>
+                ))}
                 {["体检前，这些准备请记好", "久坐的你，今天动起来了吗？"].map(
                   (name, i) => (
                     <button
                       key={name}
                       onClick={() => {
+                        setArticleId("");
                         setArticle(name);
                         go("article");
                       }}
@@ -1477,6 +1606,17 @@ export default function Patient() {
                           placeholder="搜索套餐名称"
                         />
                       </div>
+                      <label className="pt-field">
+                        筛选套餐类型
+                        <select
+                          value={packageTypeFilter}
+                          onChange={(e) => setPackageTypeFilter(e.target.value)}
+                        >
+                          <option value="">全部类型</option>
+                          <option>固定套餐</option>
+                          <option>筛查套餐</option>
+                        </select>
+                      </label>
                       {multiPackageMode && (
                         <p className="pt-note" role="note">
                           套餐 N 选 M：{applicablePackages.length} 选{" "}
@@ -1493,7 +1633,12 @@ export default function Patient() {
                         )}
                       <div className="pt-package-options">
                         {applicablePackages
-                          .filter((p) => p.name.includes(query))
+                          .filter(
+                            (p) =>
+                              p.name.includes(query) &&
+                              (!packageTypeFilter ||
+                                getPackageType(p) === packageTypeFilter),
+                          )
                           .map((p) => (
                             <div
                               className={`pt-package-option ${selectedPackageIds.includes(p.id) ? "selected" : ""}`}
@@ -1510,10 +1655,14 @@ export default function Patient() {
                                 </span>
                                 <span>
                                   <b>{p.name}</b>
-                                  <small>{p.items.join(" · ")}</small>
+                                  <small>
+                                    {getPackageType(p)} · {p.items.join(" · ")}
+                                  </small>
                                 </span>
                                 <strong>
-                                  {displayPrices ? `¥${p.price}` : "价格待咨询"}
+                                  {displayPrices
+                                    ? `¥${displayedPackagePrice(state, p, priceDiscount)}`
+                                    : "价格待咨询"}
                                 </strong>
                               </button>
                               <label>
@@ -1742,7 +1891,9 @@ export default function Patient() {
                               <small>{e.detail}</small>
                             </span>
                             <b>
-                              {displayPrices ? `+ ¥${e.price}` : "价格待咨询"}
+                              {displayPrices
+                                ? `+ ¥${displayedItemPrice(state, e.name, e.price, priceDiscount)}`
+                                : "价格待咨询"}
                             </b>
                           </label>
                         ),
@@ -1796,7 +1947,7 @@ export default function Patient() {
                               />
                               {item}
                               {displayPrices
-                                ? ` · ¥${bookingExtras.find((extra) => extra.name === item)?.price ?? 0}`
+                                ? ` · ¥${displayedItemPrice(state, item, bookingExtras.find((extra) => extra.name === item)?.price ?? 0, priceDiscount)}`
                                 : ""}
                             </label>
                           ))}
@@ -1844,7 +1995,7 @@ export default function Patient() {
                         className="pt-secondary"
                         style={{ padding: "7px 9px", fontSize: 10 }}
                         key={day}
-                        onClick={() => setDate(day)}
+                        onClick={() => chooseDate(day)}
                       >
                         {day.slice(5)}
                       </button>
@@ -1855,9 +2006,9 @@ export default function Patient() {
                       预约日期
                       <input
                         type="date"
-                        min={new Date().toISOString().slice(0, 10)}
+                        min={bookingDateOffset(state)}
                         value={date}
-                        onChange={(e) => setDate(e.target.value)}
+                        onChange={(e) => chooseDate(e.target.value)}
                       />
                     </label>
                     <label>
@@ -1878,8 +2029,15 @@ export default function Patient() {
                   >
                     {groupContractBlocked
                       ? "当前体检人不在单位订单有效名单或预约日期内"
-                      : availability.error ||
+                      : selectionDateError ||
+                        availability.error ||
                         `当日全院剩余 ${availability.remaining} / ${availability.capacity} 个预约名额`}
+                    {availability.resources.map((r) => (
+                      <small key={r.id} style={{ display: "block" }}>
+                        {r.name}：当日剩余 {r.remaining ?? "不限"} / 本时段剩余{" "}
+                        {r.slotRemaining ?? "不限"}
+                      </small>
+                    ))}
                   </div>
                   <div className="pt-note">
                     请提前 10
@@ -1911,14 +2069,16 @@ export default function Patient() {
                       <small>
                         {!displayPrices
                           ? "价格展示已关闭"
-                          : view === "group"
-                            ? `单位承担 ¥${groupCharge.unit} / 自费 ¥${groupCharge.personal}`
-                            : "预约总金额"}
+                          : bookingPriceMode(state) === "原价"
+                            ? "预约原价合计（成交以支付确认为准）"
+                            : view === "group"
+                              ? `单位承担 ¥${groupCharge.unit} / 自费 ¥${groupCharge.personal}`
+                              : "预约总金额"}
                         <br />
                       </small>
                       <strong>
                         {displayPrices
-                          ? `¥${total.toLocaleString()}`
+                          ? `¥${displayedTotal.toLocaleString()}`
                           : "待确认"}
                       </strong>
                     </div>
@@ -1950,7 +2110,9 @@ export default function Patient() {
                           <th key={p.id}>
                             {p.name}
                             <strong>
-                              {displayPrices ? `¥${p.price}` : "价格待咨询"}
+                              {displayPrices
+                                ? `¥${displayedPackagePrice(state, p, priceDiscount)}`
+                                : "价格待咨询"}
                             </strong>
                           </th>
                         ))}
@@ -2332,11 +2494,16 @@ export default function Patient() {
                     <h2>
                       {["booked", "paid"].includes(upcoming.status)
                         ? "一层 · 自助报到区"
-                        : `${Object.keys(upcoming.results).length ? "二层" : "一层"} · ${upcoming.items.find((item) => !upcoming.results[item]) || "报告服务台"}`}
+                        : nextStation?.recommendation
+                          ? `${nextStation.recommendation.zone} · ${nextStation.recommendation.name}`
+                          : "暂无可推荐站点"}
                     </h2>
                     <p>
-                      <Clock3 size={16} /> 预计等候 6 分钟{" "}
-                      <small>演示估算</small>
+                      <Clock3 size={16} />{" "}
+                      {nextStation?.recommendation
+                        ? `预计等候 ${nextStation.recommendation.waitMinutes} 分钟（本地队列估算）`
+                        : nextStation?.reason || "报到后按项目推荐"}
+                      <small>{nextStation?.recommendation?.explanation}</small>
                     </p>
                   </div>
                   <section
@@ -2354,6 +2521,43 @@ export default function Patient() {
                       <small>{upcoming.id}</small>
                     </div>
                   </section>
+                  {queueSummary && (
+                    <section aria-label="我的队列完成概览">
+                      <h3>排队与检查概览</h3>
+                      {(
+                        [
+                          ["待检", queueSummary.pending],
+                          ["已检", queueSummary.completed],
+                          ["历史结束", queueSummary.historical],
+                        ] as const
+                      ).map(([title, rows]) => (
+                        <div key={title} aria-label={`${title}队列`}>
+                          <b>
+                            {title} {rows.length}
+                          </b>
+                          {rows.length ? (
+                            rows.map((row) => (
+                              <p key={row.id}>
+                                {row.queueName} ·{" "}
+                                {row.status === "not_queued"
+                                  ? "尚未入队"
+                                  : row.status === "done"
+                                    ? "已完成"
+                                    : row.status === "cleared"
+                                      ? "已主动结束/清理"
+                                      : row.status === "cancelled"
+                                        ? "已取消"
+                                        : "等待检查"}{" "}
+                                · {row.businessDate}
+                              </p>
+                            ))
+                          ) : (
+                            <p>暂无{title}队列</p>
+                          )}
+                        </div>
+                      ))}
+                    </section>
+                  )}
                   <h3 className="pt-subheading">我的实时演示队列</h3>
                   {currentTickets.map((ticket) => (
                     <div className="pt-info-banner" key={ticket.id}>
@@ -2475,11 +2679,51 @@ export default function Patient() {
           )}
           {view === "reports" && (
             <section className="pt-card">
+              <div className="pt-form-grid">
+                <label>
+                  报告体检起始日期
+                  <input
+                    type="date"
+                    value={reportDateFrom}
+                    onChange={(e) => setReportDateFrom(e.target.value)}
+                  />
+                </label>
+                <label>
+                  报告体检结束日期
+                  <input
+                    type="date"
+                    value={reportDateTo}
+                    onChange={(e) => setReportDateTo(e.target.value)}
+                  />
+                </label>
+              </div>
+              <button
+                className="pt-secondary"
+                onClick={() => {
+                  setReportDateFrom("");
+                  setReportDateTo("");
+                }}
+              >
+                清除报告日期筛选
+              </button>
+              {invalidReportRange && (
+                <p role="alert">起始日期不能晚于结束日期。</p>
+              )}
+              <p className="pt-note">
+                本人已发布报告：匹配 {filteredReports.length} / {reports.length}{" "}
+                份，日期包含起止当天。
+              </p>
               {!currentReport ? (
                 <div className="pt-empty">
                   <FileCheck2 size={45} />
-                  <h3>报告正在路上</h3>
-                  <p>总检审核通过后，报告将展示在这里。</p>
+                  <h3>
+                    {reports.length ? "没有符合日期范围的报告" : "报告正在路上"}
+                  </h3>
+                  <p>
+                    {reports.length
+                      ? "请调整或清除日期筛选。"
+                      : "总检审核通过后，报告将展示在这里。"}
+                  </p>
                   <button
                     className="pt-secondary"
                     onClick={() => go("profile")}
@@ -2502,13 +2746,22 @@ export default function Patient() {
                       value={currentReport.id}
                       onChange={(e) => setReportId(e.target.value)}
                     >
-                      {reports.map((r) => (
+                      {filteredReports.map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.date} · {r.campus}
                         </option>
                       ))}
                     </select>
                   </label>
+                  <Suspense
+                    fallback={<p className="pt-note">正在加载本地PDF工具…</p>}
+                  >
+                    <ReportDelivery
+                      selectedIds={[currentReport.id]}
+                      patientId={patient.id}
+                      compact
+                    />
+                  </Suspense>
                   <div className="pt-report-summary">
                     <ShieldCheck size={27} />
                     <div>
@@ -2760,38 +3013,7 @@ export default function Patient() {
                 </div>
               </div>
               <h3 className="pt-subheading">给体检中心留言</h3>
-              {messages.map((msg, i) => (
-                <div className="pt-message-bubble" key={i}>
-                  <b>我 · 留言已记录</b>
-                  <p>{msg}</p>
-                  <small>待工作人员处理（演示）</small>
-                </div>
-              ))}
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-                placeholder="请填写演示留言，不要输入真实个人敏感信息"
-              />
-              <button
-                className="pt-primary"
-                disabled={!message.trim()}
-                onClick={() => {
-                  setMessages([...messages, message.trim()]);
-                  act({
-                    type: "ADD_TASK",
-                    payload: {
-                      title: `H5 留言：${message.trim()}`,
-                      patientId: patient.id,
-                      status: "待处理",
-                    },
-                  });
-                  setMessage("");
-                  tell("留言已提交到本地服务工单");
-                }}
-              >
-                提交留言
-              </button>
+              <PatientConversation patientId={patient.id} />
               <h3 className="pt-subheading">服务满意度问卷</h3>
               <p className="pt-note">
                 合成体验问卷：五道评分均为必答，1 分为很不满意，5
@@ -3082,33 +3304,80 @@ export default function Patient() {
           )}
           {view === "article" && (
             <section className="pt-card pt-reading">
-              <span className="pt-pill">健康课堂 · 科普示例</span>
-              <h2>{article}</h2>
-              {configuredArticle && (
-                <p className="pt-info-banner">{configuredArticle.summary}</p>
+              <h2>健康课堂文章</h2>
+              <nav aria-label="已发布健康文章">
+                {publishedArticles.length ? (
+                  publishedArticles.map((row) => (
+                    <button
+                      className="pt-secondary"
+                      key={row.id}
+                      onClick={() => setArticleId(row.id)}
+                    >
+                      {row.name}
+                    </button>
+                  ))
+                ) : (
+                  <p>暂无已发布文章。</p>
+                )}
+              </nav>
+              {articleId ? (
+                selectedArticle ? (
+                  <article aria-label="已发布文章正文">
+                    <span className="pt-pill">
+                      {selectedArticle.category} · 已发布
+                    </span>
+                    <h2>{selectedArticle.name}</h2>
+                    <p className="pt-muted">
+                      {selectedArticle.owner || "体检中心"} ·{" "}
+                      {selectedArticle.date}
+                    </p>
+                    <div
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {selectedArticle.description || "暂无正文"}
+                    </div>
+                  </article>
+                ) : (
+                  <p role="alert">
+                    该文章已撤回或未发布，正文不可见，请选择其他文章。
+                  </p>
+                )
+              ) : (
+                <>
+                  <span className="pt-pill">健康课堂 · 科普示例</span>
+                  <h2>{article}</h2>
+                  {configuredArticle && (
+                    <p className="pt-info-banner">
+                      {configuredArticle.summary}
+                    </p>
+                  )}
+                  <p className="pt-muted">
+                    健康中心编辑部 · 2026 年 10 月 · 3 分钟
+                  </p>
+                  <div className="pt-article-cover">
+                    <HeartPulse size={70} strokeWidth={1} />
+                    <span>认真生活，好好照顾自己。</span>
+                  </div>
+                  <h3>提前准备，从容开启</h3>
+                  <p>
+                    预约完成后，请留意体检中心提供的项目清单与准备要求，确认到院时间、院区和需要携带的资料。如有正在使用的药物，请向专业人员咨询，不要自行停药。
+                  </p>
+                  <h3>把健康融入日常</h3>
+                  <p>
+                    规律的作息、适合自己的活动与均衡饮食，都是关心健康的起点。如果对检查结果有疑问，可以通过报告解读服务，与专业人员沟通。
+                  </p>
+                </>
               )}
-              <p className="pt-muted">
-                健康中心编辑部 · 2026 年 10 月 · 3 分钟
-              </p>
-              <div className="pt-article-cover">
-                <HeartPulse size={70} strokeWidth={1} />
-                <span>认真生活，好好照顾自己。</span>
-              </div>
-              <h3>提前准备，从容开启</h3>
-              <p>
-                预约完成后，请留意体检中心提供的项目清单与准备要求，确认到院时间、院区和需要携带的资料。如有正在使用的药物，请向专业人员咨询，不要自行停药。
-              </p>
-              <h3>把健康融入日常</h3>
-              <p>
-                规律的作息、适合自己的活动与均衡饮食，都是关心健康的起点。如果对检查结果有疑问，可以通过报告解读服务，与专业人员沟通。
-              </p>
               <button
                 className="pt-secondary"
                 onClick={() => {
                   act({
                     type: "ADD_AUDIT",
                     payload: {
-                      message: `${patient.name} 收藏健康课堂：${article}`,
+                      message: `${patient.name} 收藏健康课堂：${selectedArticle?.name || article}`,
                     },
                   });
                   tell("文章已加入演示收藏");
@@ -3352,9 +3621,9 @@ export default function Patient() {
               新预约日期
               <input
                 type="date"
-                min={new Date().toISOString().slice(0, 10)}
+                min={bookingDateOffset(state)}
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => chooseDate(e.target.value)}
               />
             </label>
             <label>
@@ -3389,6 +3658,15 @@ export default function Patient() {
                         state.appointments.find((a) => a.id === editId)
                           ?.groupCompany || patient.company,
                       time,
+                      packageIds: state.appointments.find(
+                        (a) => a.id === editId,
+                      )?.packageIds || [
+                        state.appointments.find((a) => a.id === editId)
+                          ?.packageId || "",
+                      ],
+                      items:
+                        state.appointments.find((a) => a.id === editId)
+                          ?.items || [],
                     },
                   );
                   if (!nextAvailability.allowed)
@@ -3421,7 +3699,7 @@ export default function Patient() {
               期望日期
               <input
                 type="date"
-                min={new Date().toISOString().slice(0, 10)}
+                min={bookingDateOffset(state)}
                 value={serviceDate}
                 onChange={(e) => setServiceDate(e.target.value)}
               />

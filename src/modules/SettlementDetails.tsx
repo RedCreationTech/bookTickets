@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Download, ReceiptText } from "lucide-react";
 import { useDemo } from "../store";
 import type { DemoState } from "../model";
+import { actualOrderCollections } from "../orderFinanceRules";
 import { downloadCsv } from "./Operations";
 type Amount = number | null;
 const money = (value: unknown): Amount =>
@@ -106,28 +107,8 @@ export function buildSettlementRows(state: DemoState) {
         waived: (order.waived || []).includes(item),
       };
     });
-    const account = (state.records.groupAccounts || []).find(
-      (a) => a.id === "GA-" + order.groupOrderId,
-    );
-    const unitPaid =
-      money(order.unitPaidAmount) ??
-      (unit === 0
-        ? 0
-        : account?.settledIds?.includes(order.id)
-          ? unit
-          : order.status === "booked"
-            ? 0
-            : null);
-    const personalPaid =
-      money(order.personalPaidAmount) ??
-      (personal === 0
-        ? 0
-        : order.paidAt
-          ? personal
-          : order.status === "booked"
-            ? 0
-            : null);
-    const paid = money(order.paidAmount) ?? sum([unitPaid, personalPaid]);
+    const collections = actualOrderCollections(state, order);
+    const paid = collections.paid;
     const refund = order.refunded
       ? money(order.refundAmount)
       : order.refundRequested
@@ -162,6 +143,9 @@ export function buildSettlementRows(state: DemoState) {
       unit,
       personal,
       paid,
+      paidEvidence: collections.source,
+      unitPaid: collections.unitPaid,
+      personalPaid: collections.personalPaid,
       due,
       pendingRefund,
       refund,

@@ -1,0 +1,151 @@
+{
+  "scope": "父任务在analytics39条交回后移交的7条团检报告：T0357,T0358,T0359,T0360,T0361,T0362,T0364",
+  "ownerFiles": [
+    "src/groupReportRules.ts",
+    "src/groupReportDocx.ts",
+    "src/modules/GroupReportBuilder.tsx",
+    "tests/group-report-builder.test.tsx"
+  ],
+  "integration": "GroupReportBuilder named/default export，父任务挂Core单位报告入口。",
+  "verification": {
+    "tests": 11,
+    "commands": [
+      "npx vitest run tests/group-report-builder.test.tsx",
+      "npx eslint src/groupReportRules.ts src/groupReportDocx.ts src/modules/GroupReportBuilder.tsx tests/group-report-builder.test.tsx",
+      "npm run typecheck",
+      "WRITE_GROUP_DOCX=1 npx vitest run tests/group-report-builder.test.tsx",
+      "soffice --headless --convert-to pdf --outdir /tmp/health-word-font-qa /tmp/health-word-font-qa/fixed-group-report.docx",
+      "pdftotext -layout /tmp/health-word-font-qa/fixed-group-report.pdf /tmp/health-word-font-qa/fixed-group-report.txt",
+      "pdftoppm -png -r 110 -f 1 -singlefile /tmp/health-word-font-qa/fixed-group-report.pdf /tmp/health-word-font-qa/page-1"
+    ],
+    "wordVerification": "实际生成/tmp/health-word-font-qa/fixed-group-report.docx；LibreOffice转换fixed-group-report.pdf，共3页。pdftotext完整抽出一至四和附件一至三中文标题；page-1.png及page-3.png目检无缺字、无重叠；pdffonts显示NotoSansCJKsc Regular/Bold已嵌入PDF。DOCX文本仍为可编辑段落/表格，不是截图。",
+    "result": "团报11/11；与项目及统计39例合并50/50。新增父收费项→临床报告子项联动；DOCX标题缺字经实际LibreOffice/Poppler/目检修复验证，详见wordVerification。"
+  },
+  "items": [
+    {
+      "id": "T0357",
+      "implementationOwner": "analytics (core group-report handoff)",
+      "originalText": "单位体检可根据单位完成体检人员出具单位团体报告。",
+      "gapClosed": "仅纳入选定单位已完成体检人员生成团体报告，保留纳入名单和统计口径。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupReportRules.ts :: groupReportPopulation, buildGroupReport",
+        "src/modules/GroupReportBuilder.tsx :: filters, selected anomalies, snapshot archive"
+      ],
+      "tests": [
+        "tests/group-report-builder.test.tsx :: cohort selection and actual abnormal analysis",
+        "tests/group-report-builder.test.tsx :: archived cohort UI"
+      ],
+      "boundary": "仅合成团检完成项目数据；每患者取日期范围内最新完成订单，至少1项非弃检检查有结果。不等同总检审核；婚姻/部门未知不补造，异常及三高为演示阈值不作诊断。归档保存人群ID与结果快照，后续源订单变化不覆写。Word为可编辑OOXML格式，无真实签章。"
+    },
+    {
+      "id": "T0358",
+      "implementationOwner": "analytics (core group-report handoff)",
+      "originalText": "支持按照体检日期、性别、婚姻状况、年龄段、套餐、部门等多种组合条件筛选需要出具团检报告的人群。",
+      "gapClosed": "团检报告人群增加体检日期、婚姻、套餐、部门等联合条件，现只有单位/年龄/性别。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupReportRules.ts :: groupReportPopulation, buildGroupReport",
+        "src/modules/GroupReportBuilder.tsx :: filters, selected anomalies, snapshot archive"
+      ],
+      "tests": [
+        "tests/group-report-builder.test.tsx :: cohort selection and actual abnormal analysis",
+        "tests/group-report-builder.test.tsx :: archived cohort UI"
+      ],
+      "boundary": "仅合成团检完成项目数据；每患者取日期范围内最新完成订单，至少1项非弃检检查有结果。不等同总检审核；婚姻/部门未知不补造，异常及三高为演示阈值不作诊断。归档保存人群ID与结果快照，后续源订单变化不覆写。Word为可编辑OOXML格式，无真实签章。"
+    },
+    {
+      "id": "T0359",
+      "implementationOwner": "analytics (core group-report handoff)",
+      "originalText": "可根据检出的异常筛选需要生成哪些异常进行团检报告生成。",
+      "gapClosed": "从实际检出异常列表选择入报告异常，并按名称/检出数排序。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupReportRules.ts :: groupReportPopulation, buildGroupReport",
+        "src/modules/GroupReportBuilder.tsx :: filters, selected anomalies, snapshot archive"
+      ],
+      "tests": [
+        "tests/group-report-builder.test.tsx :: cohort selection and actual abnormal analysis",
+        "tests/group-report-builder.test.tsx :: archived cohort UI"
+      ],
+      "boundary": "仅合成团检完成项目数据；每患者取日期范围内最新完成订单，至少1项非弃检检查有结果。不等同总检审核；婚姻/部门未知不补造，异常及三高为演示阈值不作诊断。归档保存人群ID与结果快照，后续源订单变化不覆写。Word为可编辑OOXML格式，无真实签章。"
+    },
+    {
+      "id": "T0360",
+      "implementationOwner": "analytics (core group-report handoff)",
+      "originalText": "异常明细可按照名称、检出数量排序进行选择。",
+      "gapClosed": "从实际检出异常列表选择入报告异常，并按名称/检出数排序。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupReportRules.ts :: groupReportPopulation, buildGroupReport",
+        "src/modules/GroupReportBuilder.tsx :: filters, selected anomalies, snapshot archive"
+      ],
+      "tests": [
+        "tests/group-report-builder.test.tsx :: cohort selection and actual abnormal analysis",
+        "tests/group-report-builder.test.tsx :: archived cohort UI"
+      ],
+      "boundary": "仅合成团检完成项目数据；每患者取日期范围内最新完成订单，至少1项非弃检检查有结果。不等同总检审核；婚姻/部门未知不补造，异常及三高为演示阈值不作诊断。归档保存人群ID与结果快照，后续源订单变化不覆写。Word为可编辑OOXML格式，无真实签章。"
+    },
+    {
+      "id": "T0361",
+      "implementationOwner": "analytics (core group-report handoff)",
+      "originalText": "支持按照男女参检比例，男性前十种异常，女性前十种异常，常见疾病分布，三高人群统计分析等多种方式进行数据展示分析。（可自行选择异常数量）",
+      "gapClosed": "实现男女分别前N异常、常见疾病及三高人数的动态分析，N可选；使用明确合成规则不临床诊断。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupReportRules.ts :: groupReportPopulation, buildGroupReport",
+        "src/modules/GroupReportBuilder.tsx :: filters, selected anomalies, snapshot archive"
+      ],
+      "tests": [
+        "tests/group-report-builder.test.tsx :: cohort selection and actual abnormal analysis",
+        "tests/group-report-builder.test.tsx :: archived cohort UI"
+      ],
+      "boundary": "仅合成团检完成项目数据；每患者取日期范围内最新完成订单，至少1项非弃检检查有结果。不等同总检审核；婚姻/部门未知不补造，异常及三高为演示阈值不作诊断。归档保存人群ID与结果快照，后续源订单变化不覆写。Word为可编辑OOXML格式，无真实签章。"
+    },
+    {
+      "id": "T0362",
+      "implementationOwner": "analytics (core group-report handoff)",
+      "originalText": "支持生成word 版本，可支持进行编辑调整。",
+      "gapClosed": "生成可编辑Word团检报告文件，不以CSV或网页预览替代。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupReportDocx.ts :: Document/Packer editable OOXML document and local download",
+        "src/modules/GroupReportBuilder.tsx :: Word export from selected immutable snapshot"
+      ],
+      "tests": [
+        "tests/group-report-builder.test.tsx :: genuine editable DOCX export"
+      ],
+      "boundary": "仅合成团检完成项目数据；每患者取日期范围内最新完成订单，至少1项非弃检检查有结果。不等同总检审核；婚姻/部门未知不补造，异常及三高为演示阈值不作诊断。归档保存人群ID与结果快照，后续源订单变化不覆写。Word为可编辑OOXML格式，无真实签章。"
+    },
+    {
+      "id": "T0364",
+      "implementationOwner": "analytics (core group-report handoff)",
+      "originalText": "支持导出单位阳性报告结论数据。",
+      "gapClosed": "导出所选单位实际阳性及结论明细，非仅人口维度分桶CSV。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupReportRules.ts :: groupReportPopulation, buildGroupReport",
+        "src/modules/GroupReportBuilder.tsx :: filters, selected anomalies, snapshot archive",
+        "src/groupReportRules.ts :: groupPositiveCsv, groupConclusionCsv"
+      ],
+      "tests": [
+        "tests/group-report-builder.test.tsx :: cohort selection and actual abnormal analysis",
+        "tests/group-report-builder.test.tsx :: archived cohort UI",
+        "tests/group-report-builder.test.tsx :: uses saved immutable results and conclusions after underlying appointments change, including both CSV attachments"
+      ],
+      "boundary": "仅合成团检完成项目数据；每患者取日期范围内最新完成订单，至少1项非弃检检查有结果。不等同总检审核；婚姻/部门未知不补造，异常及三高为演示阈值不作诊断。归档保存人群ID与结果快照，后续源订单变化不覆写。Word为可编辑OOXML格式，无真实签章。"
+    }
+  ],
+  "integrationAddendum": [
+    {
+      "items": [
+        "T0359",
+        "T0360",
+        "T0361",
+        "T0364"
+      ],
+      "evidence": "团报异常来源复用clinicalItems展开后的abnormalityFacts。父生化收费项映射空腹血糖9.2仍计1项100元，质控与团报血糖检出/分母均为1；弃检父项不纳入子项分母。",
+      "test": "tests/analytics-completion.test.tsx :: expands charged parent items ..."
+    }
+  ]
+}

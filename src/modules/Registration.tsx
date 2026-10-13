@@ -1,5 +1,24 @@
 import { useState } from "react";
 import { useDemo } from "../store";
+export const CERTIFICATE_TYPES = [
+  "演示身份证",
+  "演示医保卡",
+  "演示电子医保",
+  "演示就诊卡",
+  "演示电子健康卡",
+  "演示护照",
+  "演示外国人永久居住证",
+  "演示台胞证",
+  "演示军人证",
+  "演示港澳台证件",
+  "其他演示证件",
+];
+export const DEFAULT_ORDER_TYPES = ["个检", "团检", "入职", "公务员", "职业病"];
+export const DEFAULT_CARD_READERS = [
+  { id: "DEMO-USB-A", name: "红创演示 USB 读卡器 A" },
+  { id: "DEMO-DUAL-B", name: "红创演示双接口读卡器 B" },
+  { id: "DEMO-NFC-C", name: "红创演示 NFC 读卡器 C" },
+];
 export const defaultCustomerTypes = [
   { id: "regular", name: "个人常规", orderType: "个检", queueArea: "常规区" },
   { id: "group", name: "单位职工", orderType: "团检", queueArea: "团检区" },
@@ -21,6 +40,7 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
     p?.customerType || "regular",
   );
   const [company, setCompany] = useState(p?.company || "个检");
+  const [initials, setInitials] = useState(p?.initials || "");
   const [pastMedicalHistory, setPastMedicalHistory] = useState(
     p?.pastMedicalHistory || "合成：无特殊既往史",
   );
@@ -72,11 +92,9 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
             value={certificateType}
             onChange={(e) => setCertificateType(e.target.value)}
           >
-            <option>演示身份证</option>
-            <option>演示护照</option>
-            <option>演示军人证</option>
-            <option>演示港澳台证件</option>
-            <option>其他演示证件</option>
+            {CERTIFICATE_TYPES.map((type) => (
+              <option key={type}>{type}</option>
+            ))}
           </select>
         </label>
         <label>
@@ -99,6 +117,15 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          客户姓名简拼
+          <input
+            aria-label="客户姓名简拼"
+            value={initials}
+            onChange={(event) => setInitials(event.target.value.toUpperCase())}
+            placeholder="例如 HC，仅用于合成检索"
+          />
         </label>
         <label>
           所属单位
@@ -146,6 +173,7 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
               certificateType,
               certificate,
               customerType,
+              initials: initials.trim().toUpperCase(),
               pastMedicalHistory,
               company,
               phone: p?.phone || "演示未填写",
@@ -232,11 +260,20 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
               value={orderType}
               onChange={(e) => setOrderType(e.target.value)}
             >
-              <option>个检</option>
-              <option>团检</option>
-              <option>入职</option>
-              <option>公务员</option>
-              <option>职业病</option>
+              {[
+                ...new Set([
+                  ...DEFAULT_ORDER_TYPES.map(
+                    (name) =>
+                      (state.records.orderTypes || []).find(
+                        (row) => row.id === `OT-${name}`,
+                      )?.name || name,
+                  ),
+                  ...(state.records.orderTypes || []).map((row) => row.name),
+                  ...types.map((row) => row.orderType),
+                ]),
+              ].map((name) => (
+                <option key={name}>{name}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -264,7 +301,213 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
           保存类型映射
         </button>
       </details>
+      <RegistrationTypeSettings />
       {message && <p role="status">{message}</p>}
     </div>
+  );
+}
+
+export function RegistrationTypeSettings() {
+  const { state, act } = useDemo();
+  const types = state.records.customerTypes?.length
+    ? state.records.customerTypes
+    : defaultCustomerTypes;
+  const [kind, setKind] = useState("customer"),
+    [existingId, setExistingId] = useState(""),
+    [typeName, setTypeName] = useState(""),
+    [message, setMessage] = useState("");
+  const [readerName, setReaderName] = useState(""),
+    [readerId, setReaderId] = useState(
+      state.config.cardReaderModel || DEFAULT_CARD_READERS[0].id,
+    );
+  const readers = [
+    ...DEFAULT_CARD_READERS,
+    ...(state.records.cardReaderModels || []).filter(
+      (r) => !DEFAULT_CARD_READERS.some((d) => d.id === r.id),
+    ),
+  ];
+  const orderTypes = [
+    ...(state.records.orderTypes || []),
+    ...DEFAULT_ORDER_TYPES.map((name) => ({ id: `OT-${name}`, name })),
+  ].filter((r, index, all) => all.findIndex((a) => a.id === r.id) === index);
+  const choices = kind === "customer" ? types : orderTypes;
+  return (
+    <>
+      <details>
+        <summary>新增与重命名客户 / 订单类型</summary>
+        <div className="form-grid">
+          <label>
+            类型类别
+            <select
+              aria-label="类型类别"
+              value={kind}
+              onChange={(e) => {
+                setKind(e.target.value);
+                setExistingId("");
+                setTypeName("");
+              }}
+            >
+              <option value="customer">客户类型</option>
+              <option value="order">订单类型</option>
+            </select>
+          </label>
+          <label>
+            维护目标类型
+            <select
+              aria-label="维护目标类型"
+              value={existingId}
+              onChange={(e) => {
+                setExistingId(e.target.value);
+                setTypeName(
+                  choices.find((r) => r.id === e.target.value)?.name || "",
+                );
+              }}
+            >
+              <option value="">新增类型</option>
+              {choices.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            类型名称
+            <input
+              aria-label="类型名称"
+              value={typeName}
+              onChange={(e) => setTypeName(e.target.value)}
+            />
+          </label>
+        </div>
+        <button
+          className="btn"
+          onClick={() => {
+            const name = typeName.trim();
+            if (
+              !name ||
+              name.length > 40 ||
+              choices.some((row) => row.id !== existingId && row.name === name)
+            ) {
+              setMessage("请填写不重复且不超过40字的类型名称。");
+              return;
+            }
+            const id = existingId || `TYPE-${kind}-${encodeURIComponent(name)}`,
+              collection = kind === "customer" ? "customerTypes" : "orderTypes";
+            if (kind === "customer")
+              types.forEach((row) =>
+                act({
+                  type: "UPSERT_RECORD",
+                  payload: { collection, record: row },
+                }),
+              );
+            const old = choices.find((row) => row.id === id);
+            act({
+              type: "UPSERT_RECORD",
+              payload: {
+                collection,
+                record:
+                  kind === "customer"
+                    ? {
+                        ...(old || { orderType: "个检", queueArea: "常规区" }),
+                        id,
+                        name,
+                      }
+                    : { id, name },
+              },
+            });
+            if (kind === "order" && old && old.name !== name)
+              types
+                .filter((row) => row.orderType === old.name)
+                .forEach((row) =>
+                  act({
+                    type: "UPSERT_RECORD",
+                    payload: {
+                      collection: "customerTypes",
+                      record: { ...row, orderType: name },
+                    },
+                  }),
+                );
+            setTypeName("");
+            setExistingId("");
+            setMessage(
+              "类型已保存，登记下拉与新开单映射共用此配置；历史订单保留原记录。",
+            );
+          }}
+        >
+          保存自定义类型
+        </button>
+        <ul>
+          {choices.map((row) => (
+            <li key={row.id}>{row.name}</li>
+          ))}
+        </ul>
+      </details>
+      <details>
+        <summary>模拟读卡器型号配置</summary>
+        <p>仅维护本地合成设备型号，不读取真实证件或连接设备驱动。</p>
+        <div className="form-grid">
+          <label>
+            当前模拟读卡器
+            <select
+              aria-label="当前模拟读卡器"
+              value={readerId}
+              onChange={(e) => setReaderId(e.target.value)}
+            >
+              {readers.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            自定义读卡器型号
+            <input
+              aria-label="自定义读卡器型号"
+              value={readerName}
+              onChange={(e) => setReaderName(e.target.value)}
+            />
+          </label>
+        </div>
+        <button
+          className="btn"
+          onClick={() => {
+            const name = readerName.trim();
+            if (!name || readers.some((r) => r.name === name)) {
+              setMessage("请填写不重复的合成读卡器型号。");
+              return;
+            }
+            const id = `DEMO-CUSTOM-${encodeURIComponent(name)}`;
+            act({
+              type: "UPSERT_RECORD",
+              payload: {
+                collection: "cardReaderModels",
+                record: { id, name, simulated: true },
+              },
+            });
+            setReaderId(id);
+            setReaderName("");
+            setMessage("自定义模拟读卡器已加入列表，请保存当前选择。");
+          }}
+        >
+          新增模拟读卡器型号
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            if (!readers.some((r) => r.id === readerId)) return;
+            act({
+              type: "UPDATE_CONFIG",
+              payload: { cardReaderModel: readerId },
+            });
+            setMessage("当前模拟读卡器已保存。");
+          }}
+        >
+          保存读卡器选择
+        </button>
+      </details>
+      {message && <p role="status">{message}</p>}
+    </>
   );
 }

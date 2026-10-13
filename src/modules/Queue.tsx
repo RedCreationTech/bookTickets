@@ -5,80 +5,24 @@ import { QRCodeSVG } from "qrcode.react";
 import { createPortal } from "react-dom";
 import { useDemo } from "../store";
 import type { DemoState } from "../model";
+import {
+  deriveQueueDefinitions,
+  hasGuideQueueAccess,
+  queueBusinessDay,
+  queueDayCounts,
+  customerQueueSummary,
+  searchQueueCustomers,
+  queueCustomerType,
+  recommendNextStation,
+  availableQueueRooms,
+  previewRoomDispatch,
+  ticketBusinessDay,
+} from "./queueAutomationRules";
+export {
+  deriveQueueDefinitions,
+  hasGuideQueueAccess,
+} from "./queueAutomationRules";
 import { Badge, Empty, Modal, PageTitle } from "../ui";
-const areas: Record<string, string> = {
-  采血区: "血常规",
-  超声区: "腹部彩超",
-  心电图区: "心电图",
-  一般检查区: "一般检查",
-};
-export function deriveQueueDefinitions(state: DemoState) {
-  const configured = state.records.guideDepartments || [];
-  const definitions = Object.entries(areas).map(([name, item]) => {
-    const mapped = configured.find((d) =>
-      String(d.items)
-        .split(/[、,，\n]/)
-        .map((x) => x.trim())
-        .includes(item),
-    );
-    return {
-      id: name,
-      name,
-      department: mapped?.name || name,
-      code: mapped?.code || name,
-      items: mapped
-        ? String(mapped.items)
-            .split(/[、,，\n]/)
-            .map((x) => x.trim())
-            .filter(Boolean)
-        : [item],
-      zone: mapped?.zone || name,
-      minutes: Number(mapped?.minutes) || 5,
-      enabled: !mapped || mapped.status !== "已停用",
-      sex: mapped?.sex || "不限",
-      type: "常规",
-    };
-  });
-  configured
-    .filter((d) => !definitions.some((q) => q.code === d.code))
-    .forEach((d) =>
-      definitions.push({
-        id: d.code || d.id,
-        name: `${d.name}队列`,
-        department: d.name,
-        code: d.code || d.id,
-        items: String(d.items)
-          .split(/[、,，\n]/)
-          .map((x) => x.trim())
-          .filter(Boolean),
-        zone: d.zone,
-        minutes: Number(d.minutes) || 5,
-        enabled: d.status !== "已停用",
-        sex: d.sex || "不限",
-        type: "常规",
-      }),
-    );
-  for (const configured of state.records.queueDefinitions || []) {
-    const mapped = state.records.guideDepartments?.find(
-      (d) =>
-        d.code === configured.departmentCode ||
-        d.name === configured.department,
-    );
-    const q = {
-      ...configured,
-      department: mapped?.name || configured.department,
-      zone: mapped?.zone || configured.zone,
-      enabled: configured.enabled !== false && mapped?.status !== "已停用",
-      items: configured.items || [],
-      sex: mapped?.sex || "不限",
-      type: configured.type === "VIP" ? "VIP" : "常规",
-    };
-    const index = definitions.findIndex((d) => d.id === q.id);
-    if (index >= 0) definitions[index] = { ...definitions[index], ...q };
-    else definitions.push(q as (typeof definitions)[number]);
-  }
-  return definitions;
-}
 function ScrollList({
   label,
   auto,
@@ -116,16 +60,6 @@ function ScrollList({
       {children}
     </div>
   );
-}
-export function hasGuideQueueAccess(state: DemoState, queueId: string) {
-  const active = state.config.guideActiveUserId;
-  if (!active)
-    return ["admin", "reception", "doctor"].includes(state.config.role);
-  const user = state.records.guideUsers?.find((r) => r.id === active);
-  const session = state.records.guideSessions?.find(
-    (r) => r.userId === active && r.status === "online",
-  );
-  return !!user?.enabled && !!session && user.queueIds?.includes(queueId);
 }
 function GuideUsers() {
   const { state, act } = useDemo();
@@ -716,6 +650,253 @@ function FocusedQueueProgress() {
   );
 }
 
+function QueueCustomerLookup() {
+  const { state } = useDemo();
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState("");
+  const results = searchQueueCustomers(state, query);
+  const detail =
+    selected && results.some((a) => a.id === selected)
+      ? customerQueueSummary(state, selected)
+      : null;
+  const statusLabel: Record<string, string> = {
+    waiting: "候检",
+    calling: "呼叫中",
+    paused: "暂停",
+    missed: "过号",
+    done: "已检",
+    cleared: "已清空",
+    cancelled: "已取消",
+    not_queued: "尚未入队",
+  };
+  return (
+    <section className="panel">
+      <h2>客户跨队列查询</h2>
+      <label>
+        姓名、体检号或 DEMO 证件号
+        <input
+          aria-label="队列客户搜索"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSelected("");
+          }}
+          placeholder="支持模糊查询，选择精确体检订单"
+        />
+      </label>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>客户</th>
+              <th>体检号</th>
+              <th>DEMO证件</th>
+              <th>客户类型</th>
+              <th>查看</th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((a) => {
+              const summary = customerQueueSummary(state, a.id)!;
+              return (
+                <tr key={a.id}>
+                  <td>{summary.patient?.name}</td>
+                  <td>{a.id}</td>
+                  <td>{summary.identity}</td>
+                  <td>{summary.customerType}</td>
+                  <td>
+                    <button
+                      className="text-btn"
+                      onClick={() => setSelected(a.id)}
+                    >
+                      查看全部队列 {a.id}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {!results.length && <p role="status">未找到匹配的客户或体检号。</p>}
+      {detail && (
+        <Modal title="客户全部队列信息" onClose={() => setSelected("")}>
+          <h3>
+            {detail.patient?.name} · {detail.appointment.id}
+          </h3>
+          <p>
+            {detail.identity} · {detail.customerType}
+          </p>
+          <p>体检开始时间：{detail.checkedAt}</p>
+          {(
+            [
+              ["未检队列", detail.pending],
+              ["已检队列", detail.completed],
+              ["历史队列", detail.historical],
+            ] as const
+          ).map(([title, rows]) => (
+            <section key={title}>
+              <h4>
+                {title} · {rows.length} 项
+              </h4>
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>队列</th>
+                      <th>状态</th>
+                      <th>业务日期</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((t) => (
+                      <tr key={t.id}>
+                        <td>{t.queueName}</td>
+                        <td>{statusLabel[t.status] || t.status}</td>
+                        <td>{t.businessDate}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {!rows.length && <p>无记录</p>}
+            </section>
+          ))}
+        </Modal>
+      )}
+    </section>
+  );
+}
+export function QueueRecommendationPanel({
+  appointmentId,
+}: {
+  appointmentId?: string;
+}) {
+  const { state, act } = useDemo();
+  const [selected, setSelected] = useState(appointmentId || "");
+  const [message, setMessage] = useState("");
+  const target = appointmentId || selected;
+  const result = recommendNextStation(state, target);
+  const rec = result.recommendation;
+  const bottleneck = [...result.candidates]
+    .filter((q) => q.bottleneck)
+    .sort(
+      (a, b) =>
+        b.waitMinutes - a.waitMinutes || a.queueId.localeCompare(b.queueId),
+    )[0];
+  const enqueue = (prearrange: boolean) => {
+    act({
+      type: "QUEUE_RECOMMENDED_ENQUEUE",
+      payload: { appointmentId: target, bottleneck: prearrange },
+    });
+    setMessage(
+      prearrange
+        ? "已按当前配置提交瓶颈预排；相同订单队列只保留一次票据。"
+        : "已按当前候选提交第一站入队；相同订单队列不会重复入队。",
+    );
+  };
+  return (
+    <section className="panel" aria-label="可解释下一站推荐">
+      <h2>第一站 / 下一站与瓶颈预排</h2>
+      {!appointmentId && (
+        <label>
+          待导检订单
+          <select
+            value={selected}
+            onChange={(e) => {
+              setSelected(e.target.value);
+              setMessage("");
+            }}
+          >
+            <option value="">请选择已到检客户</option>
+            {state.appointments
+              .filter((a) => ["checked", "in_exam"].includes(a.status))
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {state.patients.find((p) => p.id === a.patientId)?.name} ·{" "}
+                  {a.id}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
+      <p>{result.reason}</p>
+      {rec && (
+        <div className="callout">
+          <div>
+            <strong>
+              建议下一站：{rec.name} · {rec.zone}
+            </strong>
+            <p>
+              预计等待 {rec.waitMinutes} 分钟；{rec.items.join("、")}
+            </p>
+            <p>{rec.explanation}</p>
+            <button
+              className="btn"
+              disabled={
+                !!rec.ticketId || !hasGuideQueueAccess(state, rec.queueId)
+              }
+              onClick={() => enqueue(false)}
+            >
+              {rec.ticketId ? "第一站已在队列中" : "将推荐第一站入队"}
+            </button>
+          </div>
+        </div>
+      )}
+      {bottleneck && (
+        <p>
+          瓶颈预排候选：{bottleneck.name}，预计等待 {bottleneck.waitMinutes}{" "}
+          分钟。
+          <button
+            className="btn"
+            disabled={
+              !!bottleneck.ticketId ||
+              !hasGuideQueueAccess(state, bottleneck.queueId)
+            }
+            onClick={() => enqueue(true)}
+          >
+            {bottleneck.ticketId ? "瓶颈已预排或入队" : "预排瓶颈科室"}
+          </button>
+        </p>
+      )}
+      <details>
+        <summary>查看候选评分与排除原因</summary>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>队列</th>
+                <th>估计等待</th>
+                <th>得分</th>
+                <th>依据</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.candidates.map((q) => (
+                <tr key={q.queueId}>
+                  <td>
+                    {q.name}
+                    {q.bottleneck ? " · 瓶颈" : ""}
+                  </td>
+                  <td>{q.waitMinutes} 分钟</td>
+                  <td>{q.score}</td>
+                  <td>{q.explanation}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {result.excluded.map((q) => (
+          <p key={q.queueId}>
+            {q.name}：{q.reason}
+          </p>
+        ))}
+      </details>
+      {message && <p role="status">{message}</p>}
+    </section>
+  );
+}
+
 export default function Queue({ screen = false }: { screen?: boolean }) {
   const { state, act } = useDemo();
   const [dept, setDept] = useState("采血区");
@@ -756,6 +937,9 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
   const pauseBusy = useRef(false);
   const resumedTokens = useRef(new Set<string>());
   const [roomId, setRoomId] = useState("");
+  const dispatchSequence = useRef(0);
+  const day = queueBusinessDay(state);
+  const roomMode = state.config.queueRoomModes?.[dept] || "manual";
   const queues = deriveQueueDefinitions(state);
   const definition = queues.find((q) => q.id === dept) || queues[0];
   const eligible = state.appointments.filter((a) =>
@@ -774,6 +958,7 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
           position: i,
           waitMinutes: q.minutes + i * 3,
           createdAt: new Date().toISOString(),
+          businessDate: String(a.checkedAt || a.date).slice(0, 10),
         })),
     );
     (initial.length ? initial : [{ id: "INIT", status: "init" }]).forEach(
@@ -796,35 +981,24 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
   const permitted = hasGuideQueueAccess(state, dept);
   const open = isOpen(dept) && permitted;
   const allTickets = state.records.queueTickets || [];
-  const tickets = allTickets.filter((t) => t.department === dept);
+  const tickets = allTickets.filter(
+    (t) => t.department === dept && ticketBusinessDay(state, t) === day,
+  );
   const list = tickets
     .filter((t) => ["waiting", "calling"].includes(t.status))
     .sort((a, b) => a.position - b.position);
-  const current = list.find((t) => t.status === "calling");
+  const current = list.find(
+    (t) =>
+      t.status === "calling" &&
+      (roomMode === "multi" || !roomId || t.roomId === roomId),
+  );
   const missed = tickets.filter((t) => t.status === "missed");
   const done = tickets.filter((t) => t.status === "done");
-  const mappedRooms = (state.records.guideRooms || []).filter(
-    (r) =>
-      r.department === definition.department ||
-      r.queue === definition.code ||
-      r.queue === dept,
-  );
-  const rooms = mappedRooms.length
-    ? mappedRooms.filter(
-        (r) =>
-          r.status !== "已停用" &&
-          state.records.guideZones?.find((z) => z.name === r.zone)?.status !==
-            "已停用",
-      )
-    : [
-        {
-          id: "DEFAULT",
-          name: `${definition.name} 02 诊室`,
-          zone: definition.zone,
-          capacity: 1,
-        },
-      ];
-  const chosenRoom = rooms.find((r) => r.id === roomId) || rooms[0];
+  const rooms = availableQueueRooms(state, dept);
+  const chosenRoom =
+    rooms.find(
+      (r) => r.id === (roomId || state.config.queueSingleRooms?.[dept]),
+    ) || rooms[0];
   const activeRoom = rooms.find((r) => r.id === current?.roomId) || chosenRoom;
   const zone = state.records.guideZones?.find(
     (z) => z.name === (activeRoom?.zone || definition.zone),
@@ -854,34 +1028,29 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
       type: "UPSERT_RECORD",
       payload: { collection: "queueTickets", record },
     });
-  const call = (ticket: any) => {
-    if (!open || !chosenRoom) {
-      setNotice("队列已关闭或没有可用诊室，无法呼叫。");
+  const call = (ticket?: any) => {
+    const preview = previewRoomDispatch(
+      state,
+      dept,
+      ticket?.id,
+      roomId || state.config.queueSingleRooms?.[dept],
+    );
+    if (preview.error) {
+      setNotice(preview.error);
       return;
     }
-    const appointment = state.appointments.find(
-      (a) => a.id === ticket.appointmentId,
-    );
-    const assignedRoom = roomId
-      ? chosenRoom
-      : rooms.find((r) => r.id === ticket.roomId) ||
-        rooms.find((r) => r.zone === appointment?.preferredQueueArea) ||
-        chosenRoom;
-    if (current && current.id !== ticket.id)
-      save({ ...current, status: "waiting" });
-    save({
-      ...ticket,
-      status: "calling",
-      roomId: assignedRoom.id,
-      roomName: assignedRoom.name,
-      zone: assignedRoom.zone,
-      calledAt: new Date().toLocaleTimeString("zh-CN"),
-      callCount: (ticket.callCount || 0) + 1,
-      spokenText: `请 ${state.records.queuePatientPreferences?.find((p) => p.id === appointment?.patientId)?.pronunciation || patients(ticket)?.name || "演示客户"} 前往 ${assignedRoom.name}`,
-      guideUserId: state.config.guideActiveUserId || "admin",
+    act({
+      type: "QUEUE_DISPATCH",
+      payload: {
+        queueId: dept,
+        ticketId: ticket?.id,
+        roomId: roomId || state.config.queueSingleRooms?.[dept],
+        requestId: `${dept}-${Date.now()}-${++dispatchSequence.current}`,
+        at: new Date().toISOString(),
+      },
     });
     setNotice(
-      `呼叫已分配至 ${assignedRoom.name}；前端大屏同步，语音与微信推送未接入。`,
+      `呼叫已分配至 ${preview.room?.name}；前端大屏同步，语音与微信推送未接入。`,
     );
   };
   const move = (index: number, offset: number) => {
@@ -1008,7 +1177,6 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
     setQueueError("");
     setNotice("队列配置已生效：检查项目匹配、名称、区域和等待估算均同步。");
   };
-  const day = new Date().toISOString().slice(0, 10);
   const arrived = state.appointments.filter(
     (a) =>
       (a.checkedAt?.slice(0, 10) || a.date) === day &&
@@ -1019,15 +1187,10 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
   const todayComplete = arrived.filter((a) =>
     ["review", "approved", "printed"].includes(a.status),
   );
-  const pendingCount = (id: string) =>
-    allTickets.filter(
-      (t) => t.department === id && ["waiting", "calling"].includes(t.status),
-    ).length;
-  const passedCount = (id: string) =>
-    allTickets.filter((t) => t.department === id && t.status === "missed")
-      .length;
+  const pendingCount = (id: string) => queueDayCounts(state, id, day).waiting;
+  const passedCount = (id: string) => queueDayCounts(state, id, day).missed;
   const completedCount = (id: string) =>
-    allTickets.filter((t) => t.department === id && t.status === "done").length;
+    queueDayCounts(state, id, day).completed;
   const validBound = (value: string) =>
     value === "" || (Number.isInteger(Number(value)) && Number(value) >= 0);
   const validRange = [
@@ -1201,11 +1364,33 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
           <GuideClock />
           <QueuePatientPreferences />
           <FocusedQueueProgress />
+          <QueueRecommendationPanel />
+          <QueueCustomerLookup />
         </>
       )}
       {!screen && (
         <section className="panel">
           <h2>当日到检与队列概览</h2>
+          <label>
+            队列统计业务日期
+            <input
+              type="date"
+              value={day}
+              onChange={(e) => {
+                if (e.target.value)
+                  act({
+                    type: "UPDATE_CONFIG",
+                    payload: { queueBusinessDate: e.target.value },
+                  });
+              }}
+            />
+          </label>
+          <p>
+            按票据业务日期统计，当前队列待检{" "}
+            {queueDayCounts(state, dept, day).waiting} 人次 · 过号{" "}
+            {queueDayCounts(state, dept, day).missed} 人次 · 已检{" "}
+            {queueDayCounts(state, dept, day).completed} 人次。
+          </p>
           <div className="form-grid">
             <div>
               当日登记：{arrived.length} 人（男{" "}
@@ -1365,7 +1550,8 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
           )}
           <p className="muted">
             演示负荷 = 候检 / 呼叫人数 × 单人配置分钟数；达到{" "}
-            {bottleneckMinutes} 分钟显示瓶颈，不代表智能优化或临床判断。
+            {bottleneckMinutes}{" "}
+            分钟显示瓶颈；下方推荐会结合配置瓶颈、服务均时、性别、依赖和区域评分，不作临床判断。
           </p>
           <div className="table-scroll">
             <table aria-label="队列筛选结果">
@@ -1542,6 +1728,21 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
                   ? queueDisplayName(current)
                   : "等候呼叫"}
             </div>
+            {current && (
+              <p>{queueCustomerType(state, patients(current)?.id || "")}</p>
+            )}
+            {roomMode === "multi" && (
+              <div aria-label="多诊室正在呼叫">
+                {list
+                  .filter((t) => t.status === "calling")
+                  .map((t) => (
+                    <p key={t.id}>
+                      {t.roomName}：{queueDisplayName(t)} ·{" "}
+                      {queueCustomerType(state, patients(t)?.id || "")}
+                    </p>
+                  ))}
+              </div>
+            )}
             <p>
               {open
                 ? current?.appointmentId || "请选择候检客户"
@@ -1632,9 +1833,7 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
                   <button
                     className="btn btn-primary"
                     disabled={!open || !list.length || !chosenRoom}
-                    onClick={() =>
-                      call(list.find((t) => t.status !== "calling") || list[0])
-                    }
+                    onClick={() => call()}
                   >
                     <Volume2 size={15} />
                     呼叫下一位
@@ -1653,6 +1852,9 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
                   </span>
                   <div>
                     <strong>{queueDisplayName(t)}</strong>
+                    <small>
+                      {queueCustomerType(state, patients(t)?.id || "")}
+                    </small>
                     <small>{t.appointmentId}</small>
                   </div>
                   <Badge tone={t.status === "calling" ? "green" : "gray"}>
@@ -1757,7 +1959,10 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
                 .map((t) => (
                   <div className="queue-row" key={t.id}>
                     <div>
-                      <strong>{queueDisplayName(t)}</strong>
+                      <strong>
+                        {queueDisplayName(t)} ·{" "}
+                        {queueCustomerType(state, patients(t)?.id || "")}
+                      </strong>
                       <small>{t.pauseReason}</small>
                     </div>
                     <button
@@ -1779,6 +1984,9 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
               {done.map((t) => (
                 <div className="queue-row" key={t.id}>
                   <strong>{queueDisplayName(t)}</strong>
+                  <small>
+                    {queueCustomerType(state, patients(t)?.id || "")}
+                  </small>
                   <small>{t.appointmentId}</small>
                   <Badge>已完成</Badge>
                 </div>
@@ -1889,12 +2097,106 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
           )}
           <section className="panel">
             <h3>诊室与区域映射</h3>
+            <p>
+              工作模式：
+              {roomMode === "multi"
+                ? "多诊室共享池"
+                : roomMode === "single"
+                  ? "单诊室"
+                  : "手动诊室调度"}
+            </p>
+            {!screen && (
+              <>
+                <label>
+                  诊室工作模式
+                  <select
+                    aria-label="诊室工作模式"
+                    value={roomMode}
+                    disabled={!permitted}
+                    onChange={(e) =>
+                      act({
+                        type: "QUEUE_SET_ROOM_MODE",
+                        payload: {
+                          queueId: dept,
+                          mode: e.target.value,
+                          roomId: chosenRoom?.id,
+                        },
+                      })
+                    }
+                  >
+                    {roomMode === "manual" && (
+                      <option value="manual" disabled>
+                        手动诊室调度（选择工作模式）
+                      </option>
+                    )}
+                    <option value="single">单诊室</option>
+                    <option value="multi">多诊室共享池</option>
+                  </select>
+                </label>
+                <button
+                  className="btn"
+                  disabled={!permitted}
+                  onClick={() => {
+                    act({
+                      type: "QUEUE_REBALANCE_CLOSED_ROOMS",
+                      payload: { queueId: dept },
+                    });
+                    setNotice(
+                      "已将停用诊室未完成票据退回共享池，可继续派发至可用诊室。",
+                    );
+                  }}
+                >
+                  回收停用诊室并重新分配
+                </button>
+                <p className="muted">
+                  共享池按正在服务人数 /
+                  诊室容量选择最低负载的空闲房间；单诊室只取本房间或未分配客户。不会将同一票据同时叫到两间诊室。
+                </p>
+              </>
+            )}
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>诊室</th>
+                    <th>当前负载</th>
+                    <th>服务位</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rooms.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.name}</td>
+                      <td>
+                        {
+                          list.filter(
+                            (t) => t.status === "calling" && t.roomId === r.id,
+                          ).length
+                        }
+                      </td>
+                      <td>{r.capacity || 1}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {!screen && (
               <label className="field">
                 呼叫诊室
                 <select
                   value={chosenRoom?.id || ""}
-                  onChange={(e) => setRoomId(e.target.value)}
+                  onChange={(e) => {
+                    setRoomId(e.target.value);
+                    if (state.config.queueRoomModes?.[dept] === "single")
+                      act({
+                        type: "QUEUE_SET_ROOM_MODE",
+                        payload: {
+                          queueId: dept,
+                          mode: "single",
+                          roomId: e.target.value,
+                        },
+                      });
+                  }}
                 >
                   {!rooms.length && <option value="">暂无可用诊室</option>}
                   {rooms.map((r) => (
@@ -1988,6 +2290,9 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
                 <div className="queue-row" key={t.id}>
                   <div>
                     <strong>{queueDisplayName(t)}</strong>
+                    <small>
+                      {queueCustomerType(state, patients(t)?.id || "")}
+                    </small>
                     <small>{t.reason}</small>
                   </div>
                   {!screen && (
@@ -2177,6 +2482,51 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
               }
             />
           </label>
+          <label className="field">
+            适用性别
+            <select
+              value={editingQueue.sex || "不限"}
+              onChange={(e) =>
+                setEditingQueue({ ...editingQueue, sex: e.target.value })
+              }
+            >
+              <option>不限</option>
+              <option>男</option>
+              <option>女</option>
+            </select>
+          </label>
+          <label className="check-line">
+            <input
+              type="checkbox"
+              checked={!!editingQueue.bottleneck}
+              onChange={(e) =>
+                setEditingQueue({
+                  ...editingQueue,
+                  bottleneck: e.target.checked,
+                })
+              }
+            />
+            设为瓶颈科室（可预排）
+          </label>
+          <label className="field">
+            前置检查项目（顿号分隔）
+            <input
+              value={
+                Array.isArray(editingQueue.dependencies)
+                  ? editingQueue.dependencies.join("、")
+                  : editingQueue.dependencies || ""
+              }
+              onChange={(e) =>
+                setEditingQueue({
+                  ...editingQueue,
+                  dependencies: e.target.value
+                    .split(/[、,，]/)
+                    .map((x) => x.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+          </label>
           <fieldset>
             <legend>可入队检查项目</legend>
             {[...new Set(state.packages.flatMap((p) => p.items))].map(
@@ -2299,6 +2649,13 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
               onClick={() => {
                 save({
                   id: `${dept}-${candidate}`,
+                  businessDate: String(
+                    state.appointments.find((a) => a.id === candidate)
+                      ?.checkedAt ||
+                      state.appointments.find((a) => a.id === candidate)
+                        ?.date ||
+                      day,
+                  ).slice(0, 10),
                   department: dept,
                   appointmentId: candidate,
                   status: "waiting",

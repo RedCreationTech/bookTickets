@@ -74,6 +74,9 @@ describe("independent QA: cross-surface lifecycle and persistence", () => {
     click("确认签到");
     expect(snapshot().appointments[0].status).toBe("checked");
     await remount("/exam");
+    fireEvent.change(screen.getByLabelText("分检业务日期"), {
+      target: { value: snapshot().appointments[0].date },
+    });
     click("填入正常示例");
     fireEvent.change(screen.getByLabelText("分检小结 / 医学建议（演示）"), {
       target: { value: "合成演示结果，待总检复核。" },
@@ -220,7 +223,7 @@ describe("independent QA: audit of exposed mutation guards", () => {
     expect(
       (
         within(dialog).getByRole("button", {
-          name: "加项：肺功能 ¥50",
+          name: "进入项目加项",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -329,19 +332,35 @@ describe("independent QA: selected star-clause interactions and regression cases
     expect(snapshot().tasks).toHaveLength(0);
     expect(snapshot().records.alerts[0].status).toBe("已处理");
   });
-  it("T0342 hides unselected synthetic history years and never fills missing history with normal", async () => {
+  it("T0342 compares selected actual stored history and never fills missing results with normal", async () => {
     seed((s) => {
-      s.appointments = [s.appointments[4]];
+      const a = s.appointments[4];
+      s.appointments = [
+        a,
+        {
+          ...a,
+          id: "HIST-QA-2025",
+          date: "2025-10-13",
+          results: { 空腹血糖: "6.4" },
+        },
+      ];
     });
     await mount("/reports");
-    click("预览 / 管理");
-    fireEvent.change(screen.getByLabelText("历史对比次数"), {
-      target: { value: "3" },
-    });
-    expect(screen.getByRole("columnheader", { name: "2025年" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: "2025 年订单" }));
-    expect(screen.queryByRole("columnheader", { name: "2025年" })).toBeNull();
-    expect(screen.getAllByText("— 未收录").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "预览 / 管理" })[0]);
+    fireEvent.click(screen.getByText("选择实际历史订单对比"));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "对比历史订单HIST-QA-2025" }),
+    );
+    expect(
+      screen.getByRole("columnheader", { name: "2025-10-13 · HIST-QA-2025" }),
+    ).toBeTruthy();
+    expect(screen.getAllByText("未收录").length).toBeGreaterThan(0);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "对比历史订单HIST-QA-2025" }),
+    );
+    expect(
+      screen.queryByRole("columnheader", { name: "2025-10-13 · HIST-QA-2025" }),
+    ).toBeNull();
   });
   it("T0434/35 validates nonzero and excessive repayments before updating a single persistent bill", async () => {
     seed();
@@ -520,37 +539,70 @@ describe("independent QA: positive critical-result reporting", () => {
   });
 });
 
-describe('independent QA: final entrypoint integration',()=>{
- it('opens the actual appointment CSV import entry, validates a sample, and persists its booking once',async()=>{
-  seed(s=>{s.appointments=[];});await mount('/appointments');click('团检 CSV 导入');
-  await screen.findByRole('button',{name:'填入合成示例'});
-  click('填入合成示例');click('校验名单');
-  expect(screen.getByRole('table',{name:'团检导入预览'})).toBeTruthy();
-  fireEvent.click(screen.getByRole('checkbox',{name:/我已确认上述 1 条合成名单/}));
-  click('确认创建 1 条预约');expect(snapshot().appointments).toHaveLength(1);
-  expect(snapshot().appointments[0].source).toBe('团检 CSV 导入');click('完成');
-  await remount('/appointments');expect(screen.getByText(/团检 CSV 导入/,{selector:'small'})).toBeTruthy();
- });
- it('opens workload analytics through the navigation and displays structured change details',async()=>{
-  seed(s=>Object.assign(s,reducer(s,{type:'UPDATE_CONFIG',payload:{dailyCapacity:12}})));
-  await mount('/dashboard');
-  fireEvent.click(screen.getByRole('link',{name:'工作量统计'}));
-  await waitFor(()=>expect(screen.getByRole('heading',{name:'工作量统计'})).toBeTruthy());
-  expect(screen.getByRole('table',{name:'人员工作量'})).toBeTruthy();
-  fireEvent.click(within(screen.getByRole('table',{name:'操作事件'})).getAllByRole('button')[0]);
-  const dialog=screen.getByRole('dialog',{name:'审计事件详情'});
-  expect(within(dialog).getByText('变更前')).toBeTruthy();
-  expect(within(dialog).getByText('变更后')).toBeTruthy();
-  expect(dialog.textContent).toContain('dailyCapacity');
-  expect(snapshot().audit[0]).toMatchObject({action:'UPDATE_CONFIG',entity:'config',before:{dailyCapacity:80},after:{dailyCapacity:12}});
- });
- it('T0103 updates the synthetic historical reference when the selected booking patient changes',async()=>{
-  seed();await mount('/appointments');click('新建预约');
-  const dialog=screen.getByRole('dialog');
-  const before=within(dialog).getByText(/林知远的合成记录/).textContent;
-  fireEvent.change(within(dialog).getByLabelText('体检人'),{target:{value:'P003'}});
-  const after=within(dialog).getByText(/陈映山的合成记录/).textContent;
-  expect(after).not.toEqual(before);expect(after).toContain('A类');
-  expect(within(dialog).getByRole('checkbox',{name:/增加/})).toBeTruthy();
- });
+describe("independent QA: final entrypoint integration", () => {
+  it("opens the actual appointment CSV import entry, validates a sample, and persists its booking once", async () => {
+    seed((s) => {
+      s.appointments = [];
+    });
+    await mount("/appointments");
+    click("团检 CSV 导入");
+    await screen.findByRole("button", { name: "填入合成示例" });
+    click("填入合成示例");
+    click("校验名单");
+    expect(screen.getByRole("table", { name: "团检导入预览" })).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /我已确认上述 1 条合成名单/ }),
+    );
+    click("确认创建 1 条预约");
+    expect(snapshot().appointments).toHaveLength(1);
+    expect(snapshot().appointments[0].source).toBe("团检 CSV 导入");
+    click("完成");
+    await remount("/appointments");
+    expect(
+      screen.getByText(/团检 CSV 导入/, { selector: "small" }),
+    ).toBeTruthy();
+  });
+  it("opens workload analytics through the navigation and displays structured change details", async () => {
+    seed((s) =>
+      Object.assign(
+        s,
+        reducer(s, { type: "UPDATE_CONFIG", payload: { dailyCapacity: 12 } }),
+      ),
+    );
+    await mount("/dashboard");
+    fireEvent.click(screen.getByRole("link", { name: "工作量统计" }));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "工作量统计" })).toBeTruthy(),
+    );
+    expect(screen.getByRole("table", { name: "人员工作量" })).toBeTruthy();
+    fireEvent.click(
+      within(screen.getByRole("table", { name: "操作事件" })).getAllByRole(
+        "button",
+      )[0],
+    );
+    const dialog = screen.getByRole("dialog", { name: "审计事件详情" });
+    expect(within(dialog).getByText("变更前")).toBeTruthy();
+    expect(within(dialog).getByText("变更后")).toBeTruthy();
+    expect(dialog.textContent).toContain("dailyCapacity");
+    expect(snapshot().audit[0]).toMatchObject({
+      action: "UPDATE_CONFIG",
+      entity: "config",
+      before: { dailyCapacity: 80 },
+      after: { dailyCapacity: 12 },
+    });
+  });
+  it("T0103 updates the synthetic historical reference when the selected booking patient changes", async () => {
+    seed();
+    await mount("/appointments");
+    click("新建预约");
+    const dialog = screen.getByRole("dialog");
+    const before = within(dialog).getByText(/林知远的合成记录/).textContent;
+    fireEvent.change(within(dialog).getByLabelText("体检人"), {
+      target: { value: "P003" },
+    });
+    const after = within(dialog).getByText(/陈映山的合成记录/).textContent;
+    expect(after).not.toEqual(before);
+    expect(after).toContain("A类");
+    expect(within(dialog).getByRole("checkbox", { name: /增加/ })).toBeTruthy();
+  });
 });

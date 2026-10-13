@@ -1,3 +1,4 @@
+import { BusinessAutomationPanel } from "./QueueAutomation";
 import { useRef, useState } from "react";
 import type { PointerEvent, ReactNode } from "react";
 import {
@@ -2828,7 +2829,12 @@ export default function ControlCenter({ section }: { section?: string }) {
       </div>
       <div role="tabpanel" aria-label={tabs.find((t) => t.id === tab)?.label}>
         {tab === "notifications" && <Notifications />}
-        {tab === "event-notifications" && <EventNotifications />}
+        {tab === "event-notifications" && (
+          <>
+            <EventNotifications />
+            <BusinessAutomationPanel />
+          </>
+        )}
         {tab === "identity" && <IdentityQuality />}
         {tab === "signatures" && <Signatures />}
         {tab === "rejections" && <RejectionQuality />}

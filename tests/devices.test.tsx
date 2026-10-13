@@ -752,6 +752,15 @@ describe("单位排期、时钟、问卷与门户配置闭环", () => {
     expect(state().records.bookingQuestionnaires[0].recommended).toContain(
       "甲状腺彩超",
     );
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments[0].questionnaireAnswers).toContain(
+      "关注甲状腺健康",
+    );
+    expect(state().appointments[0].recommendedItems).toContain("甲状腺彩超");
+    expect(state().appointments[0].items).toContain("甲状腺彩超");
     s.config.questionnaireEnabled = false;
     s.config.questionnaireSkippable = false;
     expect(

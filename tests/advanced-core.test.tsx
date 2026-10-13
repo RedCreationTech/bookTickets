@@ -90,17 +90,40 @@ describe("advanced frontend scenarios", () => {
       screen.getByRole("heading", { name: "陈映山 的体检报告" }),
     ).toBeInTheDocument();
   });
-  it("A06 batch report cabinet movement is linked to selected orders only", () => {
+  it("A06 batch report inventory uses stable cabinet IDs and selected orders only", () => {
+    const s = createInitialState(),
+      a = s.appointments.find(
+        (a) => a.status === "printed" || a.status === "approved",
+      )!;
+    a.printedAt = "2026-10-13T07:00:00Z";
+    a.printCount = 1;
+    s.records.reportCabinetCategories = [
+      { id: "C", name: "A区", status: "已启用" },
+    ];
+    s.records.reportCabinetSlots = [
+      {
+        id: "S",
+        name: "02-03",
+        categoryId: "C",
+        capacity: 20,
+        status: "已启用",
+      },
+    ];
+    localStorage.setItem(KEY, JSON.stringify(s));
     mount(<Reports />);
-    const checkboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(checkboxes[1]);
-    fireEvent.change(screen.getByRole("textbox", { name: "批量报告柜位置" }), {
-      target: { value: "A-02-03" },
+    fireEvent.click(screen.getByLabelText("选择报告" + a.id));
+    fireEvent.change(screen.getByLabelText("报告流转动作"), {
+      target: { value: "stock_in" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "批量移柜" }));
+    fireEvent.change(screen.getByLabelText("目标报告柜位"), {
+      target: { value: "S" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "预览本次报告流转" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认登记本次流转" }));
+    expect(data().appointments.filter((x: any) => x.cabinet)).toHaveLength(1);
     expect(
-      data().appointments.filter((x: any) => x.cabinet === "A-02-03"),
-    ).toHaveLength(1);
+      data().records.reportArchives.find((x: any) => x.appointmentId === a.id),
+    ).toMatchObject({ slotId: "S", inventoryStatus: "in" });
   });
   it("A07 appointment date filter and direct selected link work", () => {
     window.location.hash = "/appointments?selected=TJ2026100001";

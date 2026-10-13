@@ -27,6 +27,22 @@ import {
 } from "lucide-react";
 import { useDemo } from "../store";
 import "./operations.css";
+import {
+  OrganizationWorkspace,
+  DictionaryCategories,
+  DeviceInventory,
+} from "./AdminDomains";
+import { UiResourceSettings, uiElementAllowed } from "./UiResources";
+import { LocalMessages, DoctorTeamRelations } from "./HealthDomains";
+import { CrmProgress } from "./CrmProgress";
+import { ServiceBatch, AccountsFinance } from "./ServiceFinance";
+import {
+  ProductAttributes,
+  ExchangeWorkbench,
+  OrderDisputes,
+} from "./CommerceAftercare";
+import PatientBookingSettings from "./PatientBookingSettings";
+import MessageWorkbench from "./MessageWorkbench";
 
 export type Row = Record<string, any>;
 export type FieldSpec = {
@@ -525,8 +541,13 @@ export function RecordWorkspace({
             导入
           </button>
           <button
+            hidden={!uiElementAllowed(state, "operations.export")}
             className="btn"
             onClick={() => {
+              if (!uiElementAllowed(state, "operations.export")) {
+                setNotice("当前角色无导出权限");
+                return;
+              }
               downloadCsv(spec.label, visible, [
                 ...spec.fields,
                 f("status", "状态"),
@@ -889,6 +910,12 @@ export function RecordWorkspace({
               {spec.kind === "products" && (
                 <section className="ops-inline-box">
                   <h3>商品图片与结构化属性</h3>
+                  {(record.attributeOptions || []).map((attribute: Row) => (
+                    <p key={attribute.key}>
+                      <b>{attribute.key}</b>：{attribute.values.join(" / ")}
+                    </p>
+                  ))}
+
                   <p>
                     仅保存本地图片；PNG/JPEG/WebP，每张最大 256 KB，最多 3 张。
                   </p>
@@ -2415,6 +2442,7 @@ settingsSpecs.push(
         "短信模板",
         "驳回意见",
       ]),
+      f("level", "小结等级", "select", ["一般", "关注", "重要"]),
       f("code", "项目 / 模板编码"),
       f("related", "关联项目编码"),
       f("description", "配置内容", "textarea"),
@@ -3380,8 +3408,11 @@ function LoyaltyCenter() {
                       {a.name} · <Tag value={a.status} />
                     </b>
                     <small>
-                      {a.date} · {a.team} · 名额 {count}/{a.capacity} · 签到奖励{" "}
-                      {a.points} 豆
+                      {a.date} ·{" "}
+                      {state.records.doctorTeams?.find(
+                        (t: Row) => t.id === a.teamId,
+                      )?.name || a.team}{" "}
+                      · 名额 {count}/{a.capacity} · 签到奖励 {a.points} 豆
                     </small>
                   </div>
                   <div className="ops-action-wrap">
@@ -3730,6 +3761,11 @@ function CommerceSimulator() {
   const persist = (collection: string, record: Row) =>
     act({ type: "UPSERT_RECORD", payload: { collection, record } });
   const submit = () => {
+    if (!uiElementAllowed(state, "commerce.order.create")) {
+      setNotice("当前角色无创建交易权限");
+      setConfirm(false);
+      return;
+    }
     if (confirmationConsumed.current) return;
     confirmationConsumed.current = true;
     const errors = [...quote.errors];
@@ -4023,9 +4059,11 @@ function CommerceSimulator() {
         </div>
         <div className="ops-modal-actions">
           <button
+            hidden={!uiElementAllowed(state, "commerce.order.create")}
             className="btn btn-primary"
             onClick={() => {
-              if (confirm) return;
+              if (confirm || !uiElementAllowed(state, "commerce.order.create"))
+                return;
               confirmationConsumed.current = false;
               setConfirm(true);
             }}
@@ -4943,6 +4981,31 @@ const sectionMeta: Record<
     specs: settingsSpecs,
   },
 };
+const completionTabs: Record<string, [string, string][]> = {
+  services: [
+    ["crmProgress", "客户订单进度"],
+    ["serviceBatch", "服务批量维护"],
+    ["accountsFinance", "服务财务与余额"],
+    ["teamRelations", "我的团队关系"],
+  ],
+  commerce: [
+    ["exchanges", "换货库存处理"],
+    ["attributes", "商品属性选项"],
+    ["accountsFinance", "商城财务与余额"],
+  ],
+  content: [["sentMessages", "已发短信邮件"]],
+  support: [
+    ["orderDisputes", "订单关联介入"],
+    ["patientMessages", "检前检中留言"],
+  ],
+  settings: [
+    ["organizationScope", "机构人员归属"],
+    ["dictionaryCategories", "字典分类管理"],
+    ["deviceInventory", "设备库存台账"],
+    ["actualUiResources", "实际页面权限"],
+    ["patientBookingSettings", "患者预约规则"],
+  ],
+};
 export default function Operations({
   section = "services",
 }: {
@@ -4985,7 +5048,7 @@ export default function Operations({
         {meta.specs.map((s) => (
           <button
             key={s.key}
-            className={spec.key === s.key ? "active" : ""}
+            className={tab === s.key ? "active" : ""}
             onClick={() => {
               setTab(s.key);
               setShowAudit(false);
@@ -4993,6 +5056,18 @@ export default function Operations({
           >
             {s.label}
             {s.key === "tickets" && <span>2</span>}
+          </button>
+        ))}
+        {(completionTabs[route] || []).map(([key, label]) => (
+          <button
+            key={key}
+            className={tab === key ? "active" : ""}
+            onClick={() => {
+              setTab(key);
+              setShowAudit(false);
+            }}
+          >
+            {label}
           </button>
         ))}
         {route === "settings" && (
@@ -5004,7 +5079,35 @@ export default function Operations({
           </button>
         )}
       </div>
-      {showAudit ? (
+      {!showAudit && tab === "crmProgress" ? (
+        <CrmProgress />
+      ) : !showAudit && tab === "serviceBatch" ? (
+        <ServiceBatch />
+      ) : !showAudit && tab === "accountsFinance" ? (
+        <AccountsFinance />
+      ) : !showAudit && tab === "teamRelations" ? (
+        <DoctorTeamRelations />
+      ) : !showAudit && tab === "exchanges" ? (
+        <ExchangeWorkbench />
+      ) : !showAudit && tab === "attributes" ? (
+        <ProductAttributes />
+      ) : !showAudit && tab === "sentMessages" ? (
+        <LocalMessages sentOnly />
+      ) : !showAudit && tab === "orderDisputes" ? (
+        <OrderDisputes />
+      ) : !showAudit && tab === "organizationScope" ? (
+        <OrganizationWorkspace />
+      ) : !showAudit && tab === "dictionaryCategories" ? (
+        <DictionaryCategories />
+      ) : !showAudit && tab === "deviceInventory" ? (
+        <DeviceInventory />
+      ) : !showAudit && tab === "actualUiResources" ? (
+        <UiResourceSettings />
+      ) : !showAudit && tab === "patientBookingSettings" ? (
+        <PatientBookingSettings />
+      ) : !showAudit && tab === "patientMessages" ? (
+        <MessageWorkbench />
+      ) : showAudit ? (
         <section className="panel ops-panel">
           <div className="ops-panel-title">
             <div>

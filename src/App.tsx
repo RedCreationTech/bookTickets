@@ -1,3 +1,4 @@
+import { resolveMenuPresentation } from "./modules/UiResources";
 import { useEffect, useState, useRef, lazy, Suspense } from "react";
 import {
   Activity,
@@ -277,7 +278,14 @@ export default function App() {
         </div>
         <nav>
           {navigation.map((g) => {
-            const items = g.items.filter((i) => role.paths.includes(i.path));
+            const items = g.items
+              .filter((i) => role.paths.includes(i.path))
+              .map((i) => ({
+                ...i,
+                presentation: resolveMenuPresentation(state, i.path, i.name),
+              }))
+              .filter((i) => i.presentation.visible)
+              .sort((a, b) => a.presentation.order - b.presentation.order);
             return (
               !!items.length && (
                 <div className="nav-group" key={g.group}>
@@ -289,7 +297,7 @@ export default function App() {
                       className={route === i.path ? "active" : ""}
                     >
                       <i.icon size={18} />
-                      {i.name}
+                      {i.presentation.label}
                       {i.path === "/review" && (
                         <span className="nav-count">
                           {
@@ -329,7 +337,12 @@ export default function App() {
           </button>
           <div className="breadcrumb">
             工作空间 <span>/</span>
-            <strong>{current?.name || "工作台"}</strong>
+            <strong>
+              {current
+                ? resolveMenuPresentation(state, current.path, current.name)
+                    .label
+                : "工作台"}
+            </strong>
           </div>
           <div className="topbar-controls">
             <select

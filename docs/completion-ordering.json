@@ -1,0 +1,632 @@
+{
+  "scope": "固定 implementationOwner=ordering 的33项；未改原778审计与覆盖矩阵。T0256不在本组；T0177自取子义与T0162原文联动明确保留澄清边界。",
+  "ownerFiles": [
+    "src/batchOrderingRules.ts",
+    "src/groupImportRules.ts",
+    "src/orderFinanceRules.ts",
+    "src/orderProgressRules.ts",
+    "src/modules/BatchOrdering.tsx",
+    "src/modules/Registration.tsx",
+    "src/modules/OrderingConfiguration.tsx",
+    "src/modules/OrderFinanceCompletion.tsx",
+    "src/modules/OrderProgress.tsx",
+    "tests/batch-ordering.test.tsx",
+    "tests/ordering-completion.test.tsx",
+    "tests/order-finance-completion.test.tsx",
+    "src/modules/Groups.tsx",
+    "src/modules/SettlementDetails.tsx",
+    "tests/group-payment-regression.test.tsx",
+    "tests/settlement-details.test.tsx"
+  ],
+  "integrationFilesOwnedByParent": [
+    "src/modules/Core.tsx",
+    "src/modules/Advanced.tsx",
+    "src/model.ts",
+    "src/store.tsx"
+  ],
+  "verification": {
+    "commands": [
+      "npx vitest run tests/batch-ordering.test.tsx tests/ordering-completion.test.tsx tests/order-finance-completion.test.tsx",
+      "npx eslint src/batchOrderingRules.ts src/groupImportRules.ts src/orderFinanceRules.ts src/orderProgressRules.ts src/modules/BatchOrdering.tsx src/modules/Registration.tsx src/modules/OrderingConfiguration.tsx src/modules/OrderFinanceCompletion.tsx src/modules/OrderProgress.tsx",
+      "npm run typecheck"
+    ],
+    "result": "最终本组3文件66/66通过：原batch-ordering 22、新ordering-completion 26、新order-finance-completion 18。新增源文件eslint通过，全局npm run typecheck通过；未冒称全仓回归或Chromium视觉验收。",
+    "visualVerification": "本组只执行确定性Vitest/jsdom行为测试、lint/typecheck；未独立执行Chromium视觉验收。共享Modal portal与table-scroll复用。",
+    "testEvidenceFile": "docs/completion-ordering-test-results.json",
+    "adjacentRegression": {
+      "command": "npx vitest run tests/review-tools.test.tsx tests/execution-desk.test.tsx tests/ordering-clinical.test.tsx",
+      "result": "邻接回归实际62/62通过，与本组66项分开计数。"
+    }
+  },
+  "records": [
+    "orderBatches",
+    "discountApprovals",
+    "discountCodeAuthorizations",
+    "orderingRules",
+    "customerTypes",
+    "orderTypes",
+    "cardReaderModels",
+    "groupOrderBookingRules",
+    "orderTransactions",
+    "cards",
+    "cardBatches",
+    "cardChallenges",
+    "cardTransactions",
+    "groupSettlementSnapshots",
+    "orderItemEvents",
+    "orderFlowEvents"
+  ],
+  "items": [
+    {
+      "id": "T0087",
+      "implementationOwner": "ordering",
+      "originalText": "支持默认显示当前院区订单、项目、套餐、业务数据等信息。",
+      "gapAddressed": "让订单和业务列表默认采用当前院区，并提供显式跨院区切换；当前默认全部数据未按院区隔离。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/Core.tsx::Appointments filterCampus",
+        "src/orderProgressRules.ts::queryOrders",
+        "src/modules/OrderFinanceCompletion.tsx::财务查询院区 / 单位结算院区"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC01"
+      ],
+      "boundary": "订单与财务查询默认当前院区，显式全部院区；会员卡主档是跨院区账户主档，无真实数据隔离。"
+    },
+    {
+      "id": "T0088",
+      "implementationOwner": "ordering",
+      "originalText": "支持创建订单时仅显示当前院区套餐、项目信息。",
+      "gapAddressed": "给检查项目规则增加院区范围，并在开单附加项目选择和提交校验中生效。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupImportRules.ts::itemAvailableAtCampus / validateCampusItems",
+        "src/modules/OrderingConfiguration.tsx::OrderingConfiguration",
+        "src/batchOrderingRules.ts::prepareOrder"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC02",
+        "tests/ordering-completion.test.tsx::OC23"
+      ],
+      "boundary": "本地项目院区规则，真实资源及服务端越权校验未接入。"
+    },
+    {
+      "id": "T0093",
+      "implementationOwner": "ordering",
+      "originalText": "支持身份证、医保卡、电子医保、就诊卡、电子健康卡、护照、外国人永久居住证、台胞证等证件类型。",
+      "gapAddressed": "补齐医保卡、电子医保、就诊卡、电子健康卡、外国人永久居住证、台胞证的独立可选类型并保存。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/Registration.tsx::CERTIFICATE_TYPES / RegistrationProfile"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC03"
+      ],
+      "boundary": "11种独立合成证件类型；不采集真实身份或进行实名验证。"
+    },
+    {
+      "id": "T0095",
+      "implementationOwner": "ordering",
+      "originalText": "内置多种读卡器型号，并支持自定义选择读卡器型号。",
+      "gapAddressed": "新增预置读卡器型号列表和自定义型号保存/选择，仅维护模拟设备配置即可。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/Registration.tsx::DEFAULT_CARD_READERS / RegistrationTypeSettings"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC04"
+      ],
+      "boundary": "预置与自定义模拟型号，仅本地配置，不使用驱动或读卡硬件。"
+    },
+    {
+      "id": "T0102",
+      "implementationOwner": "ordering",
+      "originalText": "客户类型、订单类型可自定义。",
+      "gapAddressed": "新增/重命名客户类型和订单类型，并使新类型可用于登记及映射；目前列表固定。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/Registration.tsx::RegistrationTypeSettings / 保存类型映射"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC05"
+      ],
+      "boundary": "新增、重命名及映射共用稳定类型ID；历史订单保留已登记类型。"
+    },
+    {
+      "id": "T0108",
+      "implementationOwner": "ordering",
+      "originalText": "支持折扣权限管理，输入打折密码后依相应折扣权限打折，不允许超出权限。",
+      "gapAddressed": "加入演示折扣密码输入和验证，密码通过后激活对应授权下限；目前没有密码验证动作。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/batchOrderingRules.ts::DISCOUNT_CODE_UNLOCK / DISCOUNT_CODE_APPLY",
+        "src/modules/BatchOrdering.tsx::DiscountPasswordDesk"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC06"
+      ],
+      "boundary": "公开合成代码，仅演示订单绑定、折扣下限、10分钟有效期及一次消费；不是安全密码系统。"
+    },
+    {
+      "id": "T0109",
+      "implementationOwner": "ordering",
+      "originalText": "超出折扣权限时，支持发起折扣审批申请。",
+      "gapAddressed": "从超限开单发起携带目标折扣和订单草稿的申请，展示待批/通过/驳回，批准后允许该次折扣。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/batchOrderingRules.ts::DISCOUNT_REQUEST / DISCOUNT_DECIDE / DISCOUNT_CONSUME / DISCOUNT_WITHDRAW",
+        "src/modules/BatchOrdering.tsx::DiscountApprovalDesk"
+      ],
+      "tests": [
+        "tests/batch-ordering.test.tsx::DA01",
+        "tests/batch-ordering.test.tsx::DA02",
+        "tests/batch-ordering.test.tsx::DA03",
+        "tests/batch-ordering.test.tsx::DA04",
+        "tests/batch-ordering.test.tsx::DA05",
+        "tests/batch-ordering.test.tsx::DA06",
+        "tests/batch-ordering.test.tsx::DA07",
+        "tests/batch-ordering.test.tsx::DA08",
+        "tests/batch-ordering.test.tsx::DA09",
+        "tests/batch-ordering.test.tsx::DA10"
+      ],
+      "boundary": "审批绑定已保存的未缴预约及报价快照，申请与审批角色分离，非医院审批服务。"
+    },
+    {
+      "id": "T0131",
+      "implementationOwner": "ordering",
+      "originalText": "支持自动匹配分组及分组校验。",
+      "gapAddressed": "依据单位人员分组自动匹配 groupPersonnelId/套餐，并校验人员是否属于所填分组；当前仅检查名字存在。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupImportRules.ts::resolveGroupImportRow",
+        "src/modules/Advanced.tsx::GroupImport"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC07"
+      ],
+      "boundary": "使用本地单位合同/人员分组与现有合成身份；不接医院单位主数据。"
+    },
+    {
+      "id": "T0133",
+      "implementationOwner": "ordering",
+      "originalText": "自动校验身份证号错误信息，并提示错误行号。",
+      "gapAddressed": "加入明确合成测试身份证模式，对格式、出生日期及校验位做本地校验并显示错误行号，不接实名服务。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupImportRules.ts::syntheticIdentityCheck / makeSyntheticIdentity",
+        "src/modules/Advanced.tsx::GroupImport"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC08"
+      ],
+      "boundary": "仅SYNTHETIC-999999虚构地区前缀；格式、出生日期、校验位及行号提示；不验证真实身份证。"
+    },
+    {
+      "id": "T0135",
+      "implementationOwner": "ordering",
+      "originalText": "支持特殊团检导入身份证号为空的名单，例如公务员入职体检。",
+      "gapAddressed": "提供特殊团检免证件模式，允许空值并使用稳定合成人员键备单，同时普通模式仍拒绝空值。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupImportRules.ts::resolveGroupImportRow special-empty",
+        "src/modules/Advanced.tsx::GroupImport"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC09"
+      ],
+      "boundary": "特殊模式稳定合成人员键；同名歧义拒绝，普通模式仍拒绝空身份。"
+    },
+    {
+      "id": "T0137",
+      "implementationOwner": "ordering",
+      "originalText": "支持套餐内换项，超出团检订单金额的部分自动转为个人付费。",
+      "gapAddressed": "增加套餐内换项操作，替换项目后重算 pricing/groupSplit 并自动转个人差额。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/batchOrderingRules.ts::prepareOrder swap / contractSplit",
+        "src/modules/BatchOrdering.tsx::GroupItemSwap"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC10"
+      ],
+      "boundary": "换出/换入、必检/依赖与状态守卫、重算单位限额和个人差额；已缴或已检订单需原财务/临床流程。"
+    },
+    {
+      "id": "T0143",
+      "implementationOwner": "ordering",
+      "originalText": "可按预约、团检备单、个检登记、第三方预约区分订单来源。",
+      "gapAddressed": "加入来源筛选及独立第三方预约合成导入入口/标记，区分预约、团检备单、个检登记、第三方预约四类。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderProgressRules.ts::orderSourceClass / previewThirdPartyOrder / ORDER_THIRD_PARTY_IMPORT",
+        "src/modules/OrderProgress.tsx::ThirdPartyOrderImport / OrderSearchDesk"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC11",
+        "tests/ordering-completion.test.tsx::OC22"
+      ],
+      "boundary": "四来源筛选；第三方为DEMO编号本地导入，复用预约/报价/项目院区及容量；无第三方接口。"
+    },
+    {
+      "id": "T0148",
+      "implementationOwner": "ordering",
+      "originalText": "支持按姓名、身份证、体检号、单位名称、简拼等进行模糊或精准检索。",
+      "gapAddressed": "补证件号与简拼索引，以及模糊/精准匹配切换。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderProgressRules.ts::queryOrders",
+        "src/modules/OrderProgress.tsx::OrderSearchDesk",
+        "src/modules/Registration.tsx::客户姓名简拼"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC01"
+      ],
+      "boundary": "姓名/证件/体检号/单位/手工简拼的大小写归一模糊与精准匹配；不调用姓名拼音或实名服务。"
+    },
+    {
+      "id": "T0152",
+      "implementationOwner": "ordering",
+      "originalText": "支持查看订单项目状态，以及弃检项目、未检项目、已登记项目、已收到报告项目的明细。",
+      "gapAddressed": "增加项目状态明细区及筛选，分别显示弃检、未检、已登记和已收到报告项目。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderProgressRules.ts::orderItemRows / itemOperationErrors / ORDER_ITEM_ACTION",
+        "src/modules/OrderProgress.tsx::OrderItemProgress"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC12",
+        "tests/ordering-completion.test.tsx::OC14",
+        "tests/ordering-completion.test.tsx::OC25"
+      ],
+      "boundary": "弃检/未检/已登记/已收到报告分开；报告接收可记凭证但绝不制造分检结果。"
+    },
+    {
+      "id": "T0153",
+      "implementationOwner": "ordering",
+      "originalText": "支持查看和查询以下订单流转状态：订单创建、预约中、预约完成、取消预约、订单到检、订单弃检、检查中、检查完成、检查被驳回、初审中、初审完成、驳回至初审、主检中、主检完成、驳回至主检、总检中、总检完成、驳回至总检、终审中、终审完成、驳回至终审、订单结束。",
+      "gapAddressed": "建立可查询的完整流转事件/阶段状态视图，覆盖条文列举的预约、到检、各审核完成与驳回、订单结束。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderProgressRules.ts::ORDER_FLOW_STATES / orderFlowEvents / ORDER_REVIEW_START / ORDER_REVIEW_RETURN / ORDER_CLOSE",
+        "src/modules/OrderProgress.tsx::OrderFlowDesk",
+        "src/model.ts::REVIEW"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC21",
+        "tests/ordering-completion.test.tsx::OC24",
+        "tests/ordering-completion.test.tsx::OC26"
+      ],
+      "boundary": "22种状态按实际审计、分检与审核节点事件查询；四节点须在登记前明确启用。未发生、未留痕或种子缺失时间不补造。"
+    },
+    {
+      "id": "T0154",
+      "implementationOwner": "ordering",
+      "originalText": "支持按创建时间、开始体检时间、预约时间等时间段查询订单。",
+      "gapAddressed": "添加时间字段选择（创建/到检/预约）和起止日期，并按相应已记录时间筛订单。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderProgressRules.ts::queryOrders dateField",
+        "src/modules/OrderProgress.tsx::OrderSearchDesk"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC15"
+      ],
+      "boundary": "按保存的创建/到检/预约日期查询；未知创建或到检时间不使用预约时间冒充。"
+    },
+    {
+      "id": "T0162",
+      "implementationOwner": "ordering",
+      "originalText": "原文：“支持刷身份证自定带出身份证号并自动设置的时间段内历史订单。”保留刷卡带出身份证号及时间段历史订单的场景，具体联动动作待澄清。",
+      "gapAddressed": "增加模拟刷证件填入证件号并按可配置历史起止范围展示匹配订单；原文“自动设置的时间段”含义仍需确认。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/OrderProgress.tsx::模拟刷证件查询历史订单"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC20"
+      ],
+      "boundary": "模拟读卡带出合成标识，并使用操作者保存的历史起止范围；原文“自动设置”的具体联动仍待澄清。"
+    },
+    {
+      "id": "T0168",
+      "implementationOwner": "ordering",
+      "originalText": "团检支持批量删减、增加项目。",
+      "gapAddressed": "新增多选订单的项目加减清单、逐单变更预览和一次确认应用，校验锁定/必检并重新计价。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/batchOrderingRules.ts::BATCH_ORDER_APPLY / previewBatchOrders",
+        "src/modules/BatchOrdering.tsx::BatchOrdering"
+      ],
+      "tests": [
+        "tests/batch-ordering.test.tsx::BO01",
+        "tests/batch-ordering.test.tsx::BO02",
+        "tests/batch-ordering.test.tsx::BO03",
+        "tests/batch-ordering.test.tsx::BO04",
+        "tests/batch-ordering.test.tsx::BO05",
+        "tests/batch-ordering.test.tsx::BO06",
+        "tests/batch-ordering.test.tsx::BO07",
+        "tests/batch-ordering.test.tsx::BO08",
+        "tests/batch-ordering.test.tsx::BO09",
+        "tests/batch-ordering.test.tsx::BO10",
+        "tests/batch-ordering.test.tsx::BO11",
+        "tests/batch-ordering.test.tsx::BO12",
+        "tests/ordering-completion.test.tsx::OC23"
+      ],
+      "boundary": "逐单预览/确认/取消/幂等及成功失败审计；锁定、收费后或有结果订单跳过。"
+    },
+    {
+      "id": "T0169",
+      "implementationOwner": "ordering",
+      "originalText": "团检支持批量更换套餐。",
+      "gapAddressed": "新增目标套餐选择、逐单适用性和差价预览，确认后替换套餐及项目/分摊。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/batchOrderingRules.ts::prepareOrder replace",
+        "src/modules/BatchOrdering.tsx::BatchOrdering"
+      ],
+      "tests": [
+        "tests/batch-ordering.test.tsx::BO05",
+        "tests/batch-ordering.test.tsx::BO06",
+        "tests/batch-ordering.test.tsx::BO07",
+        "tests/batch-ordering.test.tsx::BO08"
+      ],
+      "boundary": "批量套餐更换重算项目、金额及分摊，并检查性别/院区/依赖/单位合同/容量；非服务端批处理。"
+    },
+    {
+      "id": "T0170",
+      "implementationOwner": "ordering",
+      "originalText": "支持按时间段查看存在未完成项目、未回传项目的订单明细。",
+      "gapAddressed": "增加起止日期过滤的未完成/未回传订单明细表，列出每单缺失项目并可跳转。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderProgressRules.ts::queryOrders missingOnly / orderItemRows",
+        "src/modules/OrderProgress.tsx::OrderSearchDesk",
+        "src/modules/Core.tsx::Exam appointmentId deep link"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC15",
+        "tests/ordering-completion.test.tsx::OC25"
+      ],
+      "boundary": "时间段未完成和未回传项目列表及分检入口；仅本地保存/接收证据，无设备自动回传接口。"
+    },
+    {
+      "id": "T0177",
+      "implementationOwner": "ordering",
+      "originalText": "对未完成项目支持弃检、确认、改期、自取等操作。",
+      "gapAddressed": "为未完成项目提供逐项确认及项目独立改期日期/状态；当前多为整单改期和弃检。原文自取子动作须待澄清，不补造领取规则。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderProgressRules.ts::ORDER_ITEM_ACTION",
+        "src/modules/OrderProgress.tsx::OrderItemProgress"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC13",
+        "tests/ordering-completion.test.tsx::OC14",
+        "tests/ordering-completion.test.tsx::OC19",
+        "tests/ordering-completion.test.tsx::OC25"
+      ],
+      "boundary": "逐项确认、改期、弃检留痕。项目改期登记不改整单，不自动占医院号源，不造结果。原文“自取”待澄清，不虚构领取规则。"
+    },
+    {
+      "id": "T0182",
+      "implementationOwner": "ordering",
+      "originalText": "支持通过权限配置解禁权限。",
+      "gapAddressed": "增加解锁权限配置，并在UI和本地动作层同时校验，未授权角色不能解禁。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderProgressRules.ts::canUnlockOrder / ORDER_UNLOCK_CONFIGURE / ORDER_UNLOCK",
+        "src/modules/OrderProgress.tsx::OrderUnlockSettings",
+        "src/model.ts::UPDATE_APPOINTMENT locked guard"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC16"
+      ],
+      "boundary": "前端角色与自定义角色数据范围双重守卫、原因审计；服务端授权仍为外部边界。"
+    },
+    {
+      "id": "T0183",
+      "implementationOwner": "ordering",
+      "originalText": "支持可视化批量追加项目。",
+      "gapAddressed": "新增多选订单的项目加减清单、逐单变更预览和一次确认应用，校验锁定/必检并重新计价。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/BatchOrdering.tsx::BatchOrdering",
+        "src/batchOrderingRules.ts::BATCH_ORDER_APPLY"
+      ],
+      "tests": [
+        "tests/batch-ordering.test.tsx::BO01",
+        "tests/batch-ordering.test.tsx::BO02",
+        "tests/batch-ordering.test.tsx::BO10",
+        "tests/batch-ordering.test.tsx::BO12",
+        "tests/ordering-completion.test.tsx::OC23"
+      ],
+      "boundary": "可视项目清单及逐单影响预览，确认后复核最新状态及容量；不是批量到检替代。"
+    },
+    {
+      "id": "T0184",
+      "implementationOwner": "ordering",
+      "originalText": "支持现金、银联、微信、支付宝等方式收费、退费；移动支付需提供相关接口。",
+      "gapAddressed": "增加收退费渠道选择并持久记录每笔模拟交易的渠道；真实移动支付仍列外部边界。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderFinanceRules.ts::PAYMENT_CHANNELS / ORDER_PAYMENT_APPLY",
+        "src/modules/OrderFinanceCompletion.tsx::OrderFinanceDesk"
+      ],
+      "tests": [
+        "tests/order-finance-completion.test.tsx::OF01",
+        "tests/order-finance-completion.test.tsx::OF05",
+        "tests/order-finance-completion.test.tsx::OF15"
+      ],
+      "boundary": "现金/银联/微信/支付宝逐笔合成渠道；无网关、真实收款或退款。"
+    },
+    {
+      "id": "T0185",
+      "implementationOwner": "ordering",
+      "originalText": "支持全退全收、收退相抵、按项目收费/退费模式。",
+      "gapAddressed": "增加按项目选择收/退、净额抵扣和全退全收模式，预览账单并记录各项目交易。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderFinanceRules.ts::previewOrderPayment / orderPaidAllocations / ORDER_PAYMENT_APPLY",
+        "src/modules/OrderFinanceCompletion.tsx::OrderFinanceDesk"
+      ],
+      "tests": [
+        "tests/order-finance-completion.test.tsx::OF02",
+        "tests/order-finance-completion.test.tsx::OF03",
+        "tests/order-finance-completion.test.tsx::OF04",
+        "tests/order-finance-completion.test.tsx::OF05",
+        "tests/order-finance-completion.test.tsx::OF13"
+      ],
+      "boundary": "整单/项目/相抵/全退全收，保存收退两腿与净额、项目余额；无报价旧单按保存总额重建并明示合成分摊。"
+    },
+    {
+      "id": "T0190",
+      "implementationOwner": "ordering",
+      "originalText": "支持按订单合同金额、订单明细、已检订单、已检项目、弃检项目不计费、未检项目不计费等多种方式发起结算。",
+      "gapAddressed": "新增合同金额、订单明细、已检订单、已检项目以及弃检/未检不计费规则选择和逐项金额预览，再生成结算快照。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderFinanceRules.ts::previewGroupSettlement / GROUP_SETTLEMENT_CONFIRM",
+        "src/modules/OrderFinanceCompletion.tsx::GroupSettlementDesk"
+      ],
+      "tests": [
+        "tests/order-finance-completion.test.tsx::OF11"
+      ],
+      "boundary": "六种口径、院区范围、个人自费排除、逐项目理由及确认快照；仅待模拟结算登记，不伪造实际到账。"
+    },
+    {
+      "id": "T0197",
+      "implementationOwner": "ordering",
+      "originalText": "提供批量制作会员卡功能。",
+      "gapAddressed": "增加批量数量、卡类型/余额参数与生成预览，一次创建唯一卡号列表。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderFinanceRules.ts::CARD_BATCH_ISSUE",
+        "src/modules/OrderFinanceCompletion.tsx::MembershipCardDesk"
+      ],
+      "tests": [
+        "tests/order-finance-completion.test.tsx::OF06",
+        "tests/order-finance-completion.test.tsx::OF12"
+      ],
+      "boundary": "数量/类型/余额或套餐批量预览与唯一卡号，幂等取消；无制卡硬件。"
+    },
+    {
+      "id": "T0198",
+      "implementationOwner": "ordering",
+      "originalText": "会员卡作为支付方式抵扣体检费用，抵扣时进行短信验证码验证。",
+      "gapAddressed": "选择体检订单和抵扣额，增加模拟短信验证码发送/输入校验，成功后同步卡余额与订单实收并防重复。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderFinanceRules.ts::CARD_SEND_CODE / CARD_REDEEM",
+        "src/modules/OrderFinanceCompletion.tsx::MembershipCardDesk"
+      ],
+      "tests": [
+        "tests/order-finance-completion.test.tsx::OF07",
+        "tests/order-finance-completion.test.tsx::OF08"
+      ],
+      "boundary": "本地公开验证码，绑定卡/订单/金额/操作者，错误3次锁定、5分钟过期、一次原子扣减；无短信发送或真实支付。"
+    },
+    {
+      "id": "T0199",
+      "implementationOwner": "ordering",
+      "originalText": "系统提供消费卡明细报表。",
+      "gapAddressed": "记录每次卡消费的订单、金额、时间并提供消费卡明细查询/导出。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderFinanceRules.ts::CARD_REDEEM cardTransactions",
+        "src/modules/OrderFinanceCompletion.tsx::MembershipCardDesk 消费卡明细"
+      ],
+      "tests": [
+        "tests/order-finance-completion.test.tsx::OF09"
+      ],
+      "boundary": "消费台账记录订单/卡/金额/时间/前后余额，可筛选并CSV导出；仅合成账。"
+    },
+    {
+      "id": "T0200",
+      "implementationOwner": "ordering",
+      "originalText": "提供套餐卡功能，套餐卡在体检完成后失效。",
+      "gapAddressed": "实现套餐卡类型、绑定套餐/订单、核销状态，并在关联订单检查完成时自动失效。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderFinanceRules.ts::CARD_BATCH_ISSUE / CARD_REDEEM / synchronizePackageCardLifecycle",
+        "src/model.ts::reducer lifecycle wrapper"
+      ],
+      "tests": [
+        "tests/order-finance-completion.test.tsx::OF10",
+        "tests/order-finance-completion.test.tsx::OF14"
+      ],
+      "boundary": "套餐卡绑定相符套餐订单，全有效项目有实际结果且检查提交后自动失效；不以单纯标题或随意status替代。"
+    },
+    {
+      "id": "T0249",
+      "implementationOwner": "ordering",
+      "originalText": "支持查看项目检查状态：未执行项目、检查中项目。",
+      "gapAddressed": "增加项目开始检查状态及未执行/检查中明细，结果保存后转完成。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/orderProgressRules.ts::orderItemRows / ORDER_ITEM_ACTION start",
+        "src/modules/OrderProgress.tsx::OrderItemProgress"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC12",
+        "tests/ordering-completion.test.tsx::OC14"
+      ],
+      "boundary": "独立未执行/检查中，真实结果保存后派生已完成；人工开始不补填结果。"
+    },
+    {
+      "id": "T0479",
+      "implementationOwner": "ordering",
+      "originalText": "创建订单时选择指定单位，优先显示单位专属套餐，也可选择查看全部套餐。",
+      "gapAddressed": "团检开单除单位专属优先展示，还需明确查看全部套餐入口；现名单允许集合会直接限制所有套餐。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupImportRules.ts::groupPackageChoices",
+        "src/modules/OrderingConfiguration.tsx::GroupPackageBrowser",
+        "src/modules/Core.tsx::outsideGroupPersonalPay"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC17",
+        "tests/order-finance-completion.test.tsx::OF11"
+      ],
+      "boundary": "单位专属优先，显式查看全部；非约定套餐明确全个人自费，批改保留标记且单位结算排除；适用性仍受年龄性别院区守卫。"
+    },
+    {
+      "id": "T0483",
+      "implementationOwner": "ordering",
+      "originalText": "支持为单位不同订单配置不同的预约设置。",
+      "gapAddressed": "单位同名的不同订单应分别选择和维护预约规则，当前排期主要按company匹配而非groupOrderId。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/groupImportRules.ts::getGroupOrderBookingRules / validateGroupOrderBooking",
+        "src/modules/OrderingConfiguration.tsx::OrderingConfiguration",
+        "src/modules/Core.tsx::groupOrderId"
+      ],
+      "tests": [
+        "tests/ordering-completion.test.tsx::OC18",
+        "tests/ordering-completion.test.tsx::OC23"
+      ],
+      "boundary": "按真实groupOrderId分别维护日期/时段/日容量，叠加最终项目与套餐资源限制；无跨医院资源调度。"
+    }
+  ],
+  "financialRegressionAddendum": {
+    "scope": "同一已实现财务闭环的独立交叉回归修复，不新增原子项或更改冻结33项清单。",
+    "evidence": [
+      "src/orderFinanceRules.ts::actualOrderCollections / GROUP_ACCOUNT_SETTLE / GROUP_ACCOUNT_REVERSE",
+      "src/modules/Groups.tsx::预付款分配及原路冲销预览确认",
+      "src/modules/SettlementDetails.tsx::buildSettlementRows实际收款证据",
+      "src/batchOrderingRules.ts::prepareOrder、折扣批准消费及合成密码消费同步selfPay"
+    ],
+    "facts": [
+      "总399 / 单位300 / 个人99：个人付款只记99；单位账户分配后实收399、账户1000→700，项目实收合计399。",
+      "原路冲销按原分配项目退300回原单位账户，实收保留个人99，账户700→1000，临床状态/结果不倒退；新requestId可重结算，旧流水永久保留。",
+      "单位分配和冲销payer=unit、cash=false，账户ledger.transactionId关联canonical tx；不把同一预付款计为两笔现金收入。",
+      "批量追加骨密度后amount479、groupSplit.personal=selfPay=179，实际H5支付弹窗与实际收款179一致；两种折扣消费同样同步。",
+      "SettlementDetails优先有效逐笔流水/期初分摊，不凭paidAt或settledIds推定实收；已分配单位款禁止直接转现金退费，须先原路冲销。"
+    ],
+    "tests": [
+      "tests/group-payment-regression.test.tsx::GP01–GP12",
+      "tests/settlement-details.test.tsx::actual paid evidence regression"
+    ],
+    "validation": "最后六文件104/104通过：group-payment-regression 12、settlement-details 6、原batch-ordering 22、ordering-completion 26、order-finance-completion 18、ordering-clinical 20。owner修改源码lint与全局typecheck通过。",
+    "boundary": "本地模拟账户及支付；没有银行、移动支付或真实资金操作。真实并发事务和服务端权限仍需后端实现。"
+  }
+}

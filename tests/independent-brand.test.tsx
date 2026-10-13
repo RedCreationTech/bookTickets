@@ -38,7 +38,7 @@ describe('Independent brand migration: existing business data preserved',()=>{
   expect(stored().appointments[0]).toMatchObject({id:'LEGACY-ORDER-KEEP',amount:723.45});expect(localStorage.getItem(LEGACY)).toBe(raw);
  });
  it('preserves technical identifiers and leaves the input state untouched while replacing readable Chinese/English labels',()=>{
-  const old=legacyState();old.records.brandFixture=[{id:'qinghe-technical-id',patientId:'qinghe-patient-id',appointmentIds:['qinghe-order-id'],name:'QINGHE Qinghe qinghe 青禾'}];const before=JSON.stringify(old);const next=migrateDemoBrand(old,true);
-  expect(next.records.brandFixture[0]).toEqual({id:'qinghe-technical-id',patientId:'qinghe-patient-id',appointmentIds:['qinghe-order-id'],name:'HONGCHUANG Hongchuang hongchuang 红创'});expect(JSON.stringify(old)).toBe(before);expect(migrateDemoBrand(next)).toEqual(next);
+  const old=legacyState();old.records.brandFixture=[{id:'qinghe-technical-id',patientId:'qinghe-patient-id',appointmentIds:['qinghe-order-id'],name:'QINGHE Qinghe qinghe 青禾 清和'}];const before=JSON.stringify(old);const next=migrateDemoBrand(old,true);
+  expect(next.records.brandFixture[0]).toEqual({id:'qinghe-technical-id',patientId:'qinghe-patient-id',appointmentIds:['qinghe-order-id'],name:'HONGCHUANG Hongchuang hongchuang 红创 红创'});expect(JSON.stringify(old)).toBe(before);expect(migrateDemoBrand(next)).toEqual(next);
  });
 });

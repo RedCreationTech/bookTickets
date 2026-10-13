@@ -1,3 +1,29 @@
+import {
+  reduceOrderProgressAction,
+  canUnlockOrder,
+} from "./orderProgressRules";
+import {
+  reduceReportArchiveAction,
+  augmentReportArchiveEvents,
+} from "./modules/reportArchiveRules";
+import {
+  reduceQueueAutomationAction,
+  augmentBusinessEvents,
+} from "./modules/queueAutomationRules";
+import {
+  reduceClinicalAction,
+  reviewNodes,
+  reviewDoctorEligible,
+  validateClinicalResults,
+  clinicalItems,
+} from "./clinicalRules";
+import {
+  reduceOrderFinanceAction,
+  synchronizePackageCardLifecycle,
+  orderPaidAllocations,
+  orderPricingLines,
+} from "./orderFinanceRules";
+import { reduceBatchOrderingAction } from "./batchOrderingRules";
 export type Status =
   | "booked"
   | "paid"
@@ -297,7 +323,19 @@ function uid(prefix: string) {
     prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   );
 }
-export function reducer(state: DemoState, action: Action): DemoState {
+function baseReducer(state: DemoState, action: Action): DemoState {
+  const progressState = reduceOrderProgressAction(state, action);
+  if (progressState !== undefined) return progressState;
+  const archiveState = reduceReportArchiveAction(state, action);
+  if (archiveState !== undefined) return archiveState;
+  const financeState = reduceOrderFinanceAction(state, action);
+  if (financeState !== undefined) return financeState;
+  const automationState = reduceQueueAutomationAction(state, action);
+  if (automationState !== undefined) return automationState;
+  const clinicalState = reduceClinicalAction(state, action);
+  if (clinicalState !== undefined) return clinicalState;
+  const batchState = reduceBatchOrderingAction(state, action);
+  if (batchState !== undefined) return batchState;
   const p = action.payload || {};
   const next: DemoState = { ...state };
   let message: string;
@@ -471,15 +509,98 @@ export function reducer(state: DemoState, action: Action): DemoState {
       message = `恢复取消预约 ${p.id}供查询，不恢复叫号/打印任务，不重新收费或恢复预约资格`;
       break;
     }
-    case "PAYMENT":
+    case "PAYMENT": {
       if (!a || a.status !== "booked") return state;
+      const group = !!a.groupSplit || !!a.groupOrderId;
+      const personalTarget = group
+        ? Number(a.groupSplit?.personal ?? a.selfPay ?? a.amount)
+        : a.amount;
+      if (
+        !Number.isFinite(personalTarget) ||
+        personalTarget < 0 ||
+        personalTarget > a.amount
+      )
+        return state;
+      const previousPaid = Number(a.paidAmount || 0),
+        previousPersonal = group
+          ? Number(
+              a.personalPaidAmount ??
+                Math.max(0, previousPaid - Number(a.unitPaidAmount || 0)),
+            )
+          : previousPaid;
+      const charge = Math.max(
+          0,
+          Math.round((personalTarget - previousPersonal) * 100) / 100,
+        ),
+        at = new Date().toISOString();
+      const opening = orderPaidAllocations(state, a),
+        allocations = { ...opening },
+        pricing = orderPricingLines(state, a),
+        lines: any[] = [];
+      let cents = Math.round(charge * 100);
+      for (const row of pricing) {
+        const n = Math.min(
+          cents,
+          Math.max(
+            0,
+            Math.round((row.amount - (allocations[row.item] || 0)) * 100),
+          ),
+        );
+        if (n > 0) {
+          allocations[row.item] =
+            Math.round(((allocations[row.item] || 0) + n / 100) * 100) / 100;
+          lines.push({ item: row.item, charge: n / 100, refund: 0 });
+          cents -= n;
+        }
+      }
+      if (cents > 0) return state;
+      const paidAmount = Math.round((previousPaid + charge) * 100) / 100;
       update({
         status: "paid",
         paymentMethod: p.method || "模拟微信",
-        paidAt: new Date().toISOString(),
+        paidAmount,
+        personalPaidAmount: group ? personalTarget : paidAmount,
+        amountDue: Math.max(0, Math.round((a.amount - paidAmount) * 100) / 100),
+        paidAt: at,
+        pricing,
+        paymentOpeningAllocations: a.paymentOpeningAllocations || opening,
+        paymentAllocations: allocations,
+        paymentStatusNote:
+          group && paidAmount < a.amount
+            ? "个人已付款；单位份额待结算"
+            : "模拟已全额付款",
       });
-      message = `模拟收款 ${p.id} ¥${a.amount}`;
+      next.records = {
+        ...state.records,
+        orderTransactions: [
+          ...(state.records.orderTransactions || []),
+          ...(charge > 0
+            ? [
+                {
+                  id: `QUICK-PAY-${a.id}`,
+                  appointmentId: a.id,
+                  patientId: a.patientId,
+                  channel: p.method || "模拟微信",
+                  mode: "personal_payment",
+                  payer: "personal",
+                  lines,
+                  grossCharge: charge,
+                  grossRefund: 0,
+                  net: charge,
+                  at,
+                  actor: state.config.role,
+                  reason: group
+                    ? "团检个人自付；单位未结算份额不记实收"
+                    : "个人模拟付款",
+                  simulated: true,
+                },
+              ]
+            : []),
+        ],
+      };
+      message = `模拟收款 ${p.id} ¥${charge}${group ? "（仅个人份额，单位挂账另结算）" : ""}`;
       break;
+    }
     case "CHECKIN":
       if (!a || a.locked || !["paid", "checked"].includes(a.status))
         return state;
@@ -491,10 +612,42 @@ export function reducer(state: DemoState, action: Action): DemoState {
       message = `到检登记 ${p.id} ${p.campus || a.campus}`;
       break;
     case "SAVE_RESULTS":
-      if (!a || a.locked || !["checked", "in_exam"].includes(a.status))
+      if (
+        !a ||
+        a.locked ||
+        !["checked", "in_exam"].includes(a.status) ||
+        validateClinicalResults(
+          state,
+          Object.keys(p.results || {}),
+          p.results || {},
+        ).length ||
+        (p.complete && a.examAdditions?.some((r: any) => r.status === "待付款"))
+      )
         return state;
       update({
         results: { ...a.results, ...p.results },
+        resultMetadata: {
+          ...(a.resultMetadata || {}),
+          ...Object.fromEntries(
+            Object.entries(p.results || {})
+              .filter(
+                ([item, value]) =>
+                  typeof value === "string" &&
+                  value.trim() &&
+                  (!p.metadataItems || p.metadataItems.includes(item)) &&
+                  (!a.resultMetadata?.[item] || a.results[item] !== value),
+              )
+              .map(([item]) => [
+                item,
+                {
+                  doctor: p.doctor || a.doctor || "未登记",
+                  department: p.department || a.department || "未登记",
+                  room: p.room || a.room || "未登记",
+                  at: new Date().toISOString(),
+                },
+              ]),
+          ),
+        },
         status: p.complete ? "review" : "in_exam",
         conclusion: p.conclusion ?? a.conclusion,
         submittedAt: p.complete ? new Date().toISOString() : a.submittedAt,
@@ -516,24 +669,46 @@ export function reducer(state: DemoState, action: Action): DemoState {
     case "REVIEW":
       if (
         !a ||
+        a.locked ||
         a.status !== "review" ||
         (p.expectedStage !== undefined &&
           p.expectedStage !== (a.reviewStage || 0))
       )
         return state;
       {
+        if (!reviewDoctorEligible(state, a, p.doctor || a.doctor || "周医生"))
+          return state;
+        const nodes = reviewNodes(state, a);
         const stage = (a.reviewStage || 0) + 1;
+        const at = new Date().toISOString();
+        const doctor = p.doctor || a.doctor || state.config.role;
+        const history = {
+          stage: stage - 1,
+          node: nodes[stage - 1],
+          doctor,
+          startedAt:
+            a.stageStartedAt?.[nodes[stage - 1]] || a.submittedAt || null,
+          startedAtSource: a.stageStartedAt?.[nodes[stage - 1]]
+            ? "节点开始"
+            : "送审代理",
+          completedAt: at,
+          status: "已通过",
+        };
         update({
           reviewStage: stage,
-          status: stage >= state.config.reviewStages ? "approved" : "review",
+          reviewNodes: nodes,
+          reviewHistory: [...(a.reviewHistory || []), history],
+          stageMetadata: [
+            ...(a.stageMetadata || []),
+            { ...history, stage: history.node },
+          ],
+          status: stage >= nodes.length ? "approved" : "review",
           conclusion: p.conclusion ?? a.conclusion,
-          locked: stage >= state.config.reviewStages,
+          locked: stage >= nodes.length,
           approvedAt:
-            stage >= state.config.reviewStages
-              ? new Date().toISOString()
-              : undefined,
+            stage >= nodes.length ? new Date().toISOString() : undefined,
         });
-        message = `${["初审", "主检", "总检"][Math.min(stage - 1, 2)]}通过 ${p.id}`;
+        message = `${nodes[stage - 1]}通过 ${p.id}`;
       }
       break;
     case "REJECT":
@@ -543,6 +718,32 @@ export function reducer(state: DemoState, action: Action): DemoState {
         reviewStage: 0,
         locked: false,
         rejectReason: p.reason,
+        redoItems: Array.isArray(p.items) && p.items.length ? p.items : a.items,
+        results: Object.fromEntries(
+          Object.entries(a.results).map(([item, value]) => [
+            item,
+            [
+              ...(p.items?.length ? p.items : a.items),
+              ...clinicalItems(state, {
+                ...a,
+                items: p.items?.length ? p.items : a.items,
+              }),
+            ].includes(item)
+              ? ""
+              : value,
+          ]),
+        ),
+        reviewHistory: [],
+        reviewRejectHistory: [
+          ...(a.reviewRejectHistory || []),
+          {
+            node: reviewNodes(state, a)[a.reviewStage || 0],
+            items: p.items?.length ? p.items : a.items,
+            doctor: a.doctor,
+            reason: p.reason,
+            at: new Date().toISOString(),
+          },
+        ],
       });
       message = `驳回 ${p.id}：${p.reason || "需要复核"}`;
       break;
@@ -553,10 +754,11 @@ export function reducer(state: DemoState, action: Action): DemoState {
         printedAt: new Date().toISOString(),
         printCount: (a.printCount || 0) + 1,
       });
-      message = `模拟打印并装订报告 ${p.id}`;
+      message = `模拟打印报告 ${p.id}${p.bound ? "并完成模拟装订" : ""}`;
       break;
     case "UPDATE_APPOINTMENT":
-      if (!a) return state;
+      if (!a || (a.locked && p.locked === false && !canUnlockOrder(state, a)))
+        return state;
       update(p);
       message = `订单变更 ${p.id}：${Object.keys(p)
         .filter((k) => k !== "id")
@@ -675,6 +877,20 @@ export function reducer(state: DemoState, action: Action): DemoState {
     ].slice(0, 1000);
   }
   return next;
+}
+export function reducer(state: DemoState, action: Action): DemoState {
+  const base = baseReducer(state, action);
+  const next =
+    base === state || ["RESET", "SYNC"].includes(action.type)
+      ? base
+      : synchronizePackageCardLifecycle(base);
+  return next === state || ["RESET", "SYNC"].includes(action.type)
+    ? next
+    : augmentReportArchiveEvents(
+        state,
+        augmentBusinessEvents(state, next, action),
+        action,
+      );
 }
 export function exportCsv(filename: string, rows: Record<string, any>[]) {
   if (!rows.length) return;

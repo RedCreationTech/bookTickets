@@ -698,6 +698,70 @@ AUTO_TESTS += [
  ('29,42,386,464-465,753,755','tests/registration-consents.test.tsx','B08 archived order snapshots'),
 ]
 
+# Fixed B220 post-implementation review. This is a separately authored human
+# review, not an import of owner receipts or a route-presence completion score.
+COMPLETION_REVIEW = ROOT / 'docs/FRONTEND_COMPLETION_REVIEW.json'
+if COMPLETION_REVIEW.exists():
+    completion = json.loads(COMPLETION_REVIEW.read_text(encoding='utf-8'))
+    closing_rows = [r for r in completion['items'] if r['baselineCategory'] == 'B']
+    assert len(closing_rows) == 220 and len({r['id'] for r in closing_rows}) == 220
+    closing_numbers = {int(r['id'][1:]) for r in closing_rows}
+    replace_reviews(','.join(map(str, sorted(closing_numbers))))
+    retained_tests = []
+    for spec, file, test_name in AUTO_TESTS:
+        ids = []
+        for fragment in spec.split(','):
+            if '-' in fragment:
+                first, last = map(int, fragment.split('-')); ids.extend(range(first, last + 1))
+            else: ids.append(int(fragment))
+        keep = [n for n in ids if n not in closing_numbers]
+        if keep: retained_tests.append((','.join(map(str, keep)), file, test_name))
+    AUTO_TESTS[:] = retained_tests
+    for r in closing_rows:
+        reviewed(str(int(r['id'][1:])), r['primaryFile'], [r['primaryAnchor']],
+                 r['matrixStatus'], r['currentInteraction'],
+                 (('尚存前端缺口：' + r['remainingGap'] + ' ') if r['remainingGap'] else '') + r['remainingBoundary'],
+                 'mock', route=r['route'])
+        REVIEWS[-1]['evidence'] = '人工复核动作、共享数据与实际挂载；详见 docs/FRONTEND_COMPLETION_REVIEW.json。仅本地前端范围，不能外推为投标/生产完全满足。'
+        for t in r['tests']:
+            AUTO_TESTS.append((str(int(r['id'][1:])), t['file'], t.get('sourceAnchor',t['name'])))
+
+# Relocated implementations outside the B220 scope: preserve their previous
+# status while replacing removed anchors and describing the actual current flow.
+replace_reviews('116,206,208,211,335,338,339,347,349,564-567,569')
+reviewed('116,338','ReportArchive',['ReportArchive','recipient','method'],'partial','选择当前报告的领取方式及合成领取人，预览确认后保存发放人、时间、对象及历史。','实际身份签收、邮寄和电子认证未接入；纸质流转只登记合成事实。',route='/reports')
+reviewed('206,208,211','SpecimenStation',['SpecimenStation','IdentityPhotoViewer','prints'],'partial','已到检体检号定位当前采样站，生成真实CODE128示意、模拟打印与多次补打，并登记采集及操作时间/人员；查看登记抽象核验资料。','条码软件编码及本地记录有实现，不证明打印机输出/扫描回执；身份照片仍为合成抽象图，不作真实身份认证。',route='/exam')
+reviewed('335,339,347,349','ReportArchive',['ReportArchive','operation','appointmentIds'],'demonstrated','多选报告进入整批流转预览，登记模拟打印、移柜或发放，导出含选中报告的历史清单；正式柜位与库存状态联动。','真实打印、柜体、物流和身份签收未执行；预览确认与版本/容量守卫仅本地。',route='/reports')
+reviewed('564-567','src/modules/queueAutomationRules.ts',['deriveQueueDefinitions','availableQueueRooms'],'demonstrated','科室/项目/区域/诊室与独立队列配置实际被队列定义及可用诊室函数消费，影响入队匹配、估时和呼叫分配。','本地共享配置，非现场终端或医院主数据接口。',route='/queue')
+reviewed('569','src/modules/queueAutomationRules.ts',['deriveQueueDefinitions'],'partial','使用当前浏览器共享体检订单和导检配置，驱动模拟队列。','没有与现有医院体检系统的真实无缝接口、可靠同步和联调证据。',classification='unverifiable',route='/queue')
+AUTO_TESTS = [(ids,file,{'U05 report exposes selectable synthetic history years':'U05 report compares actual same-patient stored orders and records issuance','A06 batch report cabinet movement':'A06 batch report inventory uses stable cabinet IDs and selected orders only'}.get(name,name)) for ids,file,name in AUTO_TESTS]
+
+# Wording-only refresh after implementations moved into shared workspaces.
+# This does not reclassify the frozen A/C/D audit or promote matrix statuses.
+BOUNDARY_REFRESH = {}
+def refresh_boundary(ids, text):
+    for n in ids: BOUNDARY_REFRESH[f'T{n:04d}'] = text
+refresh_boundary([90], '已有前端院区/患者/类型范围过滤和显式跨院区查询；浏览器原始存储可访问，不是服务端数据隔离或跨院区生产资源统筹。')
+refresh_boundary([117], '健康工作区已按实际合成患者ID维护家庭关系；开单就地家庭录入范围与真实亲属身份/授权仍须分别核验，不能以家庭页面代替全部开单子流程。')
+refresh_boundary([127], '名单/人员分组及套餐变更已有共享工作区；不等于医院完整人员主数据就地维护，换项/弃检计价仅按明确的本地规则。')
+refresh_boundary([178,179,180], '导检回收已能提示未检项目并保存逐项确认快照；没有签字板、回收机、高拍仪或真实设备回执，本地记录不等于设备集成。')
+refresh_boundary([202], '已有可保存的字段白名单/多条件/分组汇总报表及同源CSV；仅针对本地登记的数据集，非医院任意数据库或生产财务报表引擎。')
+refresh_boundary([228,247], '维护的演示结果/小结词条可应用；不具备医院完整临床词典、正式诊断标准或临床有效性证明。')
+refresh_boundary([241,242,243], '数值/描述子项目及异常/危急/纠错界限可维护并用于输入；规则为演示配置，非院方审定的医学阈值、误差范围或专家共识验证。')
+refresh_boundary([248,250], '已有逐项目登记/开始/收到报告/未完成/改期/弃检状态与时间留痕；未回传来源仅本地记录，非LIS/PACS或设备实际执行确认。')
+refresh_boundary([289], '可配置演示医生等级及报告难度范围并实际限制匹配；项目数/金额权重尚无院方确认，不能作为正式临床分级规则。')
+refresh_boundary([313,316,317], '可配置审核撤销权限和初审节点，并按真实阶段向分检或主检退回；定向通知为本地事件记录，医院岗位账号、真实送达和服务端并发锁另验。')
+refresh_boundary([326,331,332,333,351], '已有用途版式和嵌入中文字体的真实PDF生成/预览；仅合成报告及有限模板，医学内容审批、医院全量专科版式和打印设备仍需正式验收。')
+refresh_boundary([330], '实际历史订单可在报告工作区选择比较；历史对比UI并不自动证明所选对比内容已写入每种PDF版式，医学报告格式与终审须另验。')
+refresh_boundary([412,413,414,415], '已有多项目规则字典、全局异常处置及可选随访；专家共识完整AB字典、医学有效性和真实岗位推送未验证，不能把演示抓取当临床符合性。')
+refresh_boundary([420,421,422], '共享业务事件可生成本地通知，复查/随访及前一天提醒需显式推进时钟；无真实短信、微信送达或页面关闭后的后台调度，注册登录仍是本地DEMO身份。')
+refresh_boundary([472], '科室/项目配置已有分检和队列消费路径；当前条目的字段维护不代表医院所有工作站主数据、外设和接口同步完整。')
+refresh_boundary([502], '队列定义可消费维护的科室/项目/区域/诊室映射并进行本地分流；尚无医院项目全集、真实等候/检查设备状态与多终端一致性验证。')
+refresh_boundary([574], '本地消息会话及档案文件另有可操作工作区；本条设备/消息配置不证明物联设备接入、短信或邮件真实发送。')
+refresh_boundary([662,663,664,667,668,669], '本地订单及匿名共享用量已参与库存与活动容量计算；真实交易、物流、外部评价发送和服务端并发库存一致性未验证。')
+refresh_boundary([726,727,729,730,731,740,741,743], '此条当前证据主要为命名/分类/说明等配置维护；其他模块已有评估模板渲染不自动证明本条分类的全部业务语义、医院规则或自动应用。')
+refresh_boundary([747,748,749,750], '客服工作区可查看与H5共享的本地会话，工单状态另行维护；不联系真实客户，不证明全部留言自动转工单或外部渠道接入。')
+
 CLARIFICATIONS = {
  'T0029': '源文取消预约自动删除与可配置并存；默认保留历史/审计的演示策略不代表院方已确认策略。',
  'T0083': '专家共识具体版本、原始问卷及规则未提供，演示规则不得宣称经临床验证。',
@@ -846,6 +910,7 @@ def apply_reviews(rows: list[dict]) -> None:
             row['test'] = f"MC-{tid}（本矩阵本行手工验收步骤，待执行）；scripts/coverage.py --check仅校验映射完整性"
             row['testProcedure'] = f"打开{row['route']}，用独立演示数据逐项执行“{row['text']}”；按本行已审交互核对输入、结果及失败分支并留证。缺少的子能力和本行边界必须分别记录，不能以路由可打开或模拟成功认定原要求满足。"
     for row in rows:
+        if row['id'] in BOUNDARY_REFRESH: row['boundary'] = BOUNDARY_REFRESH[row['id']]
         if row['id'] in CLARIFICATIONS: row['boundary'] += ' 待澄清：' + CLARIFICATIONS[row['id']]
 
 
@@ -871,6 +936,20 @@ def apply_test_refs(rows: list[dict]) -> None:
 
 def validate(rows: list[dict], source: list[dict] | None = None) -> list[str]:
     errors = []
+    # The separate fixed-B review is additive. The frozen full audit must remain intact.
+    if COMPLETION_REVIEW.exists():
+        review = json.loads(COMPLETION_REVIEW.read_text(encoding='utf-8'))
+        audit_path = ROOT / 'docs/FRONTEND_COMPLETION_AUDIT.json'
+        audit_bytes = audit_path.read_bytes()
+        if hashlib.sha256(audit_bytes).hexdigest() != '67f1ad5def5547e70dfbbc5666fa6d780dd3c613f673b4d2deb4637e0d02fbfc': errors.append('Frozen 778-item baseline audit changed')
+        originals = json.loads(audit_bytes)['items']
+        reviewed_items = review.get('items', [])
+        if [r['id'] for r in reviewed_items] != [f'T{i:04d}' for i in range(1,779)]: errors.append('Completion review must preserve all 778 unique software IDs')
+        if len([r for r in reviewed_items if r.get('baselineCategory') == 'B']) != 220: errors.append('Completion review must contain the fixed 220 B items exactly once')
+        for original, item in zip(originals, reviewed_items):
+            if any(original[k] != item[k] for k in ('id','clause','title','text','sourcePage','sourceLine')): errors.append('Completion review altered source fields: ' + original['id'])
+            if original['category'] != item.get('baselineCategory'): errors.append('Completion review changed a baseline category: ' + original['id'])
+            if original['category'] != 'B' and item.get('reviewStatus') != 'baseline-retained': errors.append('Completion review reclassified non-B item: ' + original['id'])
     # Existence guards only; neither these bytes nor jsdom prove browser playback.
     for relative in ('public/media/workflow-guide.mp4','public/media/workflow-captions.vtt','public/media/workflow-poster.png'):
         asset=ROOT/relative
@@ -978,9 +1057,9 @@ def render_boundaries(rows: list[dict]) -> str:
 
 审计来源为用户提供的《{SOURCE_NAME}》，没有从二手网站补写或修改原始要求；标注页码沿用来源注明的招标PDF物理页号。本次没有重新核验原PDF。来源Markdown SHA-256：{SOURCE_SHA256}。条文中的疑问式、未完句、笔误及数值单位保留。完整投标证明、采购实物验收、服务承诺与上线准入不包含在前端演示通过之内。
 
-## 尚未补齐的前端交互
+## 前端复核与仍需验证的边界
 
-partial与config-only不能都归因为后端或硬件依赖。固定扩展清单中的分类加项、院区套餐、取消归档策略、亲属付款、多套餐互斥、自选包、既往史提示、财务提醒和组合科研筛选现已补充对应本地交互。回收逐项确认、完整人数筛选和浏览器凭条打印亦已补充。仍有明确边界：音频文件导入不是诊室声音录制（T0215）；双照为抽象示意且独立采血链路未证（T0403）；真实/完整AI报告解读未实现（T0354）。通知/队列时钟仅显式推进，真实送达、后台调度及语音/签字板不因有前端配置而通过。其余partial和config-only的逐项缺口继续保留矩阵，本轮只复核锁定22项及3处纠偏，没有宣称消除全部前端缺口。
+partial与config-only不能都归因为后端或硬件依赖。固定扩展清单中的分类加项、院区套餐、取消归档策略、亲属付款、多套餐互斥、自选包、既往史提示、财务提醒和组合科研筛选现已补充对应本地交互。回收逐项确认、完整人数筛选和浏览器凭条打印亦已补充。仍有明确边界：声音录制现有开始/暂停/保存合成静音WAV流程（T0215），未接真实麦克风；抽象双照已供独立采样及分检流程查看（T0403），真实身份照片仍未验证；真实/完整AI报告解读未实现（T0354）。通知/队列时钟仅显式推进，真实送达、后台调度及语音/签字板不因有前端配置而通过。完整778软件原子审计固定于9014基线（A469/B220/C81/D8），后续仅针对固定B220核验实现消费和测试，详见FRONTEND_COMPLETION_REVIEW.json/md。固定220项的本地操作与数据消费已完成定向复核，6组涉及18项的联动断点经修复回归关闭；A/C/D基线未升级。复核表单列跨模块正确性回归及发布门槛，不能由receipt、220项核销或测试数推断全仓无缺陷、生产验收通过。
 
 明确负向证据的子项清点与partial总数不同：同一项可能同时涉及前端、临床、接口和待澄清要求，未将其强行自动分成互斥缺口总量。未完句/疑问句和真实设备依赖仍按原文保留，详见逐项矩阵。
 
@@ -995,9 +1074,9 @@ partial与config-only不能都归因为后端或硬件依赖。固定扩展清�
 ## 服务与专项质控中心
 
 - /controls 提供独立通知、替检人工核验、签名留样、驳回统计、门户/导检配置与密码演练入口。入口统计只要求本条至少一个子项可定位，不掩盖该条其他子项仍缺失；请逐项阅读矩阵。
-- 通知从共享演示订单和有限异常规则生成，支持逐对象预览、批量本地记录、模拟失败/重试与操作历史。没有短信、电话或站内消息对外发送，显式推进演示时钟可生成驳回/超期及生日/节日事件，但无后台自动运行或前一天调度。内置通知类型的正文可保存为本地模板库并重复套用；仍不代表医院全量模板或真实自动发送。
+- 通知从共享演示订单和有限异常规则生成，支持逐对象预览、批量本地记录、模拟失败/重试与操作历史。没有短信、电话或站内消息对外发送，显式推进演示时钟可生成驳回/超期及生日/节日事件，并可显式扫描检前一天、复查、随访日期；无服务器后台自动运行。内置通知类型的正文可保存为本地模板库并重复套用；仍不代表医院全量模板或真实自动发送。
 - 替检核验仅使用两幅固定抽象SVG示意图及人工一致/不一致记录，没有实际身份证照片、摄像头、活体或人脸识别。签名只允许固定演示文字或随意笔画，本地可查询预览，并可另行显式确认执行受角色/状态限制的演示弃检、领取或回收；不提供法律效力、防篡改或永久保存。请勿输入真实生物信息或签名。
-- 驳回统计确实读取本地REJECT快照，但记录医生是订单责任医生，不一定等于原分检执行人；主检/总检合并。原因占比的分母为筛选后驳回事件数，不能当作临床错误发生概率。
+- 专项统计按原分检结果元数据/主检节点归属处理人及可核对样本，未知人员/时间不补造；退回动作类型的消费范围以逐项复核表为准。样本占比仅为有限本地数据的复算比例，不能当作临床错误发生概率。
 - 门户内容、海报摘要、菜单、科室/区域/诊室使用分域配置；患者H5已读取启用内容，科室/区域/诊室与业务队列也已联动；已支持本地栅格海报和主动点击HTTPS链接，真实微信发布/医院导航/导检用户已联动本地队列权限，真实认证及无缝接口仍按T项列缺口。
 - 密码表单仅校验DEMO测试字符串，成功后清空输入，不保存输入值，只保留演练完成标志/时间/强度；不修改真实密码或认证权限，不验证安全存储或生产密码策略。
 - 演示指南包含实际36秒H.264、1280×720视频、中文字幕和六章节定位。已检查媒体元数据及抽帧，自动测试只验证DOM媒体引用/章节时间/关闭。短片为流程示意，不是实际界面操作录屏、复杂操作完整教学或浏览器播放/视觉验收证据。
@@ -1010,7 +1089,7 @@ partial与config-only不能都归因为后端或硬件依赖。固定扩展清�
 
 - HIS/LIS/PACS/第三方检验报告、发医嘱、导航、呼叫中心、检查设备、短信/邮件、微信身份绑定及推送尚无真实医院接口与验收环境证据。按钮、模拟连接状态、测试提示或前端记录均不证明送达或联调成功。
 - 微信小程序和公众号能力不能用响应式Web页面替代。团检入口二维码需真码、正确的单位订单目标及有效账号；二维码图片或入口仅能证明演示范围内的跳转。
-- 支付、退费、银联、会员卡、电子发票、回款与充值只演示状态/金额。没有真实支付结算、税务开票、验签回调、幂等、财务凭证、交易一致性证明。
+- 支付、退费、银联、会员卡、电子发票、回款与充值只演示状态/金额。已有本地逐笔项目收退流水及双击防重，但没有真实支付结算、税务开票、验签回调、分布式幂等、正式财务凭证或生产交易一致性证明。
 - 定时放号、预约前一天提醒、改期到期自动弃检、报告超期、队列定时开关等不能仅凭配置输入认定执行；生产需要可观察的调度任务、失败处理、时区/节假日规则和送达证据。
 - 人员替检、锁单、多级审核锁定、并发叫号、跨院区和多终端同步需要真实并发与状态一致性验证。当前同浏览器演示不是分布式业务事务保障。
 

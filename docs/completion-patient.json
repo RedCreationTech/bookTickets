@@ -1,0 +1,223 @@
+{
+  "scope": "固定 patient 11项 + 父任务移交 T0485，共12项；不修改原审计/覆盖矩阵",
+  "ownerFiles": [
+    "src/modules/Patient.tsx",
+    "src/modules/Kiosk.tsx",
+    "src/bookingRules.ts",
+    "src/bookingDisplay.ts",
+    "src/modules/PatientBookingSettings.tsx",
+    "src/modules/MessageWorkbench.tsx",
+    "src/modules/ReportDelivery.tsx",
+    "src/reportPdf.ts",
+    "src/reportLayouts.ts",
+    "public/fonts/HongchuangDemoCJK.ttf",
+    "public/fonts/README.txt",
+    "tests/patient-completion.test.tsx",
+    "tests/pdf-delivery.test.tsx"
+  ],
+  "verification": {
+    "commands": [
+      "WRITE_PDF_SAMPLE=1 npx vitest run tests/patient-completion.test.tsx tests/pdf-delivery.test.tsx tests/devices.test.tsx tests/booking-extension.test.tsx",
+      "npx eslint src/bookingRules.ts src/bookingDisplay.ts src/modules/PatientBookingSettings.tsx src/modules/MessageWorkbench.tsx src/modules/Patient.tsx src/modules/Kiosk.tsx src/reportLayouts.ts src/reportPdf.ts src/modules/ReportDelivery.tsx tests/patient-completion.test.tsx tests/pdf-delivery.test.tsx",
+      "pdftoppm / pdfinfo / pdftotext generated local sample PDFs"
+    ],
+    "result": "主回归4文件100/100通过；随后加父子报告映射PDF专用测试，最终PDF套件17/17通过。Owner lint与git diff --check通过。后续全局 npm run typecheck 已通过（不等于全仓所有行为测试通过）。",
+    "visualVerification": "Poppler实际渲染并查看标准报告、长报告连续页、入职紧凑单页、VIP第二页；中文/分页正确且无字体警告。入职1页、VIP2页，PDF结构可解析且可抽取中文。没有执行Chromium UI视觉验收。",
+    "font": "本地Noto CJK授权字体转换TrueType，7573字符；完整嵌入构建时缩字集TTF，禁用有缺字缺陷的运行时子集器。许可见public/fonts/LICENSE-Noto.txt。"
+  },
+  "integrationAddendum": [
+    {
+      "id": "T0010/T0559",
+      "evidence": "Patient.tsx读取 recommendNextStation 和 customerQueueSummary；显示真实本地队列估算、待检/已检/历史结束，不再固定6分钟。",
+      "test": "tests/patient-completion.test.tsx :: H5 uses shared next-station estimate and renders pending completed and historical queues separately",
+      "boundary": "算法与队列业务测试由queue owner负责；仅本地可解释估算，不是真实医院实时定位。"
+    }
+  ],
+  "items": [
+    {
+      "id": "T0005",
+      "implementationOwner": "patient",
+      "originalText": "通过小程序发布健康宣教、健康教育等知识。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/Patient.tsx :: publishedArticles / selectedArticle / 已发布文章正文"
+      ],
+      "tests": [
+        "tests/patient-completion.test.tsx :: two different published article bodies are shared with H5; draft/future/withdrawn bodies never appear"
+      ],
+      "boundary": "读取本浏览器 articles 已发布正文，撤回/未来发布即时不可见。未发布微信小程序，不存在服务端内容分发。"
+    },
+    {
+      "id": "T0011",
+      "implementationOwner": "patient",
+      "originalText": "提供检中和检前留言板，客户可在小程序给体检中心留言，体检中心可回复。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/MessageWorkbench.tsx :: PatientConversation / MessageWorkbench / records.patientMessages",
+        "src/modules/Patient.tsx :: 消息与留言"
+      ],
+      "tests": [
+        "tests/patient-completion.test.tsx :: patient message, staff reply and reload use the exact same durable thread; other patients isolated",
+        "tests/patient-completion.test.tsx :: cancelled drafts do not send and double activation creates only one message"
+      ],
+      "boundary": "同一浏览器 localStorage 双向持久会话；不同客户端不会同步，无真实短信/微信消息或真实登录身份。"
+    },
+    {
+      "id": "T0051",
+      "implementationOwner": "patient",
+      "originalText": "支持多样化预约配置，可通过套餐、项目限制预约人数。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/bookingRules.ts :: anonymizedBookingResourceUsage / getBookingResourceAvailability / getBookingAvailability",
+        "src/modules/PatientBookingSettings.tsx :: 套餐与项目名额",
+        "src/modules/Patient.tsx / src/modules/Kiosk.tsx :: 最终套餐及项目传入共享限额",
+        "src/store.tsx :: 角色过滤前计算匿名资源使用量（集成由父任务完成）"
+      ],
+      "tests": [
+        "tests/patient-completion.test.tsx :: package daily and shared-project daily limits independently block and cancellation releases quota",
+        "tests/patient-completion.test.tsx :: time quotas, date overrides, zero and empty unlimited are deterministic; dedup per appointment",
+        "tests/patient-completion.test.tsx :: anonymized resource usage blocks hidden orders without including identity fields",
+        "tests/patient-completion.test.tsx :: settings persist live quota rules; H5 blocks selected package and self-service blocks shared item"
+      ],
+      "boundary": "套餐/项目独立每日/时段额度，0禁约、空白不限，取消释放；依赖 UI 入口消费共享函数，不宣称服务端并发原子扣减。"
+    },
+    {
+      "id": "T0054",
+      "implementationOwner": "patient",
+      "originalText": "设置周末不允许预约后，自动过滤周末预约日期。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/bookingRules.ts :: getBookingDates / bookingDateSelectionError",
+        "src/modules/Patient.tsx / src/modules/Kiosk.tsx :: 原生日期选择拒绝周末且清空，开放后恢复"
+      ],
+      "tests": [
+        "tests/patient-completion.test.tsx :: weekend dates are absent and rejected by date control until enabled for H5 and kiosk"
+      ],
+      "boundary": "UTC 演示营业时钟；未对接医院特殊节假日。周末快捷日期被过滤，手工日期输入被拒绝，仍有提交校验。"
+    },
+    {
+      "id": "T0066",
+      "implementationOwner": "patient",
+      "originalText": "支持价格显示方式：只显示原价、只显示执行价、什么价格都不显示等。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/bookingDisplay.ts :: bookingPriceMode / displayedPackagePrice / displayedItemPrice / originalPricingState",
+        "src/modules/PatientBookingSettings.tsx :: 独立套餐项目价格",
+        "src/modules/Patient.tsx / src/modules/Kiosk.tsx :: 价格显示消费"
+      ],
+      "tests": [
+        "tests/patient-completion.test.tsx :: 原价 display does not change booked execution amount",
+        "tests/patient-completion.test.tsx :: 执行价 display does not change booked execution amount",
+        "tests/patient-completion.test.tsx :: 不显示 display does not change booked execution amount",
+        "tests/patient-completion.test.tsx :: independent project price editor preserves shared mandatory rules; displayed original is never charged"
+      ],
+      "boundary": "原价和执行价分别保存，展示模式不改变成交价；支付确认必须显示实际模拟应付金额。真实支付/价格后端不在范围。"
+    },
+    {
+      "id": "T0081",
+      "implementationOwner": "patient",
+      "originalText": "支持固定套餐、筛查套餐等多种套餐类型。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/bookingDisplay.ts :: getPackageType",
+        "src/modules/PatientBookingSettings.tsx :: packageType",
+        "src/modules/Patient.tsx / src/modules/Kiosk.tsx :: 固定套餐/筛查套餐筛选"
+      ],
+      "tests": [
+        "tests/patient-completion.test.tsx :: settings edit original/execution independently including free execution, and persisted type filters H5 options"
+      ],
+      "boundary": "本地套餐字段与预约目录实际筛选；未接医院主数据同步或真实筛查规范。"
+    },
+    {
+      "id": "T0329",
+      "implementationOwner": "patient",
+      "originalText": "支持多样化的报告模板如：入职体检报告、驾驶员体检报告、海员体检报告、职业病体检报告、VIP 体检报告等。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/reportLayouts.ts :: 六种用途结构化章节布局",
+        "src/modules/ReportDelivery.tsx :: 报告用途与版式 / 章节预览",
+        "src/reportPdf.ts :: 紧凑/卡片分区/VIP另起页"
+      ],
+      "tests": [
+        "tests/pdf-delivery.test.tsx :: same visit produces different section structure and an actual extra VIP page",
+        "tests/pdf-delivery.test.tsx :: changing purpose updates preview content, clears old generated files and exports chosen purpose"
+      ],
+      "boundary": "标准、入职、驾驶员、海员、职业病、VIP 改变章节/顺序/布局，不仅换标题；仅合成版式，不生成适驾、任职、海员或职业健康资格结论。"
+    },
+    {
+      "id": "T0337",
+      "implementationOwner": "patient",
+      "originalText": "支持批量下载pdf 电子版报告。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/reportPdf.ts :: generateReportBatch / mergeReportPdfs",
+        "src/modules/ReportDelivery.tsx :: 批量生成合并PDF / 单份下载 / 错误重试 / 取消"
+      ],
+      "tests": [
+        "tests/pdf-delivery.test.tsx :: 长结论自动分页，批量合并每份独立页面并消除重复选择",
+        "tests/pdf-delivery.test.tsx :: 批量保留成功文件并列出单份失败，不把失败内容混进合并PDF",
+        "tests/pdf-delivery.test.tsx :: 空选与超大批次有明确守卫"
+      ],
+      "boundary": "每批最多30份，成功报告合并一份真实PDF且每份新页，并可单份下载；本地浏览器生成，不声称ZIP、服务器交付或浏览器已成功保存。"
+    },
+    {
+      "id": "T0356",
+      "implementationOwner": "patient",
+      "originalText": "报告模版选择：同一次体检，可以选择不同的模板，生成不同样式的体检报告",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/ReportDelivery.tsx :: layoutId / fingerprint 变更清除旧文件",
+        "src/reportLayouts.ts :: getReportLayout",
+        "src/reportPdf.ts :: options.layoutId"
+      ],
+      "tests": [
+        "tests/pdf-delivery.test.tsx :: same visit produces different section structure and an actual extra VIP page",
+        "tests/pdf-delivery.test.tsx :: changing purpose updates preview content, clears old generated files and exports chosen purpose"
+      ],
+      "boundary": "同单可切换预览并生成不同 PDF；不改原报告审核状态，不执行真实发放。"
+    },
+    {
+      "id": "T0486",
+      "implementationOwner": "patient",
+      "originalText": "支持报告PDF 报告查看方式。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/ReportDelivery.tsx :: application/pdf Blob iframe 本地预览",
+        "src/reportPdf.ts :: requireReportAccess / 嵌入中文 TrueType 字体"
+      ],
+      "tests": [
+        "tests/pdf-delivery.test.tsx :: 生成可解析真实PDF及内嵌中文字体，不是改后缀文本",
+        "tests/pdf-delivery.test.tsx :: H5不可生成他人报告，未审核报告也不能生成"
+      ],
+      "boundary": "真实PDF文件内嵌中文字体；字体超集外字符明确报错，不静默省略。Blob预览需浏览器内建PDF支持，无外网字体或医疗数据传输。"
+    },
+    {
+      "id": "T0487",
+      "implementationOwner": "patient",
+      "originalText": "报告下载：支持PDF 在线下载。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/ReportDelivery.tsx :: Blob 下载链接 / URL回收 / 活跃身份再次校验",
+        "src/reportPdf.ts :: generateReportPdf"
+      ],
+      "tests": [
+        "tests/pdf-delivery.test.tsx :: 生成可解析真实PDF及内嵌中文字体，不是改后缀文本",
+        "tests/pdf-delivery.test.tsx :: PDF and layout preview expand the shared clinical parent-to-report-child mapping"
+      ],
+      "boundary": "本地文件下载请求；浏览器保存位置和下载许可由用户代理管理，不宣称真实医院在线PDF接口。"
+    },
+    {
+      "id": "T0485",
+      "implementationOwner": "patient",
+      "originalText": "体检报告查询：支持根据体检日期选择需要查询的体检报告。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/Patient.tsx :: reportDateFrom / reportDateTo / filteredReports / currentReport"
+      ],
+      "tests": [
+        "tests/patient-completion.test.tsx :: inclusive start/end, empty range and selected record fallback do not expose other people or pending reports"
+      ],
+      "boundary": "仅当前合成体检人的已发布报告，起止包含当天，反向范围/空结果不展示旧PDF；不连接医院历史档案后端。"
+    }
+  ]
+}

@@ -33,7 +33,25 @@ import {
 } from "./Operations";
 import type { FieldSpec, Row, WorkspaceSpec } from "./Operations";
 import "./operations.css";
+import {
+  LocalMessages,
+  FamilyRelations,
+  CompanyHierarchy,
+  OutcomeTimeline,
+  AssessmentPackages,
+} from "./HealthDomains";
+import { uiElementAllowed } from "./UiResources";
+import { FollowupDatePlanner, RiskSortedOrders } from "./QueueAutomation";
+import { sortByRisk } from "./queueAutomationRules";
+
 import ResearchFilters from "./ResearchFilters";
+import FollowupAllocation, {
+  customerTypeOptions,
+  filterFollowupTasks,
+} from "./FollowupAllocation";
+import AssessmentTemplates, {
+  applyAssessmentTemplate,
+} from "./AssessmentTemplates";
 const dateNow = () => new Date().toISOString().slice(0, 10);
 const fid = () =>
   `H${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -615,6 +633,7 @@ function Profiles() {
           ))}
         </select>
         <button
+          hidden={!uiElementAllowed(state, "health.profile.edit")}
           className="btn btn-primary"
           onClick={() =>
             setEditor({
@@ -690,10 +709,14 @@ function Profiles() {
                       {p.sex} · {p.age} 岁 <i /> {p.company} <i /> 档案 {p.id}
                     </p>
                     <small>
-                      服务人员：{p.owner || "陈晓 · 健康管理师"} · {p.phone}
+                      服务人员：{p.owner || "陈晓 · 健康管理师"} ·{" "}
+                      {uiElementAllowed(state, "health.profile.phone")
+                        ? p.phone
+                        : "联系标识不可见"}
                     </small>
                   </div>
                   <button
+                    hidden={!uiElementAllowed(state, "health.profile.edit")}
                     className="btn"
                     onClick={() =>
                       setEditor({
@@ -732,6 +755,7 @@ function Profiles() {
                   ["metrics", "指标与预警"],
                   ["assets", "资料与设备"],
                   ["families", "家庭账户"],
+                  ["messages", "短信与邮件"],
                 ].map(([key, label]) => (
                   <button
                     className={tab === key ? "active" : ""}
@@ -1013,7 +1037,20 @@ function Profiles() {
                   ) && <p className="ops-muted">该客户尚无本地报告文件。</p>}
                 </section>
               )}
-              {recordTabs[tab] && (
+              {tab === "messages" && (
+                <LocalMessages key={p.id} patientId={p.id} />
+              )}
+              {tab === "families" && (
+                <FamilyRelations
+                  key={p.id}
+                  patientId={p.id}
+                  onOpenPatient={(id) => {
+                    setSelected(id);
+                    setTab("overview");
+                  }}
+                />
+              )}
+              {recordTabs[tab] && tab !== "families" && (
                 <RecordWorkspace
                   key={tab}
                   spec={{
@@ -1056,6 +1093,11 @@ function Profiles() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                if (!uiElementAllowed(state, "health.profile.edit")) {
+                  setNotice("当前角色无档案编辑权限");
+                  setEditor(null);
+                  return;
+                }
                 if (editor.age > 120) {
                   setNotice("年龄需在 0–120 岁之间");
                   return;
@@ -1076,7 +1118,11 @@ function Profiles() {
             >
               <div className="ops-form-grid">
                 <FormFields
-                  fields={profileFields}
+                  fields={profileFields.filter(
+                    (f) =>
+                      f.key !== "phone" ||
+                      uiElementAllowed(state, "health.profile.phone"),
+                  )}
                   draft={editor}
                   setDraft={setEditor}
                 />
@@ -1176,19 +1222,22 @@ function Profiles() {
 function Followup() {
   const { state, act } = useDemo() as any;
   const [filter, setFilter] = useState("全部客户");
+  const [customerType, setCustomerType] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [period, setPeriod] = useState("30 天");
   const [query, setQuery] = useState("");
   const [editor, setEditor] = useState<Row | null>(null);
   const [detail, setDetail] = useState<Row | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
-  const tasks = state.tasks.filter(
-    (t: Row) =>
-      (filter === "全部客户" || t.patientId === filter) &&
-      `${t.title}${state.patients.find((p: Row) => p.id === t.patientId)?.name || ""}`.includes(
-        query,
-      ),
-  );
+  const filters = {
+    patientId: filter === "全部客户" ? "" : filter,
+    customerType,
+    status: statusFilter,
+    query,
+  };
+  const customerTypes = customerTypeOptions(state);
+  const tasks = sortByRisk(state, filterFollowupTasks(state, filters));
   const statuses = ["待处理", "进行中", "已完成", "已取消"];
   const selected = detail
     ? state.tasks.find((t: Row) => t.id === detail.id)
@@ -1293,6 +1342,29 @@ function Followup() {
               </option>
             ))}
           </select>
+          <select
+            aria-label="筛选随访客户类型"
+            value={customerType}
+            onChange={(e) => setCustomerType(e.target.value)}
+          >
+            <option value="">全部客户类型</option>
+            {customerTypes.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+            <option value="__missing__">未登记客户类型</option>
+          </select>
+          <select
+            aria-label="筛选随访状态"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">全部状态</option>
+            {statuses.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
           <button
             className="btn"
             onClick={() =>
@@ -1310,6 +1382,7 @@ function Followup() {
             导出任务
           </button>
         </div>
+        <FollowupAllocation filters={filters} />
         <div className="health-kanban">
           {statuses.map((s, i) => (
             <section className={`health-kanban-col col-${i}`} key={s}>
@@ -1340,6 +1413,16 @@ function Followup() {
                       {state.patients.find((p: Row) => p.id === t.patientId)
                         ?.name || "未关联客户"}{" "}
                       · {t.owner}
+                      <small>
+                        客户类型：
+                        {customerTypes.find(
+                          (c) =>
+                            c.id ===
+                            state.patients.find(
+                              (p: Row) => p.id === t.patientId,
+                            )?.customerType,
+                        )?.name || "未登记"}
+                      </small>
                     </p>
                     <div className="health-task-foot">
                       <span>
@@ -1368,6 +1451,9 @@ function Followup() {
           ))}
         </div>
       </section>
+      <FollowupDatePlanner />
+      <RiskSortedOrders />
+      <OutcomeTimeline />
       <section className="panel ops-panel health-effect">
         <div className="ops-panel-title">
           <div>
@@ -1883,6 +1969,7 @@ function Assessments() {
   const [company, setCompany] = useState(state.patients[0]?.company || "");
   const [generated, setGenerated] = useState<Row | null>(null);
   const [saved, setSaved] = useState(false);
+  const [activePackage, setActivePackage] = useState<Row | null>(null);
   const [review, setReview] = useState("");
   const questions = assessmentForms[type];
   const reports = (state.records.assessments || []).filter(
@@ -1890,6 +1977,7 @@ function Assessments() {
   );
   const changeType = (t: string) => {
     setType(t);
+    setActivePackage(null);
     setAnswers(defaultAnswers(t));
     setGenerated(null);
     setSaved(false);
@@ -1947,12 +2035,25 @@ function Assessments() {
           <Banner>
             心理、中医、慢病计分均为明确标注的非临床模型，只验证不同表单、算法、存档与复核流程。
           </Banner>
-          {type === "设备慢病评估套餐" && (
+          <AssessmentPackages
+            key={type}
+            assessmentType={type}
+            onSelect={(row) => {
+              setActivePackage(row);
+              setGenerated(null);
+              setSaved(false);
+            }}
+          />
+          {(type === "设备慢病评估套餐" || activePackage) && (
             <div className="ops-form-grid">
               <FormFields
                 fields={healthFields
                   .slice(0, 5)
-                  .filter((f) => f.key !== "totalCholesterol")}
+                  .filter((f) =>
+                    activePackage
+                      ? activePackage.metricKeys.includes(f.key)
+                      : f.key !== "totalCholesterol",
+                  )}
                 draft={metrics}
                 setDraft={(m) => {
                   setMetrics(m);
@@ -2020,21 +2121,41 @@ function Assessments() {
                       company,
                       patientIds: cohort.map((p: Row) => p.id),
                     }
-                  : metrics;
+                  : activePackage
+                    ? Object.fromEntries(
+                        activePackage.metricKeys.map((key: string) => [
+                          key,
+                          metrics[key],
+                        ]),
+                      )
+                    : metrics;
               const score = scoreDemoAssessment(type, answers, snapshot);
-              setGenerated({
-                id: fid(),
-                name: `${type} · ${state.patients.find((p: Row) => p.id === patient)?.name}`,
-                patientId: patient,
-                category: type,
-                date: dateNow(),
-                status: "待专业复核",
-                answers: { ...answers },
-                metricSnapshot: { ...snapshot },
-                score,
-                questionSnapshot: questions,
-                description: `已完成 ${questions.length} 项 ${type} 数据采集。${score.disclaimer}`,
-              });
+              setGenerated(
+                applyAssessmentTemplate(
+                  {
+                    id: fid(),
+                    name: `${type} · ${state.patients.find((p: Row) => p.id === patient)?.name}`,
+                    patientId: patient,
+                    category: type,
+                    date: dateNow(),
+                    status: "待专业复核",
+                    answers: { ...answers },
+                    metricSnapshot: { ...snapshot },
+                    assessmentPackageSnapshot: activePackage
+                      ? JSON.parse(JSON.stringify(activePackage))
+                      : null,
+                    reportSections: activePackage?.sections || [
+                      "采集指标",
+                      "问卷答案",
+                      "演示结果",
+                    ],
+                    score,
+                    questionSnapshot: questions,
+                    description: `已完成 ${questions.length} 项 ${type} 数据采集。${score.disclaimer}`,
+                  },
+                  state.patients.find((p: Row) => p.id === patient) || {},
+                ),
+              );
               setSaved(false);
             }}
           >
@@ -2060,7 +2181,10 @@ function Assessments() {
               <h3>问卷采集完成</h3>
               <p>{generated.description}</p>
               <div className="health-answer-summary">
-                {(generated.score?.dimensions || []).map((d: Row) => (
+                {(generated.reportSections?.includes("演示结果") === false
+                  ? []
+                  : generated.score?.dimensions || []
+                ).map((d: Row) => (
                   <div key={d.name}>
                     <span>{d.name}</span>
                     <b>
@@ -2068,15 +2192,30 @@ function Assessments() {
                     </b>
                   </div>
                 ))}
-                {(generated.questionSnapshot || questions).map(
-                  ([key, label]: DemoQuestion) => (
-                    <div key={key}>
-                      <span>{label}</span>
-                      <b>{generated.answers[key]}</b>
-                    </div>
-                  ),
-                )}
+                {(generated.reportSections?.includes("问卷答案") === false
+                  ? []
+                  : generated.questionSnapshot || questions
+                ).map(([key, label]: DemoQuestion) => (
+                  <div key={key}>
+                    <span>{label}</span>
+                    <b>{generated.answers[key]}</b>
+                  </div>
+                ))}
               </div>
+              <AssessmentTemplates
+                key={generated.id}
+                report={generated}
+                patient={
+                  state.patients.find(
+                    (p: Row) => p.id === generated.patientId,
+                  ) || {}
+                }
+                assessmentTypes={Object.keys(assessmentForms)}
+                onApply={(next) => {
+                  setGenerated(next);
+                  setSaved(false);
+                }}
+              />
               <button
                 className="btn btn-primary health-full"
                 disabled={saved}
@@ -2355,6 +2494,10 @@ function Enterprise() {
       </div>
       {tab === "research" ? (
         <ResearchFilters getHealth={getPatientHealth} />
+      ) : tab === "units" ? (
+        <CompanyHierarchy />
+      ) : tab === "families" ? (
+        <FamilyRelations />
       ) : tab !== "analytics" ? (
         <RecordWorkspace
           spec={

@@ -1,0 +1,746 @@
+{
+  "scope": "固定 implementationOwner=analytics 的39条前端缺口；不修改主审计矩阵，七条团检报告另批交付。",
+  "ownerFiles": [
+    "src/analyticsData.ts",
+    "src/projectStatisticsRules.ts",
+    "src/financialAnalyticsRules.ts",
+    "src/qualityAnalyticsRules.ts",
+    "src/reportBuilderRules.ts",
+    "src/modules/ProjectStatistics.tsx",
+    "src/modules/AppointmentDashboard.tsx",
+    "src/modules/AnalyticsCharts.tsx",
+    "src/modules/AnalyticsHub.tsx",
+    "src/modules/BusinessAnalytics.tsx",
+    "src/modules/InvoiceAging.tsx",
+    "src/modules/QualityAnalytics.tsx",
+    "src/modules/ReportBuilder.tsx",
+    "src/modules/Advanced.tsx（仅Analytics wrapper）",
+    "tests/project-statistics.test.tsx",
+    "tests/analytics-completion.test.tsx"
+  ],
+  "verification": {
+    "targetedTests": 39,
+    "commands": [
+      "npx vitest run tests/project-statistics.test.tsx tests/analytics-completion.test.tsx",
+      "npx eslint (owner files)"
+    ],
+    "result": "项目/统计39个针对测试与团报11个合并50/50通过；包括真实reducer分次收费、部分退款、取消业务归档、受限患者/院区、单位非现金分配镜像防重、临床父子报告项目异常分母。",
+    "browserVerification": "本owner未执行Chromium视觉验收，由父任务统一执行。"
+  },
+  "items": [
+    {
+      "id": "T0069",
+      "implementationOwner": "analytics",
+      "originalText": "支持预约统计，医护人员可查看预约总人数、各时间段预约情况、客户性别分布、各单位预约分布等；原文用词为“实施查看”。",
+      "gapClosed": "增加按时间段、性别及单位的实际预约分布统计，而非仅总量和状态卡。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/analyticsData.ts :: filterAppointmentAnalytics, appointmentDailyStatistics, appointmentCapacityDetails",
+        "src/modules/AppointmentDashboard.tsx :: combined filters, fullscreen, timed local refresh",
+        "src/modules/AnalyticsCharts.tsx :: data-driven bars and SVG pie"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual appointment and price data"
+      ],
+      "boundary": "只统计当前本地合成订单；自动刷新和全屏为浏览器功能。容量按全院未取消订单扣减，项目/类型统计配额明确不代替预约规则。"
+    },
+    {
+      "id": "T0071",
+      "implementationOwner": "analytics",
+      "originalText": "预约统计：按指定时间段查询预约人员详情。",
+      "gapClosed": "按起止日期/时段区间查询预约人，而非单日筛选。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/analyticsData.ts :: filterAppointmentAnalytics, appointmentDailyStatistics, appointmentCapacityDetails",
+        "src/modules/AppointmentDashboard.tsx :: combined filters, fullscreen, timed local refresh",
+        "src/modules/AnalyticsCharts.tsx :: data-driven bars and SVG pie"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual appointment and price data"
+      ],
+      "boundary": "只统计当前本地合成订单；自动刷新和全屏为浏览器功能。容量按全院未取消订单扣减，项目/类型统计配额明确不代替预约规则。"
+    },
+    {
+      "id": "T0073",
+      "implementationOwner": "analytics",
+      "originalText": "预约排期统计：通过单位、类型、个检/团检、日期等组合条件检索预约情况。",
+      "gapClosed": "单位、客户/预约类型、个检团检、日期组成联合筛选，而非单个状态/日期。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/analyticsData.ts :: filterAppointmentAnalytics, appointmentDailyStatistics, appointmentCapacityDetails",
+        "src/modules/AppointmentDashboard.tsx :: combined filters, fullscreen, timed local refresh",
+        "src/modules/AnalyticsCharts.tsx :: data-driven bars and SVG pie"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual appointment and price data"
+      ],
+      "boundary": "只统计当前本地合成订单；自动刷新和全屏为浏览器功能。容量按全院未取消订单扣减，项目/类型统计配额明确不代替预约规则。"
+    },
+    {
+      "id": "T0074",
+      "implementationOwner": "analytics",
+      "originalText": "显示每日预约数、各预约类型数量、已预约数量、剩余可预约数量、每日预约项目情况。",
+      "gapClosed": "按日给出每种预约类型、项目人数及相应剩余号源，现卡片缺细分。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/analyticsData.ts :: filterAppointmentAnalytics, appointmentDailyStatistics, appointmentCapacityDetails",
+        "src/modules/AppointmentDashboard.tsx :: combined filters, fullscreen, timed local refresh",
+        "src/modules/AnalyticsCharts.tsx :: data-driven bars and SVG pie"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual appointment and price data",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "容量与预约拒单使用相同bookingResourceLimits及匿名全局占用；0为禁约。资源余量还受全院、单位、时段规则共同约束；类型仅人数分布，不臆造独立限额。真实医院号源仍需后端原子并发。"
+    },
+    {
+      "id": "T0079",
+      "implementationOwner": "analytics",
+      "originalText": "提供综合大屏数据展示，用于体检、信息科等大屏展示排期重要指标，可作为主任驾驶舱快速了解预约情况。",
+      "gapClosed": "排期驾驶舱重要趋势改为从实际预约/单位/时段计算，避免固定七日曲线。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/analyticsData.ts :: filterAppointmentAnalytics, appointmentDailyStatistics, appointmentCapacityDetails",
+        "src/modules/AppointmentDashboard.tsx :: combined filters, fullscreen, timed local refresh",
+        "src/modules/AnalyticsCharts.tsx :: data-driven bars and SVG pie"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual appointment and price data"
+      ],
+      "boundary": "只统计当前本地合成订单；自动刷新和全屏为浏览器功能。容量按全院未取消订单扣减，项目/类型统计配额明确不代替预约规则。"
+    },
+    {
+      "id": "T0201",
+      "implementationOwner": "analytics",
+      "originalText": "使用配置方式展示报表内容，可在报表内显示简单汇总数据，并和数据一起导出。",
+      "gapClosed": "提供本地报表配置：命名新报表、选数据集/显示列/汇总字段并保存；渲染配置表且导出同一汇总及数据。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/reportBuilderRules.ts :: reportDatasets, validateReport, executeReport, reportCsv",
+        "src/modules/ReportBuilder.tsx :: multi-report persistence, columns/order, AND conditions, group and numeric summaries",
+        "src/financialAnalyticsRules.ts :: inspectOrderLedger/orderTransactions按项目方向逐笔原始时间；余额快照防重"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: saved report execution and same-source export",
+        "tests/analytics-completion.test.tsx :: preserves unknown original prices through custom report sums and CSV",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "本地受限字段配置，无任意代码/SQL执行；数据行、分组和总计同一筛选源，未知金额保留未知。"
+    },
+    {
+      "id": "T0203",
+      "implementationOwner": "analytics",
+      "originalText": "支持按需求自定义报表。",
+      "gapClosed": "提供本地报表配置：命名新报表、选数据集/显示列/汇总字段并保存；渲染配置表且导出同一汇总及数据。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/reportBuilderRules.ts :: reportDatasets, validateReport, executeReport, reportCsv",
+        "src/modules/ReportBuilder.tsx :: multi-report persistence, columns/order, AND conditions, group and numeric summaries",
+        "src/financialAnalyticsRules.ts :: inspectOrderLedger/orderTransactions按项目方向逐笔原始时间；余额快照防重"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: saved report execution and same-source export",
+        "tests/analytics-completion.test.tsx :: preserves unknown original prices through custom report sums and CSV",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "本地受限字段配置，无任意代码/SQL执行；数据行、分组和总计同一筛选源，未知金额保留未知。"
+    },
+    {
+      "id": "T0204",
+      "implementationOwner": "analytics",
+      "originalText": "可根据医院要求随时添加报表。",
+      "gapClosed": "提供本地报表配置：命名新报表、选数据集/显示列/汇总字段并保存；渲染配置表且导出同一汇总及数据。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/reportBuilderRules.ts :: reportDatasets, validateReport, executeReport, reportCsv",
+        "src/modules/ReportBuilder.tsx :: multi-report persistence, columns/order, AND conditions, group and numeric summaries",
+        "src/financialAnalyticsRules.ts :: inspectOrderLedger/orderTransactions按项目方向逐笔原始时间；余额快照防重"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: saved report execution and same-source export",
+        "tests/analytics-completion.test.tsx :: preserves unknown original prices through custom report sums and CSV",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "本地受限字段配置，无任意代码/SQL执行；数据行、分组和总计同一筛选源，未知金额保留未知。"
+    },
+    {
+      "id": "T0365",
+      "implementationOwner": "analytics",
+      "originalText": "开单工作量统计：用于统计登记人员工作量，可根据个检开单、团检开单数量分别统计。（创建人员，业务员）",
+      "gapClosed": "开单工作量按创建人/业务员区分个检团检人数订单数。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/BusinessAnalytics.tsx :: order/seller, review-node, unit progress, transactions and invoice linkage views",
+        "src/financialAnalyticsRules.ts :: buildFinancialTransactions, buildReviewWorkloads, financialUnknowns",
+        "src/analyticsData.ts :: buildOrderAnalytics"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual financial facts and aging boundaries",
+        "tests/analytics-completion.test.tsx :: keeps business UI totals and exported transaction records in the same date range",
+        "tests/analytics-completion.test.tsx :: exports a selected unit progress list using exam dates and keeps the original/execution totals separate"
+      ],
+      "boundary": "开单按订单、人数按客户去重。审核取独立节点医生/时间；支付状态不推算金额，预收款分配不重复收入，票面不累加收款，历史缺失单独披露。"
+    },
+    {
+      "id": "T0366",
+      "implementationOwner": "analytics",
+      "originalText": "医生工作量统计：按照医生、诊室、时间段来统计医生工作量，包括检查项目数量及金额。（审核流程选择）",
+      "gapClosed": "按医生/诊室/科室/时间统计项目数量及原价、执行价金额，不能以操作事件数替代。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/projectStatisticsRules.ts :: buildProjectRows, filterProjectRows, summarizeProjectRows, projectCsvRows",
+        "src/modules/ProjectStatistics.tsx :: doctor/room/date/review/sales/project filters, mapping configuration"
+      ],
+      "tests": [
+        "tests/project-statistics.test.tsx :: all 8 deterministic helper/UI tests"
+      ],
+      "boundary": "以项目结果/价格快照为优先证据；旧单当前目录分摊均标估算，取消/弃检/退款归属不明排除金额合计。不是实收收入。"
+    },
+    {
+      "id": "T0367",
+      "implementationOwner": "analytics",
+      "originalText": "科室工作量统计：按照科室统计此科室检查项目数量及金额，可按照原价、执行价分别统计。",
+      "gapClosed": "按医生/诊室/科室/时间统计项目数量及原价、执行价金额，不能以操作事件数替代。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/projectStatisticsRules.ts :: buildProjectRows, filterProjectRows, summarizeProjectRows, projectCsvRows",
+        "src/modules/ProjectStatistics.tsx :: doctor/room/date/review/sales/project filters, mapping configuration"
+      ],
+      "tests": [
+        "tests/project-statistics.test.tsx :: all 8 deterministic helper/UI tests"
+      ],
+      "boundary": "以项目结果/价格快照为优先证据；旧单当前目录分摊均标估算，取消/弃检/退款归属不明排除金额合计。不是实收收入。"
+    },
+    {
+      "id": "T0370",
+      "implementationOwner": "analytics",
+      "originalText": "主检、总检医生工作量：可用按照时间范围统计主检、总检医生的工作量。",
+      "gapClosed": "将主检/总检真实阶段执行人和时间区分汇总，通用REVIEW事件不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/BusinessAnalytics.tsx :: order/seller, review-node, unit progress, transactions and invoice linkage views",
+        "src/financialAnalyticsRules.ts :: buildFinancialTransactions, buildReviewWorkloads, financialUnknowns",
+        "src/analyticsData.ts :: buildOrderAnalytics"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual financial facts and aging boundaries",
+        "tests/analytics-completion.test.tsx :: keeps business UI totals and exported transaction records in the same date range",
+        "tests/analytics-completion.test.tsx :: exports a selected unit progress list using exam dates and keeps the original/execution totals separate"
+      ],
+      "boundary": "开单按订单、人数按客户去重。审核取独立节点医生/时间；支付状态不推算金额，预收款分配不重复收入，票面不累加收款，历史缺失单独披露。"
+    },
+    {
+      "id": "T0371",
+      "implementationOwner": "analytics",
+      "originalText": "销售工作量统计：可以统计指定项目在一定的时间范围内开出的总数及对应金额。",
+      "gapClosed": "按指定项目、业务员及日期统计人数/数量/金额并输出人员清单。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/projectStatisticsRules.ts :: buildProjectRows, filterProjectRows, summarizeProjectRows, projectCsvRows",
+        "src/modules/ProjectStatistics.tsx :: doctor/room/date/review/sales/project filters, mapping configuration"
+      ],
+      "tests": [
+        "tests/project-statistics.test.tsx :: all 8 deterministic helper/UI tests"
+      ],
+      "boundary": "以项目结果/价格快照为优先证据；旧单当前目录分摊均标估算，取消/弃检/退款归属不明排除金额合计。不是实收收入。"
+    },
+    {
+      "id": "T0372",
+      "implementationOwner": "analytics",
+      "originalText": "可以统计一定时间范围内选择了某个项目的所有人员清单。（业务员工作量统计）整合到项目开单工作量",
+      "gapClosed": "按指定项目、业务员及日期统计人数/数量/金额并输出人员清单。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/projectStatisticsRules.ts :: buildProjectRows, filterProjectRows, summarizeProjectRows, projectCsvRows",
+        "src/modules/ProjectStatistics.tsx :: doctor/room/date/review/sales/project filters, mapping configuration"
+      ],
+      "tests": [
+        "tests/project-statistics.test.tsx :: all 8 deterministic helper/UI tests"
+      ],
+      "boundary": "以项目结果/价格快照为优先证据；旧单当前目录分摊均标估算，取消/弃检/退款归属不明排除金额合计。不是实收收入。"
+    },
+    {
+      "id": "T0377",
+      "implementationOwner": "analytics",
+      "originalText": "团检收入统计：用于统计某段时间内团检订单的单位订单收入明细、汇总。",
+      "gapClosed": "个人/单位收入、已开票交易与对账明细须从同源本地订单/收退款/发票派生并支持时间区间；当前账单样例与分组结算不是完整业务报表。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/BusinessAnalytics.tsx :: order/seller, review-node, unit progress, transactions and invoice linkage views",
+        "src/financialAnalyticsRules.ts :: buildFinancialTransactions, buildReviewWorkloads, financialUnknowns",
+        "src/analyticsData.ts :: buildOrderAnalytics",
+        "src/financialAnalyticsRules.ts :: inspectOrderLedger/orderTransactions按项目方向逐笔原始时间；余额快照防重"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual financial facts and aging boundaries",
+        "tests/analytics-completion.test.tsx :: keeps business UI totals and exported transaction records in the same date range",
+        "tests/analytics-completion.test.tsx :: exports a selected unit progress list using exam dates and keeps the original/execution totals separate",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "开单按订单、人数按客户去重。审核取独立节点医生/时间；支付状态不推算金额，预收款分配不重复收入，票面不累加收款，历史缺失单独披露。"
+    },
+    {
+      "id": "T0378",
+      "implementationOwner": "analytics",
+      "originalText": "团检交易统计：用于统计发起收费并完成开票或完成交易的团检交易记录。",
+      "gapClosed": "个人/单位收入、已开票交易与对账明细须从同源本地订单/收退款/发票派生并支持时间区间；当前账单样例与分组结算不是完整业务报表。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/BusinessAnalytics.tsx :: order/seller, review-node, unit progress, transactions and invoice linkage views",
+        "src/financialAnalyticsRules.ts :: buildFinancialTransactions, buildReviewWorkloads, financialUnknowns",
+        "src/analyticsData.ts :: buildOrderAnalytics"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual financial facts and aging boundaries",
+        "tests/analytics-completion.test.tsx :: keeps business UI totals and exported transaction records in the same date range",
+        "tests/analytics-completion.test.tsx :: exports a selected unit progress list using exam dates and keeps the original/execution totals separate"
+      ],
+      "boundary": "开单按订单、人数按客户去重。审核取独立节点医生/时间；支付状态不推算金额，预收款分配不重复收入，票面不累加收款，历史缺失单独披露。"
+    },
+    {
+      "id": "T0379",
+      "implementationOwner": "analytics",
+      "originalText": "个检收入统计：用于统计某段时间内个检的收入明细、汇总。",
+      "gapClosed": "个人/单位收入、已开票交易与对账明细须从同源本地订单/收退款/发票派生并支持时间区间；当前账单样例与分组结算不是完整业务报表。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/BusinessAnalytics.tsx :: order/seller, review-node, unit progress, transactions and invoice linkage views",
+        "src/financialAnalyticsRules.ts :: buildFinancialTransactions, buildReviewWorkloads, financialUnknowns",
+        "src/analyticsData.ts :: buildOrderAnalytics",
+        "src/financialAnalyticsRules.ts :: inspectOrderLedger/orderTransactions按项目方向逐笔原始时间；余额快照防重"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual financial facts and aging boundaries",
+        "tests/analytics-completion.test.tsx :: keeps business UI totals and exported transaction records in the same date range",
+        "tests/analytics-completion.test.tsx :: exports a selected unit progress list using exam dates and keeps the original/execution totals separate",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "开单按订单、人数按客户去重。审核取独立节点医生/时间；支付状态不推算金额，预收款分配不重复收入，票面不累加收款，历史缺失单独披露。"
+    },
+    {
+      "id": "T0380",
+      "implementationOwner": "analytics",
+      "originalText": "对账单统计：用于统计某段时间内交易情况，方便实现与财务对账。",
+      "gapClosed": "个人/单位收入、已开票交易与对账明细须从同源本地订单/收退款/发票派生并支持时间区间；当前账单样例与分组结算不是完整业务报表。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/BusinessAnalytics.tsx :: order/seller, review-node, unit progress, transactions and invoice linkage views",
+        "src/financialAnalyticsRules.ts :: buildFinancialTransactions, buildReviewWorkloads, financialUnknowns",
+        "src/analyticsData.ts :: buildOrderAnalytics",
+        "src/financialAnalyticsRules.ts :: inspectOrderLedger/orderTransactions按项目方向逐笔原始时间；余额快照防重"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual financial facts and aging boundaries",
+        "tests/analytics-completion.test.tsx :: keeps business UI totals and exported transaction records in the same date range",
+        "tests/analytics-completion.test.tsx :: exports a selected unit progress list using exam dates and keeps the original/execution totals separate",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "开单按订单、人数按客户去重。审核取独立节点医生/时间；支付状态不推算金额，预收款分配不重复收入，票面不累加收款，历史缺失单独披露。"
+    },
+    {
+      "id": "T0381",
+      "implementationOwner": "analytics",
+      "originalText": "结算报表（单位体检进度表）开发成页面实现。",
+      "gapClosed": "提供单位体检进度及科室/指定项目开单统计，组合日期与原价/执行价并列；当前独立金额或质控卡不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/BusinessAnalytics.tsx :: order/seller, review-node, unit progress, transactions and invoice linkage views",
+        "src/financialAnalyticsRules.ts :: buildFinancialTransactions, buildReviewWorkloads, financialUnknowns",
+        "src/analyticsData.ts :: buildOrderAnalytics"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual financial facts and aging boundaries",
+        "tests/analytics-completion.test.tsx :: keeps business UI totals and exported transaction records in the same date range",
+        "tests/analytics-completion.test.tsx :: exports a selected unit progress list using exam dates and keeps the original/execution totals separate"
+      ],
+      "boundary": "开单按订单、人数按客户去重。审核取独立节点医生/时间；支付状态不推算金额，预收款分配不重复收入，票面不累加收款，历史缺失单独披露。"
+    },
+    {
+      "id": "T0382",
+      "implementationOwner": "analytics",
+      "originalText": "可查看各单位人员检查情况，检查日期分布，参检情况发布，完成情况分布，可按照执行价、原价两种方式分别统计。",
+      "gapClosed": "提供单位体检进度及科室/指定项目开单统计，组合日期与原价/执行价并列；当前独立金额或质控卡不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/modules/BusinessAnalytics.tsx :: order/seller, review-node, unit progress, transactions and invoice linkage views",
+        "src/financialAnalyticsRules.ts :: buildFinancialTransactions, buildReviewWorkloads, financialUnknowns",
+        "src/analyticsData.ts :: buildOrderAnalytics"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual financial facts and aging boundaries",
+        "tests/analytics-completion.test.tsx :: keeps business UI totals and exported transaction records in the same date range",
+        "tests/analytics-completion.test.tsx :: exports a selected unit progress list using exam dates and keeps the original/execution totals separate"
+      ],
+      "boundary": "开单按订单、人数按客户去重。审核取独立节点医生/时间；支付状态不推算金额，预收款分配不重复收入，票面不累加收款，历史缺失单独披露。"
+    },
+    {
+      "id": "T0383",
+      "implementationOwner": "analytics",
+      "originalText": "体检项目开单明细：可根据科室、开单项目两种方式统计项目开单情况，可按照原价、执行价两种方式分别统计。",
+      "gapClosed": "提供单位体检进度及科室/指定项目开单统计，组合日期与原价/执行价并列；当前独立金额或质控卡不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/projectStatisticsRules.ts :: buildProjectRows, filterProjectRows, summarizeProjectRows, projectCsvRows",
+        "src/modules/ProjectStatistics.tsx :: doctor/room/date/review/sales/project filters, mapping configuration"
+      ],
+      "tests": [
+        "tests/project-statistics.test.tsx :: all 8 deterministic helper/UI tests"
+      ],
+      "boundary": "以项目结果/价格快照为优先证据；旧单当前目录分摊均标估算，取消/弃检/退款归属不明排除金额合计。不是实收收入。"
+    },
+    {
+      "id": "T0384",
+      "implementationOwner": "analytics",
+      "originalText": "支持统计某段时间内某个项目的开单情况。",
+      "gapClosed": "提供单位体检进度及科室/指定项目开单统计，组合日期与原价/执行价并列；当前独立金额或质控卡不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/projectStatisticsRules.ts :: buildProjectRows, filterProjectRows, summarizeProjectRows, projectCsvRows",
+        "src/modules/ProjectStatistics.tsx :: doctor/room/date/review/sales/project filters, mapping configuration"
+      ],
+      "tests": [
+        "tests/project-statistics.test.tsx :: all 8 deterministic helper/UI tests"
+      ],
+      "boundary": "以项目结果/价格快照为优先证据；旧单当前目录分摊均标估算，取消/弃检/退款归属不明排除金额合计。不是实收收入。"
+    },
+    {
+      "id": "T0385",
+      "implementationOwner": "analytics",
+      "originalText": "通用报表：根据现场要求维护通用报表，可进行报表简单报表定制。",
+      "gapClosed": "提供可选择数据字段/条件/分组/汇总的简单报表配置并实际运行保存，不能只编辑报表名称。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/reportBuilderRules.ts :: reportDatasets, validateReport, executeReport, reportCsv",
+        "src/modules/ReportBuilder.tsx :: multi-report persistence, columns/order, AND conditions, group and numeric summaries",
+        "src/financialAnalyticsRules.ts :: inspectOrderLedger/orderTransactions按项目方向逐笔原始时间；余额快照防重"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: saved report execution and same-source export",
+        "tests/analytics-completion.test.tsx :: preserves unknown original prices through custom report sums and CSV",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "本地受限字段配置，无任意代码/SQL执行；数据行、分组和总计同一筛选源，未知金额保留未知。"
+    },
+    {
+      "id": "T0388",
+      "implementationOwner": "analytics",
+      "originalText": "体检结果进度查询：可查询指定单位或日期范围的体检客户所有结果的完成情况，如检验结果有没有漏传、漏项等。",
+      "gapClosed": "以单位/日期筛选到检与检查进度，列出未检/已检人员和逐项目缺失结果。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0389",
+      "implementationOwner": "analytics",
+      "originalText": "单位到检查询：可查询单位客户到检情况，如已检客户清单、未检客户清单、客户体检项目详细清单、单位客户体检项目进度汇总等。",
+      "gapClosed": "以单位/日期筛选到检与检查进度，列出未检/已检人员和逐项目缺失结果。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0391",
+      "implementationOwner": "analytics",
+      "originalText": "动态图表展示：支持动态图标。",
+      "gapClosed": "统计大屏从实际数据动态绘制柱/饼图，提供全屏控制和可观察刷新机制；固定趋势及大屏路由不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/analyticsData.ts :: filterAppointmentAnalytics, appointmentDailyStatistics, appointmentCapacityDetails",
+        "src/modules/AppointmentDashboard.tsx :: combined filters, fullscreen, timed local refresh",
+        "src/modules/AnalyticsCharts.tsx :: data-driven bars and SVG pie"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual appointment and price data"
+      ],
+      "boundary": "只统计当前本地合成订单；自动刷新和全屏为浏览器功能。容量按全院未取消订单扣减，项目/类型统计配额明确不代替预约规则。"
+    },
+    {
+      "id": "T0392",
+      "implementationOwner": "analytics",
+      "originalText": "可进行全屏展示。",
+      "gapClosed": "统计大屏从实际数据动态绘制柱/饼图，提供全屏控制和可观察刷新机制；固定趋势及大屏路由不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/analyticsData.ts :: filterAppointmentAnalytics, appointmentDailyStatistics, appointmentCapacityDetails",
+        "src/modules/AppointmentDashboard.tsx :: combined filters, fullscreen, timed local refresh",
+        "src/modules/AnalyticsCharts.tsx :: data-driven bars and SVG pie"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual appointment and price data"
+      ],
+      "boundary": "只统计当前本地合成订单；自动刷新和全屏为浏览器功能。容量按全院未取消订单扣减，项目/类型统计配额明确不代替预约规则。"
+    },
+    {
+      "id": "T0393",
+      "implementationOwner": "analytics",
+      "originalText": "自动刷新。",
+      "gapClosed": "统计大屏从实际数据动态绘制柱/饼图，提供全屏控制和可观察刷新机制；固定趋势及大屏路由不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/analyticsData.ts :: filterAppointmentAnalytics, appointmentDailyStatistics, appointmentCapacityDetails",
+        "src/modules/AppointmentDashboard.tsx :: combined filters, fullscreen, timed local refresh",
+        "src/modules/AnalyticsCharts.tsx :: data-driven bars and SVG pie"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual appointment and price data"
+      ],
+      "boundary": "只统计当前本地合成订单；自动刷新和全屏为浏览器功能。容量按全院未取消订单扣减，项目/类型统计配额明确不代替预约规则。"
+    },
+    {
+      "id": "T0394",
+      "implementationOwner": "analytics",
+      "originalText": "支持柱状图，饼图。",
+      "gapClosed": "统计大屏从实际数据动态绘制柱/饼图，提供全屏控制和可观察刷新机制；固定趋势及大屏路由不足。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/analyticsData.ts :: filterAppointmentAnalytics, appointmentDailyStatistics, appointmentCapacityDetails",
+        "src/modules/AppointmentDashboard.tsx :: combined filters, fullscreen, timed local refresh",
+        "src/modules/AnalyticsCharts.tsx :: data-driven bars and SVG pie"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: actual appointment and price data"
+      ],
+      "boundary": "只统计当前本地合成订单；自动刷新和全屏为浏览器功能。容量按全院未取消订单扣减，项目/类型统计配额明确不代替预约规则。"
+    },
+    {
+      "id": "T0395",
+      "implementationOwner": "analytics",
+      "originalText": "异常汇总：可根据单位，个人统计每位体检客户的异常检出汇总。（可以作为团检附件）",
+      "gapClosed": "按单位/个人/日期/年龄汇总异常分布、检出率及危急值，导出命中人名单；保持明确演示阈值与分母。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0396",
+      "implementationOwner": "analytics",
+      "originalText": "异常分布情况统计：可根据异常名称，查询某段时间内异常检出分布情况。",
+      "gapClosed": "按单位/个人/日期/年龄汇总异常分布、检出率及危急值，导出命中人名单；保持明确演示阈值与分母。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0397",
+      "implementationOwner": "analytics",
+      "originalText": "支持导出检出此异常的人员名单。",
+      "gapClosed": "按单位/个人/日期/年龄汇总异常分布、检出率及危急值，导出命中人名单；保持明确演示阈值与分母。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0398",
+      "implementationOwner": "analytics",
+      "originalText": "异常检出率统计：可根据不同异常分析异常检出率，可根据时间段、单位、年龄等多维度综合查询分析。",
+      "gapClosed": "按单位/个人/日期/年龄汇总异常分布、检出率及危急值，导出命中人名单；保持明确演示阈值与分母。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0399",
+      "implementationOwner": "analytics",
+      "originalText": "危急值统计：针对检出的危急值，重大阳性等结果，进行数据统计分析。",
+      "gapClosed": "按单位/个人/日期/年龄汇总异常分布、检出率及危急值，导出命中人名单；保持明确演示阈值与分母。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0409",
+      "implementationOwner": "analytics",
+      "originalText": "可按照体检开始、报告回传、主检开始、主检结束、总检开始、总检结束等环节的执行时间，对时间较慢的环节做出提示，科室可实现针性整改。（根据不同的体检类型 对应的报告周期）",
+      "gapClosed": "记录到检、回传、主检开始结束、总检开始结束各节点，按类型阈值显示阶段耗时与慢环节。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0410",
+      "implementationOwner": "analytics",
+      "originalText": "支持统计各分检医生、主检医生被驳回的次数及驳回原因。",
+      "gapClosed": "按实际分检/主检执行人归属驳回事件，分阶段/原因计数；定义可复算总检查分母，提供主任视图/整改记录。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow",
+        "src/qualityAnalyticsRules.ts :: REJECT_TO_MAIN before.stageMetadata doctor attribution"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0411",
+      "implementationOwner": "analytics",
+      "originalText": "自动化统计分析各医生各类错误出现的概率，让科室实现针对性整改。（报表实现，主任看板整合此数据）",
+      "gapClosed": "按实际分检/主检执行人归属驳回事件，分阶段/原因计数；定义可复算总检查分母，提供主任视图/整改记录。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/qualityAnalyticsRules.ts :: qualityOrders, abnormalityFacts/Summary, majorPositiveFacts, qualityTimingRows, rejectionQualityRows",
+        "src/modules/QualityAnalytics.tsx :: completion/missing list, multidimensional denominator, timing thresholds, corrective-action workflow",
+        "src/qualityAnalyticsRules.ts :: REJECT_TO_MAIN before.stageMetadata doctor attribution"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: quality denominators, timing and correction workflow",
+        "tests/analytics-completion.test.tsx :: analytics edge evidence",
+        "tests/analytics-completion.test.tsx :: cross-module integration addendum"
+      ],
+      "boundary": "缺结果不能判断漏传原因；合成异常规则不是医学诊断。检出率分母仅可判读结果。节点无真实时间或送审代理不算实际耗时。驳回率为有限可追溯样本占比，不是临床错误概率；审计截断历史不补造。"
+    },
+    {
+      "id": "T0434",
+      "implementationOwner": "analytics",
+      "originalText": "有团检账期管理。",
+      "gapClosed": "团检账龄从实际开票/应收到期日和未收金额动态计算，现主账龄图仍固定days样例；端点按明确演示口径。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/financialAnalyticsRules.ts :: buildInvoiceAging, agingBucket",
+        "src/modules/InvoiceAging.tsx :: company terms, invoice/overdue aging, as-of date and export"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: places all age boundaries correctly and excludes void/future invoices while subtracting only valid dated receipts",
+        "tests/analytics-completion.test.tsx :: persists unit terms and consumes them in aging immediately"
+      ],
+      "boundary": "复用有效 invoiceLedger 与 invoiceReceipts；按0–30、31–60、61–90、91–180、181+互斥边界。未录入历史回款需核对，票面未收不是自动确认财务应收；无真实发票税务/银行接入。"
+    },
+    {
+      "id": "T0435",
+      "implementationOwner": "analytics",
+      "originalText": "账期管理会根据0-30,30-60,60-90,90-180,以及180 天以上未结算数据统计未结算金额",
+      "gapClosed": "团检账龄从实际开票/应收到期日和未收金额动态计算，现主账龄图仍固定days样例；端点按明确演示口径。",
+      "status": "completed_frontend",
+      "implementationEvidence": [
+        "src/financialAnalyticsRules.ts :: buildInvoiceAging, agingBucket",
+        "src/modules/InvoiceAging.tsx :: company terms, invoice/overdue aging, as-of date and export"
+      ],
+      "tests": [
+        "tests/analytics-completion.test.tsx :: places all age boundaries correctly and excludes void/future invoices while subtracting only valid dated receipts",
+        "tests/analytics-completion.test.tsx :: persists unit terms and consumes them in aging immediately"
+      ],
+      "boundary": "复用有效 invoiceLedger 与 invoiceReceipts；按0–30、31–60、61–90、91–180、181+互斥边界。未录入历史回款需核对，票面未收不是自动确认财务应收；无真实发票税务/银行接入。"
+    }
+  ],
+  "integrationAddendum": [
+    {
+      "items": [
+        "T0377",
+        "T0379",
+        "T0380",
+        "T0201",
+        "T0203",
+        "T0204",
+        "T0385"
+      ],
+      "evidence": "financialAnalyticsRules.inspectOrderLedger/buildFinancialTransactions 优先orderTransactions实际at/channel/lines/grossCharge/grossRefund/net，输出项目+收退方向行；存在新账本停用当前余额快照，启用前期初仅在唯一PAYMENT审计与opening分配完全一致时纳入；卡内抵扣不重复现金收入，冲突/不一致隔离。BusinessAnalytics渠道/项目/日期筛选与CSV，自定义交易源同口径。",
+      "tests": "analytics-completion: cross-module immutable transaction ledger (4 tests，含真实reducer两日两收一部分退)"
+    },
+    {
+      "items": [
+        "T0074"
+      ],
+      "evidence": "appointmentDailyStatistics使用getBookingAvailability与匿名bookingUsage；资源明细调用getBookingResourceAvailability，消费bookingResourceLimits/bookingResourceUsage。容量编辑写真实共享限额，0即禁约；类型仅分布无虚构独立额度。",
+      "tests": "analytics-completion: shared quota ... hidden occupancy and zero limit tests"
+    },
+    {
+      "items": [
+        "T0410",
+        "T0411"
+      ],
+      "evidence": "rejectionQualityRows纳入REJECT_TO_MAIN，使用before.stageMetadata实际主检医生及after.rejectReason；不归退回操作者。",
+      "tests": "analytics-completion: real REJECT_TO_MAIN reducer event attribution"
+    },
+    {
+      "items": [
+        "responsive"
+      ],
+      "evidence": "所有analytics/团报宽表进入ops-table-wrap；团报图栅格minmax(min(260px,100%),1fr)。",
+      "tests": "analytics-completion: every analytics table in a horizontal scrolling boundary"
+    },
+    {
+      "items": [
+        "T0377",
+        "T0379",
+        "T0380",
+        "T0201",
+        "T0203",
+        "T0204",
+        "T0385"
+      ],
+      "evidence": "financialOrders只合并useDemo传入的当前订单与已过滤cancelledAppointmentArchive.appointment，当前/归档ID去重；账本cash:false不计现金收入，group_account_allocation通过transactionId/accountLedgerId跳过groupAccounts.ledger同笔镜像。归档元信息明确标识，未知/隐藏订单不会从未授权数据恢复。",
+      "tests": "tests/analytics-completion.test.tsx :: final archive, unit allocation and report-item integration (前3例，实际reducer及scoped useDemo) "
+    },
+    {
+      "items": [
+        "T0395",
+        "T0396",
+        "T0397",
+        "T0398",
+        "T0399"
+      ],
+      "evidence": "abnormalityFacts使用clinicalItems(state,{...order,items:有效非弃检父收费项})展开报告子项，用子项实际结果计算检出分母/危急；收费数量和价格仍按父项，不增加子项费用。",
+      "tests": "tests/analytics-completion.test.tsx :: expands charged parent items to report children for abnormal denominators without charging or counting an extra project"
+    }
+  ]
+}

@@ -136,6 +136,11 @@ describe("Redcreation synthetic settlement details", () => {
       status: "paid",
       paidAt: "2026-10-10T10:00:00Z",
     });
+    expect(buildSettlementRows(s)[0]).toMatchObject({ paid: null, due: null });
+    Object.assign(s.appointments[0], {
+      personalPaidAmount: 50,
+      unitPaidAmount: 100,
+    });
     expect(buildSettlementRows(s)[0]).toMatchObject({ paid: 150, due: 0 });
     Object.assign(s.appointments[0], {
       status: "cancelled",
