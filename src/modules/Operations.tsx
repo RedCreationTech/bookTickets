@@ -1568,7 +1568,7 @@ const commerceSpecs: WorkspaceSpec[] = [
         category: "运动用品",
         price: 69,
         stock: 126,
-        sku: "QH-CUP-001",
+        sku: "HC-CUP-001",
         status: "在售",
         description: "500ml / 雾绿色 / 合成展示商品。",
       }),
@@ -1576,7 +1576,7 @@ const commerceSpecs: WorkspaceSpec[] = [
         category: "健康课程",
         price: 39,
         stock: 999,
-        sku: "QH-COURSE-002",
+        sku: "HC-COURSE-002",
         status: "在售",
         description: "4 课时健康知识教育。",
       }),
@@ -1584,7 +1584,7 @@ const commerceSpecs: WorkspaceSpec[] = [
         category: "体检服务",
         price: 599,
         stock: 48,
-        sku: "QH-EXAM-001",
+        sku: "HC-EXAM-001",
         status: "预约中",
         description: "预约型商品，需与院区日历匹配。",
       }),
@@ -4908,8 +4908,8 @@ const sectionMeta: Record<
   }
 > = {
   services: {
-    title: "专业服务",
-    en: "PROFESSIONAL SERVICES",
+    title: "医生与服务",
+    en: "MEDICAL SERVICES & CONSULTATION",
     subtitle: "让专业服务有序流转，让每一份健康关怀及时抵达。",
     icon: Users,
     specs: serviceSpecs,

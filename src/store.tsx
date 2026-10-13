@@ -36,6 +36,7 @@ export function migrateDemoBrand(
       if (key === "id" || /Ids?$/.test(key)) return value;
       const next = value
         .replaceAll("青禾", "红创")
+        .replaceAll("清和", "红创")
         .replaceAll("QINGHE", "HONGCHUANG")
         .replaceAll("Qinghe", "Hongchuang")
         .replaceAll("qinghe", "hongchuang");

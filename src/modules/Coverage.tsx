@@ -19,28 +19,44 @@ export default function Coverage() {
     "config-only": "配置演示",
     "hardware-unverifiable": "硬件不可验证",
   };
+  const rows = requirements as unknown as {
+    clause: string;
+    subitem?: string;
+    star?: boolean;
+    status: string;
+  }[];
+  const starRows = rows.filter((r) => r.star);
+  const summary = {
+    clauses: new Set(rows.map((r) => r.clause)).size,
+    items: rows.length,
+    starPositions: new Set(
+      starRows.map((r) => `${r.clause}|${r.subitem ?? ""}`),
+    ).size,
+    starItems: starRows.length,
+    hardware: rows.filter((r) => r.status === "hardware-unverifiable").length,
+  };
   return (
     <>
       <PageTitle
         eyebrow="COVERAGE / 逐条响应"
         title="标书需求覆盖与边界"
-        description="945 项是需求核对数量，不能等同于已实现功能数量。逐项记录交互入口、验证与不可纯前端验收部分。"
+        description={`${summary.items} 项是需求核对数量，不能等同于已实现功能数量。逐项记录交互入口、验证与不可纯前端验收部分。`}
       />
       <div className="coverage-summary">
         <div>
-          <strong>225</strong>
+          <strong>{summary.clauses}</strong>
           <span>原编号技术条款</span>
         </div>
         <div>
-          <strong>945</strong>
+          <strong>{summary.items}</strong>
           <span>需求核对项</span>
         </div>
         <div>
-          <strong>10</strong>
-          <span>★ 星标条款位置</span>
+          <strong>{summary.starPositions}</strong>
+          <span>★ 星标条款位置 · 拆分 {summary.starItems} 项核对</span>
         </div>
         <div>
-          <strong>167</strong>
+          <strong>{summary.hardware}</strong>
           <span>硬件项需实机验收</span>
         </div>
       </div>
