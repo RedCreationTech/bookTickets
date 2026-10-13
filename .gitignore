@@ -5,6 +5,7 @@ test-results/
 *.log
 .env*
 !.env.example
+
 *.tsbuildinfo
 __pycache__/
 *.pyc

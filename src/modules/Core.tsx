@@ -1,0 +1,2519 @@
+import { getBookingAvailability } from "../bookingRules";
+const GroupImport = lazy(() =>
+  import("./Advanced").then((m) => ({ default: m.GroupImport })),
+);
+import { analyzeDemoResults } from "../rules";
+import { useState, lazy, Suspense } from "react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  Download,
+  FileText,
+  HeartPulse,
+  Plus,
+  Printer,
+  Search,
+  ShieldCheck,
+  Users,
+  Wallet,
+  TriangleAlert,
+  RefreshCw,
+  ChevronRight,
+  Activity,
+  ScanLine,
+  SlidersHorizontal,
+} from "lucide-react";
+import { useDemo, today, exportCsv, download, statusNames } from "../store";
+import type { Appointment } from "../model";
+import {
+  Badge,
+  Bars,
+  Empty,
+  LinkButton,
+  Metric,
+  Modal,
+  PageTitle,
+  StatusBadge,
+  Trend,
+} from "../ui";
+export function Dashboard() {
+  const { state } = useDemo();
+  const count = (ss: string[]) =>
+    state.appointments.filter(
+      (x) => x.date === today() && ss.includes(x.status),
+    ).length;
+  return (
+    <>
+      <PageTitle
+        eyebrow="OVERVIEW / 运营概览"
+        title="每一份健康，都值得悉心守护"
+        description={`${new Date().toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long" })} · 中心院区今日运行平稳`}
+        actions={
+          <a className="btn btn-primary" href="#/appointments">
+            <Plus size={16} />
+            新建体检预约
+          </a>
+        }
+      />
+      <div className="hero-strip">
+        <div>
+          <span className="live-dot" />
+          全流程一体化 · 本地交互演示
+        </div>
+        <span>
+          检前预约 <ChevronRight size={13} /> 智能导检{" "}
+          <ChevronRight size={13} /> 总检报告 <ChevronRight size={13} />{" "}
+          健康管理
+        </span>
+        <a href="#/coverage">
+          查看需求响应范围 <ArrowUpRight size={15} />
+        </a>
+      </div>
+      <div className="metrics">
+        <Metric
+          label="今日体检预约"
+          value={
+            state.appointments.filter(
+              (a) => a.date === today() && a.status !== "cancelled",
+            ).length
+          }
+          unit="人"
+          note="已开放 80 个预约名额"
+        >
+          <CalendarDays size={20} />
+        </Metric>
+        <Metric
+          label="已到检人数"
+          value={count(["checked", "in_exam", "review", "approved", "printed"])}
+          unit="人"
+          note="从预约到报告，全流程可追踪"
+        >
+          <Users size={20} />
+        </Metric>
+        <Metric
+          label="待审核报告"
+          value={count(["review"])}
+          unit="份"
+          note="初审 / 主检 / 总检三级审核"
+        >
+          <FileText size={20} />
+        </Metric>
+        <Metric
+          label="待处理随访"
+          value={state.tasks.filter((t) => t.status !== "已完成").length}
+          unit="项"
+          note="按 A / B / C / D 四色分级"
+        >
+          <HeartPulse size={20} />
+        </Metric>
+      </div>
+      <div className="dashboard-grid">
+        <section className="panel trend-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>体检服务趋势</h2>
+              <p>预约与到检 · 最近 7 日合成趋势</p>
+            </div>
+            <div className="legend">
+              <i />
+              预约人数 <i className="gold" />
+              到检人数
+            </div>
+          </div>
+          <Trend />
+          <div className="chart-foot">
+            <span>
+              周度预约总量{" "}
+              <strong>
+                586 <small>人</small>
+              </strong>
+            </span>
+            <span>
+              平均到检率{" "}
+              <strong>
+                86.4<small>%</small>
+              </strong>
+            </span>
+            <span className="muted">趋势为固定合成样例</span>
+          </div>
+        </section>
+        <section className="panel todo-panel">
+          <div className="panel-heading">
+            <h2>我的待办</h2>
+            <Badge tone="gray">
+              {state.tasks.filter((t) => t.status !== "已完成").length +
+                count(["review"])}
+            </Badge>
+          </div>
+          {[
+            {
+              title: "体检报告待审核",
+              sub: "请核对异常指标与综合建议",
+              count: count(["review"]),
+              route: "/review",
+              icon: FileText,
+              color: "teal",
+            },
+            {
+              title: "重大异常跟进",
+              sub: "优先处理 A 类健康风险",
+              count: state.tasks.filter(
+                (t) => t.risk === "A类" && t.status !== "已完成",
+              ).length,
+              route: "/health",
+              icon: TriangleAlert,
+              color: "orange",
+            },
+            {
+              title: "到检确认与登记",
+              sub: "预约已付款，等待现场到检",
+              count: count(["paid"]),
+              route: "/appointments",
+              icon: CalendarDays,
+              color: "blue",
+            },
+          ].map((x) => (
+            <a className="todo" href={"#" + x.route} key={x.title}>
+              <div className={`tile-icon ${x.color}`}>
+                <x.icon size={20} />
+              </div>
+              <div>
+                <strong>{x.title}</strong>
+                <small>{x.sub}</small>
+              </div>
+              <b>{x.count}</b>
+              <ChevronRight size={15} />
+            </a>
+          ))}
+          <LinkButton href="/quality">查看全部业务提醒</LinkButton>
+        </section>
+        <section className="panel flow-panel">
+          <div className="panel-heading">
+            <h2>今日体检进度</h2>
+            <LinkButton href="/queue">导检调度</LinkButton>
+          </div>
+          <div className="flow-stations">
+            {[
+              { name: "待到检", num: count(["paid"]), icon: CalendarDays },
+              { name: "已登记", num: count(["checked"]), icon: ClipboardList },
+              { name: "检查中", num: count(["in_exam"]), icon: Activity },
+              { name: "待审核", num: count(["review"]), icon: ShieldCheck },
+              {
+                name: "报告完成",
+                num: count(["approved", "printed"]),
+                icon: CheckCircle2,
+              },
+            ].map((x) => (
+              <div className="flow-station" key={x.name}>
+                <x.icon size={20} />
+                <strong>{x.num}</strong>
+                <span>{x.name}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="panel quick-panel">
+          <div className="panel-heading">
+            <h2>常用工作台</h2>
+            <span className="muted">快速进入</span>
+          </div>
+          <div className="quick-grid">
+            {[
+              { name: "开单登记", href: "/appointments", icon: ClipboardList },
+              { name: "医生分检", href: "/exam", icon: HeartPulse },
+              { name: "总检审核", href: "/review", icon: ShieldCheck },
+              { name: "报告中心", href: "/reports", icon: FileText },
+              { name: "企业健康", href: "/enterprise", icon: Users },
+              { name: "财务结算", href: "/finance", icon: Wallet },
+            ].map((x) => (
+              <a key={x.href} href={"#" + x.href}>
+                <x.icon size={20} />
+                {x.name}
+                <ArrowUpRight size={14} />
+              </a>
+            ))}
+          </div>
+        </section>
+        <section className="panel schedule-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>今日预约</h2>
+              <p>全部为合成演示客户</p>
+            </div>
+            <LinkButton href="/appointments">全部预约</LinkButton>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>体检客户</th>
+                <th>预约时间</th>
+                <th>体检套餐</th>
+                <th>所属单位</th>
+                <th>当前状态</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {state.appointments.slice(0, 5).map((a) => {
+                const p = state.patients.find((p) => p.id === a.patientId)!;
+                return (
+                  <tr key={a.id}>
+                    <td>
+                      <div className="person">
+                        <span className="avatar">{p.name.slice(-2)}</span>
+                        <div>
+                          <strong>{p.name}</strong>
+                          <small>
+                            {p.sex} · {p.age}岁
+                          </small>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{a.time}</td>
+                    <td>
+                      {state.packages.find((p) => p.id === a.packageId)?.name}
+                    </td>
+                    <td>{p.company}</td>
+                    <td>
+                      <StatusBadge status={a.status} />
+                    </td>
+                    <td>
+                      <a
+                        className="link-btn"
+                        href={"#/appointments?selected=" + a.id}
+                      >
+                        查看 <ArrowRight size={14} />
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </>
+  );
+}
+export function Appointments() {
+  const { state, act } = useDemo();
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [filterDate, setFilterDate] = useState("");
+  const [filterCampus, setFilterCampus] = useState("all");
+  const [open, setOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [detail, setDetail] = useState(
+    new URLSearchParams(window.location.hash.split("?")[1] || "").get(
+      "selected",
+    ) || "",
+  );
+  const [patient, setPatient] = useState("P001");
+  const [pkg, setPkg] = useState("PK02");
+  const [date, setDate] = useState(today());
+  const [time, setTime] = useState("08:00–08:30");
+  const [campus, setCampus] = useState(state.config.campus);
+  const [discount, setDiscount] = useState(100);
+  const [extra, setExtra] = useState(false);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const list = state.appointments.filter((a) => {
+    const p = state.patients.find((p) => p.id === a.patientId);
+    return (
+      (!q || [a.id, p?.name, p?.company].join("").includes(q)) &&
+      (filter === "all" || a.status === filter) &&
+      (!filterDate || a.date === filterDate) &&
+      (filterCampus === "all" || a.campus === filterCampus)
+    );
+  });
+  const a = state.appointments.find((a) => a.id === detail);
+  const pack = state.packages.find((x) => x.id === pkg)!;
+  const historyPatient = state.patients.find((p) => p.id === patient)!;
+  const historyOrder = state.appointments.find(
+    (a) => a.patientId === patient && a.history,
+  );
+  const recommendation =
+    historyPatient.risk === "A类"
+      ? "颈动脉彩超"
+      : historyPatient.risk === "B类"
+        ? "血脂复查"
+        : "健康教育咨询";
+  const submit = () => {
+    const availability = getBookingAvailability(state, date);
+    if (!availability.allowed) return setError(availability.error);
+    if (discount < state.config.discountMin * 100)
+      return setError("折扣超出当前权限，请在审批中心申请授权（演示）");
+    act({
+      type: "CREATE_APPOINTMENT",
+      payload: {
+        patientId: patient,
+        packageId: pkg,
+        date,
+        time,
+        campus,
+        amount: Math.round((pack.price * discount) / 100) + (extra ? 80 : 0),
+        items: [...pack.items, ...(extra ? [recommendation] : [])],
+        source: "前台登记",
+        note,
+      },
+    });
+    setOpen(false);
+  };
+  return (
+    <>
+      <PageTitle
+        eyebrow="PRE-EXAM / 检前服务"
+        title="预约与开单登记"
+        description="个检、团检、多院区预约统一管理，订单与患者端实时联动。"
+        actions={
+          <>
+            <button
+              className="btn"
+              onClick={() =>
+                exportCsv(
+                  "预约明细.csv",
+                  list.map((a) => ({
+                    体检号: a.id,
+                    客户: state.patients.find((p) => p.id === a.patientId)
+                      ?.name,
+                    日期: a.date,
+                    状态: statusNames[a.status],
+                    金额: a.amount,
+                  })),
+                )
+              }
+            >
+              <Download size={16} />
+              导出
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setOpen(true);
+                setError("");
+              }}
+            >
+              <Plus size={16} />
+              新建预约
+            </button>
+          </>
+        }
+      />
+      <div className="metrics compact">
+        <Metric label="预约总量" value={state.appointments.length} unit="人" />
+        <Metric
+          label="待到检"
+          value={state.appointments.filter((a) => a.status === "paid").length}
+          unit="人"
+        />
+        <Metric
+          label="今日剩余名额"
+          value={Math.max(
+            0,
+            state.config.dailyCapacity -
+              state.appointments.filter(
+                (a) => a.date === today() && a.status !== "cancelled",
+              ).length,
+          )}
+          unit="个"
+        />
+        <Metric
+          label="当前院区"
+          value={state.config.campus}
+          note="到检时可自主选择院区"
+        />
+      </div>
+      <section className="panel">
+        <div className="toolbar">
+          <div className="search-field">
+            <Search size={16} />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="搜索姓名、体检号、单位"
+              aria-label="搜索预约"
+            />
+          </div>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="预约状态"
+          >
+            <option value="all">全部订单状态</option>
+            {Object.entries(statusNames).map(([v, n]) => (
+              <option key={v} value={v}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            aria-label="筛选预约日期"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+          />
+          <select
+            aria-label="筛选预约院区"
+            value={filterCampus}
+            onChange={(e) => setFilterCampus(e.target.value)}
+          >
+            <option value="all">全部院区</option>
+            <option>中心院区</option>
+            <option>东院区</option>
+          </select>
+          <span className="spacer" />
+          <button
+            className="btn"
+            disabled={!selected.length}
+            onClick={() => {
+              selected.forEach((id) =>
+                act({ type: "CHECKIN", payload: { id } }),
+              );
+              setSelected([]);
+            }}
+          >
+            批量到检 ({selected.length})
+          </button>
+          <button className="btn" onClick={() => setImporting(true)}>
+            团检 CSV 导入
+          </button>
+        </div>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    aria-label="全选预约"
+                    checked={list.length > 0 && selected.length === list.length}
+                    onChange={(e) =>
+                      setSelected(e.target.checked ? list.map((a) => a.id) : [])
+                    }
+                  />
+                </th>
+                <th>客户 / 体检号</th>
+                <th>预约信息</th>
+                <th>项目进度</th>
+                <th>金额</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((a) => {
+                const p = state.patients.find((p) => p.id === a.patientId)!;
+                return (
+                  <tr key={a.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(a.id)}
+                        aria-label={`选择${p.name}`}
+                        onChange={(e) =>
+                          setSelected(
+                            e.target.checked
+                              ? [...selected, a.id]
+                              : selected.filter((x) => x !== a.id),
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      <strong>{p.name}</strong>
+                      <small>
+                        {a.id} · {p.company}
+                      </small>
+                    </td>
+                    <td>
+                      {a.date} {a.time}
+                      <small>
+                        {a.campus} · {a.source || "在线预约"}
+                      </small>
+                    </td>
+                    <td>
+                      <span>
+                        {Object.keys(a.results).length} / {a.items.length} 项
+                      </span>
+                      <div className="progress">
+                        <i
+                          style={{
+                            width: `${(Object.keys(a.results).length / a.items.length) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </td>
+                    <td>¥{a.amount.toFixed(2)}</td>
+                    <td>
+                      <StatusBadge status={a.status} />
+                      {a.locked && <small>已锁定</small>}
+                    </td>
+                    <td>
+                      <button
+                        className="text-btn"
+                        onClick={() => setDetail(a.id)}
+                      >
+                        详情
+                      </button>
+                      {a.status === "booked" && (
+                        <button
+                          className="text-btn"
+                          onClick={() =>
+                            act({ type: "PAYMENT", payload: { id: a.id } })
+                          }
+                        >
+                          模拟收款
+                        </button>
+                      )}
+                      {a.status === "paid" && (
+                        <button
+                          className="text-btn"
+                          onClick={() =>
+                            act({
+                              type: "CHECKIN",
+                              payload: {
+                                id: a.id,
+                                campus: state.config.campus,
+                              },
+                            })
+                          }
+                        >
+                          到检
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!list.length && <Empty />}
+        </div>
+        <div className="table-footer">
+          共 {list.length} 条 · 支持状态筛选、组合搜索及批量处理
+          <span>仅保存于当前浏览器</span>
+        </div>
+      </section>
+      {importing && (
+        <Modal
+          title="团检名单导入与校验"
+          onClose={() => setImporting(false)}
+          wide
+        >
+          <Suspense fallback={<p>正在加载名单校验…</p>}>
+            <GroupImport onClose={() => setImporting(false)} />
+          </Suspense>
+        </Modal>
+      )}
+      {open && (
+        <Modal title="新建体检预约" onClose={() => setOpen(false)} wide>
+          <div className="form-grid">
+            <label>
+              体检人
+              <select
+                value={patient}
+                onChange={(e) => {
+                  setPatient(e.target.value);
+                  setExtra(false);
+                }}
+              >
+                {state.patients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} · {p.sex} · {p.age} 岁（合成）
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              体检院区
+              <select
+                value={campus}
+                onChange={(e) => setCampus(e.target.value)}
+              >
+                <option>中心院区</option>
+                <option>东院区</option>
+              </select>
+            </label>
+            <label>
+              预约日期
+              <input
+                type="date"
+                min={today()}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </label>
+            <label>
+              时段
+              <select value={time} onChange={(e) => setTime(e.target.value)}>
+                <option>08:00–08:30</option>
+                <option>08:30–09:00</option>
+                <option>09:00–09:30</option>
+              </select>
+            </label>
+            <label>
+              体检套餐
+              <select value={pkg} onChange={(e) => setPkg(e.target.value)}>
+                {state.packages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ¥{p.price}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              折扣百分比
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={discount}
+                onChange={(e) =>
+                  setDiscount(
+                    Math.max(0, Math.min(100, Number(e.target.value))),
+                  )
+                }
+              />
+            </label>
+          </div>
+          <div className="callout">
+            <HeartPulse size={20} />
+            <div>
+              <strong>历次异常参考 · 合成历史</strong>
+              <p>
+                {historyPatient.name}的合成记录：上次空腹血糖{" "}
+                {historyOrder?.history?.["空腹血糖"]?.[0] || "未收录"}，血压{" "}
+                {historyOrder?.history?.["一般检查"]?.[0] || "未收录"}，分组{" "}
+                {historyPatient.risk}
+                。推荐项目仅用于演示，临床适应证须由医生判断。
+              </p>
+              <label className="check-line">
+                <input
+                  type="checkbox"
+                  checked={extra}
+                  onChange={(e) => setExtra(e.target.checked)}
+                />
+                增加{recommendation} · ¥80
+              </label>
+            </div>
+          </div>
+          <label className="field">
+            既往史 / 备注
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="仅录入演示内容，请勿填入真实健康信息"
+            />
+          </label>
+          {error && <p className="error">{error}</p>}
+          <div className="modal-actions">
+            <strong>
+              合计 ¥
+              {Math.round((pack.price * discount) / 100) + (extra ? 80 : 0)}
+            </strong>
+            <button className="btn" onClick={() => setOpen(false)}>
+              取消
+            </button>
+            <button className="btn btn-primary" onClick={submit}>
+              确认预约
+            </button>
+          </div>
+        </Modal>
+      )}
+      {a && (
+        <Modal
+          title={`订单详情 · ${state.patients.find((p) => p.id === a.patientId)?.name}`}
+          onClose={() => setDetail("")}
+          wide
+        >
+          <div className="detail-grid">
+            <div>
+              <label>体检号</label>
+              <p>{a.id}</p>
+            </div>
+            <div>
+              <label>订单状态</label>
+              <p>
+                <StatusBadge status={a.status} />
+              </p>
+            </div>
+            <div>
+              <label>院区（可自由更换）</label>
+              <select
+                value={a.campus}
+                disabled={a.locked}
+                onChange={(e) =>
+                  act({
+                    type: "UPDATE_APPOINTMENT",
+                    payload: { id: a.id, campus: e.target.value },
+                  })
+                }
+              >
+                <option>中心院区</option>
+                <option>东院区</option>
+              </select>
+            </div>
+            <div>
+              <label>预约日期</label>
+              <input
+                type="date"
+                value={a.date}
+                min={today()}
+                disabled={a.locked}
+                onChange={(e) => {
+                  const available = getBookingAvailability(
+                    state,
+                    e.target.value,
+                    a.id,
+                  );
+                  if (!available.allowed) {
+                    setError(available.error);
+                    return;
+                  }
+                  setError("");
+                  act({
+                    type: "UPDATE_APPOINTMENT",
+                    payload: { id: a.id, date: e.target.value },
+                  });
+                }}
+              />
+            </div>
+          </div>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <h3>检查项目与结果</h3>
+          <div className="item-grid">
+            {a.items.map((x) => (
+              <div key={x}>
+                <span>{x}</span>
+                <Badge tone={a.results[x] ? "green" : "gray"}>
+                  {a.results[x] || "待检查"}
+                </Badge>
+                <button
+                  className="text-btn danger"
+                  disabled={
+                    a.locked || a.items.length <= 1 || !state.config.allowRemove
+                  }
+                  onClick={() =>
+                    act({
+                      type: "UPDATE_APPOINTMENT",
+                      payload: {
+                        id: a.id,
+                        items: a.items.filter((i) => i !== x),
+                        waived: [...(a.waived || []), x],
+                      },
+                    })
+                  }
+                >
+                  弃检
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="actions">
+            <button
+              className="btn"
+              disabled={a.locked || !state.config.allowAdd}
+              onClick={() =>
+                act({
+                  type: "UPDATE_APPOINTMENT",
+                  payload: {
+                    id: a.id,
+                    items: [...new Set([...a.items, "肺功能"])],
+                    amount: a.items.includes("肺功能")
+                      ? a.amount
+                      : a.amount + 50,
+                  },
+                })
+              }
+            >
+              加项：肺功能 ¥50
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                act({
+                  type: "CREATE_APPOINTMENT",
+                  payload: {
+                    patientId: a.patientId,
+                    packageId: a.packageId,
+                    items: a.items,
+                    amount: a.amount,
+                  },
+                });
+                setDetail("");
+              }}
+            >
+              克隆预约
+            </button>
+            <button
+              className="btn"
+              onClick={() =>
+                act({
+                  type: "UPDATE_APPOINTMENT",
+                  payload: { id: a.id, locked: !a.locked },
+                })
+              }
+            >
+              {a.locked ? "解锁订单" : "锁定订单"}
+            </button>
+            <button
+              className="btn danger"
+              disabled={a.locked || !["booked", "paid"].includes(a.status)}
+              onClick={() =>
+                act({
+                  type: "UPDATE_APPOINTMENT",
+                  payload: { id: a.id, status: "cancelled" },
+                })
+              }
+            >
+              取消预约
+            </button>
+          </div>
+          <div className="notice">
+            变更、加项、弃检、到检均写入操作追踪；取消保留历史订单。真实退款和身份验证未接入。
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+export function Exam() {
+  const { state, act } = useDemo();
+  const list = state.appointments.filter((a) =>
+    ["checked", "in_exam"].includes(a.status),
+  );
+  const [id, setId] = useState(list[0]?.id || "");
+  const [department, setDepartment] = useState("全科检查");
+  const a = list.find((a) => a.id === id) || list[0];
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const [summary, setSummary] = useState("");
+  const [override, setOverride] = useState(false);
+  const [sample, setSample] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [critical, setCritical] = useState(false);
+  if (!a)
+    return (
+      <>
+        <PageTitle
+          title="分检工作站"
+          description="先在开单登记完成到检，再进行科室检查。"
+        />
+        <Empty text="当前无待检查客户" />
+        <a className="btn btn-primary" href="#/appointments">
+          前往登记
+        </a>
+      </>
+    );
+  const p = state.patients.find((p) => p.id === a.patientId)!;
+  const values = { ...a.results, ...draft };
+  const isCritical = Number(values["空腹血糖"]) >= state.config.criticalGlucose;
+  const save = (complete: boolean) => {
+    if (a.locked) return setError("订单已锁定，不能保存或上报新的检查结果。");
+    if (complete && a.items.some((x) => !values[x]?.trim()))
+      return setError("仍有未录入的检查项目，请补全或在订单中登记弃检。");
+    if (values["空腹血糖"] && !Number.isFinite(Number(values["空腹血糖"])))
+      return setError("空腹血糖必须为数值型结果（mmol/L），不能提交文字。");
+    if (isCritical && (!override || !summary.trim()))
+      return setError(
+        "结果触发演示异常阈值，请确认已复核，并填写分检小结后提交。",
+      );
+    act({
+      type: "SAVE_RESULTS",
+      payload: { id: a.id, results: values, complete, conclusion: summary },
+    });
+    if (isCritical) {
+      act({
+        type: "UPSERT_RECORD",
+        payload: {
+          collection: "alerts",
+          record: {
+            id: "ALERT-" + a.id,
+            title: "空腹血糖异常（演示）",
+            patientId: p.id,
+            appointmentId: a.id,
+            status: "待处理",
+            value: values["空腹血糖"],
+            risk: "A类",
+          },
+        },
+      });
+      setCritical(true);
+    }
+    setDraft({});
+    setError("");
+  };
+  return (
+    <>
+      <PageTitle
+        eyebrow="CLINICAL / 科室工作站"
+        title="分检工作站"
+        description="采样登记、结果录入与异常上报。数值阈值仅为交互测试样例。"
+        actions={
+          <select
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+          >
+            <option>全科检查</option>
+            <option>检验科</option>
+            <option>超声科</option>
+            <option>采样工作站</option>
+          </select>
+        }
+      />
+      <div className="clinical-layout">
+        <aside className="panel patient-list">
+          <h3>
+            今日候检 <Badge>{list.length}</Badge>
+          </h3>
+          {list.map((x) => {
+            const p = state.patients.find((p) => p.id === x.patientId)!;
+            return (
+              <button
+                className={a.id === x.id ? "selected" : ""}
+                key={x.id}
+                onClick={() => {
+                  setId(x.id);
+                  setDraft({});
+                  setSummary("");
+                  setError("");
+                  setOverride(false);
+                }}
+              >
+                <span className="avatar">{p.name.slice(-2)}</span>
+                <span>
+                  <strong>{p.name}</strong>
+                  <small>
+                    {p.sex} · {p.age}岁 · {x.id.slice(-4)}
+                  </small>
+                </span>
+                <StatusBadge status={x.status} />
+              </button>
+            );
+          })}
+        </aside>
+        <section className="panel clinical-main">
+          <div className="clinical-person">
+            <span className="avatar large">{p.name.slice(-2)}</span>
+            <div>
+              <h2>
+                {p.name} <Badge tone="gray">合成客户</Badge>
+              </h2>
+              <p>
+                {p.sex} · {p.age}岁 · {p.company} · {a.campus}
+              </p>
+            </div>
+            <div className="spacer" />
+            <button
+              className="btn"
+              onClick={() => setShowHistory(!showHistory)}
+            >
+              <Clock size={16} />
+              历次结果
+            </button>
+            <button className="btn" onClick={() => setSample(true)}>
+              <ScanLine size={16} />
+              采样条码
+            </button>
+          </div>
+          <div className="notice">
+            检前信息：久坐、运动不足（合成问卷）。影像 / LIS /
+            身份照片为模拟状态，无真实数据接口。
+          </div>
+          {showHistory && (
+            <div className="callout">
+              <Clock size={20} />
+              <div>
+                <strong>历次合成结果：2025 / 2024 / 2023</strong>
+                <p>
+                  空腹血糖：6.4 / 6.1 / 5.8 mmol/L；血压：132/86 / 130/84 /
+                  128/82 mmHg
+                </p>
+                <button
+                  className="text-btn"
+                  onClick={() =>
+                    setDraft(
+                      Object.fromEntries(
+                        a.items.map((x) => [
+                          x,
+                          x === "空腹血糖" ? "6.4" : "正常",
+                        ]),
+                      ),
+                    )
+                  }
+                >
+                  带入上次结果（仍需人工复核）
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="panel-heading">
+            <h3>{department} · 检查结果</h3>
+            <button
+              className="text-btn"
+              onClick={() =>
+                setDraft(
+                  Object.fromEntries(
+                    a.items.map((x) => [
+                      x,
+                      x === "空腹血糖"
+                        ? "5.8"
+                        : x === "一般检查"
+                          ? "128/82"
+                          : "正常",
+                    ]),
+                  ),
+                )
+              }
+            >
+              填入正常示例
+            </button>
+          </div>
+          <table className="results-table">
+            <thead>
+              <tr>
+                <th>检查项目</th>
+                <th>本次结果</th>
+                <th>参考 / 类型</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              {a.items.map((x) => (
+                <tr key={x}>
+                  <td>
+                    <strong>{x}</strong>
+                    <small>{x === "空腹血糖" ? "mmol/L" : "科室检查"}</small>
+                  </td>
+                  <td>
+                    <input
+                      aria-label={x + "结果"}
+                      value={values[x] || ""}
+                      onChange={(e) =>
+                        setDraft({ ...draft, [x]: e.target.value })
+                      }
+                      placeholder={
+                        x === "空腹血糖" ? "输入数值" : "输入检查所见"
+                      }
+                    />
+                  </td>
+                  <td>
+                    {x === "空腹血糖"
+                      ? "数值型 · 演示阈值 " + state.config.criticalGlucose
+                      : "描述型"}
+                  </td>
+                  <td>
+                    <Badge
+                      tone={
+                        x === "空腹血糖" && isCritical
+                          ? "red"
+                          : values[x]
+                            ? "green"
+                            : "gray"
+                      }
+                    >
+                      {x === "空腹血糖" && isCritical
+                        ? "异常待复核"
+                        : values[x]
+                          ? "已录入"
+                          : "待录入"}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <label className="field">
+            分检小结 / 医学建议（演示）
+            <textarea
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="填写所见、小结与建议；演示数据不用于临床决策"
+            />
+          </label>
+          {isCritical && (
+            <label className="check-line">
+              <input
+                type="checkbox"
+                checked={override}
+                onChange={(e) => setOverride(e.target.checked)}
+              />
+              已复核异常结果，确认继续并进入异常上报流程
+            </label>
+          )}
+          {error && (
+            <p role="alert" className="error">
+              {error}
+            </p>
+          )}
+          <div className="modal-actions">
+            <span>
+              {Object.keys(values).filter((x) => values[x]).length} /{" "}
+              {a.items.length} 项已录入
+            </span>
+            <button className="btn" onClick={() => save(false)}>
+              保存草稿
+            </button>
+            <button className="btn btn-primary" onClick={() => save(true)}>
+              <Check size={16} />
+              提交分检结果
+            </button>
+          </div>
+        </section>
+      </div>
+      {sample && (
+        <Modal title="采样与条码工作站 · 模拟" onClose={() => setSample(false)}>
+          <p>
+            {p.name} · {a.id}
+          </p>
+          <div className="fake-barcode" aria-label="演示条码" />
+          <div className="detail-grid">
+            <div>
+              标本类型<strong>静脉血 / 尿液</strong>
+            </div>
+            <div>
+              检验组合<strong>血常规、肝肾功能、血脂</strong>
+            </div>
+          </div>
+          <div className="actions">
+            <button
+              className="btn"
+              onClick={() =>
+                act({
+                  type: "ADD_AUDIT",
+                  payload: { message: `模拟条码打印/补打 ${a.id}` },
+                })
+              }
+            >
+              模拟打印 / 补打
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                act({
+                  type: "UPDATE_APPOINTMENT",
+                  payload: { id: a.id, sampled: true },
+                });
+                setSample(false);
+              }}
+            >
+              确认标本采集
+            </button>
+          </div>
+        </Modal>
+      )}
+      {critical && (
+        <Modal title="重大异常已上报" onClose={() => setCritical(false)}>
+          <div className="callout alert">
+            <TriangleAlert />
+            <p>
+              异常已进入全局待办。请由健康管理岗位记录处置结果，并选择是否持续随访。当前仅模拟消息，不发送真实通知。
+            </p>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => setCritical(false)}
+          >
+            我已知晓
+          </button>
+        </Modal>
+      )}
+    </>
+  );
+}
+export function Review() {
+  const { state, act } = useDemo();
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const daysOld = (a: Appointment) =>
+    Math.floor((Date.now() - new Date(a.date).getTime()) / 86400000);
+  const list = state.appointments
+    .filter(
+      (a) =>
+        a.status === "review" &&
+        (!overdueOnly || daysOld(a) > state.config.reportDeadline),
+    )
+    .sort((a, b) => daysOld(b) - daysOld(a));
+  const [id, setId] = useState(list[0]?.id || "");
+  const [text, setText] = useState("");
+  const [reason, setReason] = useState("");
+  const [reject, setReject] = useState(false);
+  const [abnormal, setAbnormal] = useState(false);
+  const a = list.find((x) => x.id === id) || list[0];
+  if (!a)
+    return (
+      <>
+        <PageTitle
+          title="总检审核工作站"
+          description="所有当前报告已处理，可从分检工作站提交新的报告。"
+        />
+        <Empty text="没有待审核报告" />
+        {overdueOnly && (
+          <button className="btn" onClick={() => setOverdueOnly(false)}>
+            显示全部待审核报告
+          </button>
+        )}
+      </>
+    );
+  const p = state.patients.find((p) => p.id === a.patientId)!;
+  return (
+    <>
+      <PageTitle
+        eyebrow="REVIEW / 报告质控"
+        title="总检审核工作站"
+        description="初审、主检、总检三级递进，所有审核与驳回操作留痕。"
+      />
+      <div className="clinical-layout">
+        <aside className="panel patient-list">
+          <h3>
+            待审核报告 <Badge>{list.length}</Badge>
+          </h3>
+          <label className="check-line">
+            <input
+              type="checkbox"
+              checked={overdueOnly}
+              onChange={(e) => setOverdueOnly(e.target.checked)}
+            />
+            仅看超期报告
+          </label>
+          {list.map((x) => (
+            <button
+              key={x.id}
+              className={x.id === a.id ? "selected" : ""}
+              onClick={() => {
+                setId(x.id);
+                setText("");
+              }}
+            >
+              <span className="avatar">
+                {state.patients
+                  .find((p) => p.id === x.patientId)
+                  ?.name.slice(-2)}
+              </span>
+              <span>
+                <strong>
+                  {state.patients.find((p) => p.id === x.patientId)?.name}
+                </strong>
+                <small>
+                  {["初审", "主检", "总检"][x.reviewStage || 0]} ·{" "}
+                  {x.doctor || "未分配"}
+                </small>
+                {daysOld(x) > state.config.reportDeadline && (
+                  <Badge tone="red">超期{daysOld(x)}天</Badge>
+                )}
+              </span>
+              <ChevronRight size={16} />
+            </button>
+          ))}
+        </aside>
+        <section className="panel clinical-main">
+          <div className="clinical-person">
+            <div>
+              <h2>{p.name} 的体检报告</h2>
+              <p>
+                {a.id} · {p.sex} / {p.age} 岁 · {a.campus}
+              </p>
+            </div>
+            <div className="spacer" />
+            <Badge tone={p.risk === "A类" ? "red" : "amber"}>{p.risk}</Badge>
+            <button
+              className="btn"
+              onClick={() =>
+                act({
+                  type: "UPDATE_APPOINTMENT",
+                  payload: { id: a.id, locked: !a.locked },
+                })
+              }
+            >
+              {a.locked ? "解除审核锁定" : "锁定报告"}
+            </button>
+          </div>
+          <div className="review-steps">
+            {["初审", "主检", "总检"].map((x, i) => (
+              <div
+                className={(a.reviewStage || 0) >= i ? "active" : ""}
+                key={x}
+              >
+                <span>
+                  {(a.reviewStage || 0) > i ? <Check size={15} /> : i + 1}
+                </span>
+                {x}
+                <small>
+                  {(a.reviewStage || 0) > i
+                    ? "已完成"
+                    : (a.reviewStage || 0) === i
+                      ? "当前环节"
+                      : "待处理"}
+                </small>
+              </div>
+            ))}
+          </div>
+          <div className="panel-heading">
+            <h3>结果核对与历年对比</h3>
+            <label className="check-line">
+              <input
+                type="checkbox"
+                checked={abnormal}
+                onChange={(e) => setAbnormal(e.target.checked)}
+              />
+              仅看异常
+            </label>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>检查项目</th>
+                <th>本次结果</th>
+                <th>上次结果</th>
+                <th>质控提示</th>
+              </tr>
+            </thead>
+            <tbody>
+              {a.items
+                .filter(
+                  (x) =>
+                    !abnormal ||
+                    (x === "空腹血糖" && Number(a.results[x]) > 6.1),
+                )
+                .map((x) => (
+                  <tr key={x}>
+                    <td>{x}</td>
+                    <td>
+                      <strong
+                        className={
+                          x === "空腹血糖" && Number(a.results[x]) > 6.1
+                            ? "danger"
+                            : ""
+                        }
+                      >
+                        {a.results[x] || "未回传"}
+                      </strong>
+                    </td>
+                    <td>
+                      {x === "空腹血糖"
+                        ? "6.4"
+                        : x === "一般检查"
+                          ? "132/86"
+                          : "— 未收录"}
+                    </td>
+                    <td>
+                      {!a.results[x] ? (
+                        <Badge tone="red">结果缺失</Badge>
+                      ) : x === "空腹血糖" && Number(a.results[x]) > 6.1 ? (
+                        <Badge tone="amber">需复核</Badge>
+                      ) : (
+                        <Badge tone="gray">已核对</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          <div className="callout">
+            <Activity size={20} />
+            <div>
+              <strong>辅助主检 · 本地规则模拟</strong>
+              <p>
+                关联异常合并与文书质控演示，不使用医疗 AI 服务，不构成医学建议。
+              </p>
+              <button
+                className="text-btn"
+                onClick={() =>
+                  setText(analyzeDemoResults(a.results).conclusion)
+                }
+              >
+                生成关联异常综合建议
+              </button>
+            </div>
+          </div>
+          <label className="field">
+            综合结论与指导意见
+            <textarea
+              rows={4}
+              value={text || a.conclusion}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="审核者填写综合建议，或使用上方演示规则生成后编辑"
+            />
+          </label>
+          <div className="actions">
+            <label>
+              责任医生
+              <select
+                value={a.doctor || "周医生"}
+                onChange={(e) =>
+                  act({
+                    type: "UPDATE_APPOINTMENT",
+                    payload: { id: a.id, doctor: e.target.value },
+                  })
+                }
+              >
+                <option>周医生</option>
+                <option>余医生</option>
+              </select>
+            </label>
+            <button
+              className="btn"
+              onClick={() => {
+                act({
+                  type: "ADD_TASK",
+                  payload: {
+                    patientId: p.id,
+                    title: "总检异常跟进",
+                    risk: p.risk,
+                  },
+                });
+              }}
+            >
+              创建随访任务
+            </button>
+          </div>
+          <div className="modal-actions">
+            <button className="btn danger" onClick={() => setReject(true)}>
+              驳回重检
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={
+                a.items.some((x) => !a.results[x]) ||
+                !(text || a.conclusion).trim()
+              }
+              onClick={() => {
+                act({
+                  type: "REVIEW",
+                  payload: {
+                    id: a.id,
+                    conclusion: text || a.conclusion,
+                    expectedStage: a.reviewStage || 0,
+                  },
+                });
+                setText("");
+              }}
+            >
+              通过{["初审", "主检", "总检"][a.reviewStage || 0]}
+            </button>
+          </div>
+        </section>
+      </div>
+      {reject && (
+        <Modal title="退回报告" onClose={() => setReject(false)}>
+          <label className="field">
+            驳回原因（必填）
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="填写需要补充/复核的项目与原因"
+            />
+          </label>
+          <div className="modal-actions">
+            <button className="btn" onClick={() => setReject(false)}>
+              取消
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={!reason.trim()}
+              onClick={() => {
+                act({ type: "REJECT", payload: { id: a.id, reason } });
+                setReject(false);
+              }}
+            >
+              确认驳回
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+export function Reports() {
+  const { state, act } = useDemo();
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState("");
+  const [history, setHistory] = useState(2);
+  const [years, setYears] = useState<number[]>([2025, 2024, 2023]);
+  const [template, setTemplate] = useState("年度健康报告");
+  const [batch, setBatch] = useState<string[]>([]);
+  const [cabinet, setCabinet] = useState("");
+  const list = state.appointments.filter(
+    (a) =>
+      ["approved", "printed"].includes(a.status) &&
+      [a.id, state.patients.find((p) => p.id === a.patientId)?.name]
+        .join("")
+        .includes(q),
+  );
+  const a = state.appointments.find((a) => a.id === selected);
+  const reportText = (a: Appointment) =>
+    `${template}\n【合成演示报告，不用于医疗诊断】\n姓名：${state.patients.find((p) => p.id === a.patientId)?.name}\n体检号：${a.id}\n日期：${a.date}\n${a.items.map((i) => i + "：" + a.results[i]).join("\n")}\n综合结论：${a.conclusion}`;
+  return (
+    <>
+      <PageTitle
+        eyebrow="REPORTS / 报告中心"
+        title="体检报告与档案"
+        description="审核通过后可预览、打印、装订、入库与发放。硬件操作仅为模拟。"
+        actions={
+          <a className="btn btn-primary" href="#/kiosk?mode=report">
+            <Printer size={16} />
+            报告自助机
+          </a>
+        }
+      />
+      <section className="panel">
+        <div className="toolbar">
+          <div className="search-field">
+            <Search size={16} />
+            <input
+              aria-label="搜索报告"
+              placeholder="姓名 / 体检号"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <span className="spacer" />
+          <button
+            className="btn"
+            disabled={!batch.length}
+            onClick={() => {
+              batch.forEach((id) =>
+                act({
+                  type: "UPDATE_APPOINTMENT",
+                  payload: {
+                    id,
+                    delivered: true,
+                    deliveredAt: new Date().toISOString(),
+                    deliveryMethod: "单位批量领取",
+                  },
+                }),
+              );
+              exportCsv(
+                "批量报告发放单.csv",
+                list
+                  .filter((a) => batch.includes(a.id))
+                  .map((a) => ({
+                    体检号: a.id,
+                    姓名: state.patients.find((p) => p.id === a.patientId)
+                      ?.name,
+                    发放方式: "单位批量领取",
+                    发放时间: new Date().toISOString(),
+                  })),
+              );
+              setBatch([]);
+            }}
+          >
+            批量领取 / 发放单 ({batch.length})
+          </button>
+          <button
+            className="btn"
+            disabled={!batch.length}
+            onClick={() =>
+              batch.forEach((id) => act({ type: "PRINT", payload: { id } }))
+            }
+          >
+            批量模拟打印
+          </button>
+          <button
+            className="btn"
+            onClick={() =>
+              exportCsv(
+                "报告档案.csv",
+                list.map((a) => ({
+                  编号: a.id,
+                  姓名: state.patients.find((p) => p.id === a.patientId)?.name,
+                  打印时间: a.printedAt || "",
+                  报告柜: a.cabinet || "",
+                  领取: a.delivered ? "已领取" : "未领取",
+                })),
+              )
+            }
+          >
+            导出档案
+          </button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  aria-label="全选报告"
+                  checked={list.length > 0 && batch.length === list.length}
+                  onChange={(e) =>
+                    setBatch(e.target.checked ? list.map((a) => a.id) : [])
+                  }
+                />
+              </th>
+              <th>体检客户</th>
+              <th>报告日期</th>
+              <th>审核状态</th>
+              <th>打印次数</th>
+              <th>存放位置</th>
+              <th>领取状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((a) => (
+              <tr key={a.id}>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={"选择报告" + a.id}
+                    checked={batch.includes(a.id)}
+                    onChange={(e) =>
+                      setBatch(
+                        e.target.checked
+                          ? [...batch, a.id]
+                          : batch.filter((x) => x !== a.id),
+                      )
+                    }
+                  />
+                </td>
+                <td>
+                  <strong>
+                    {state.patients.find((p) => p.id === a.patientId)?.name}
+                  </strong>
+                  <small>{a.id}</small>
+                </td>
+                <td>{a.date}</td>
+                <td>
+                  <StatusBadge status={a.status} />
+                </td>
+                <td>{a.printCount || 0}</td>
+                <td>{a.cabinet || "未入库"}</td>
+                <td>
+                  <Badge tone={a.delivered ? "green" : "gray"}>
+                    {a.delivered ? "已领取" : "待领取"}
+                  </Badge>
+                </td>
+                <td>
+                  <button
+                    className="text-btn"
+                    onClick={() => setSelected(a.id)}
+                  >
+                    预览 / 管理
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!list.length && <Empty />}
+        <div className="toolbar" style={{ marginTop: 18 }}>
+          <input
+            aria-label="批量报告柜位置"
+            value={cabinet}
+            onChange={(e) => setCabinet(e.target.value)}
+            placeholder="批量移入报告柜，例如 A-02-03"
+          />
+          <button
+            className="btn"
+            disabled={!batch.length || !cabinet.trim()}
+            onClick={() =>
+              batch.forEach((id) =>
+                act({ type: "UPDATE_APPOINTMENT", payload: { id, cabinet } }),
+              )
+            }
+          >
+            批量移柜
+          </button>
+        </div>
+      </section>
+      {a && (
+        <Modal title="体检报告预览与流转" onClose={() => setSelected("")} wide>
+          <div className="toolbar">
+            <select
+              value={template}
+              onChange={(e) => setTemplate(e.target.value)}
+            >
+              <option>年度健康报告</option>
+              <option>入职体检报告</option>
+              <option>VIP 体检报告</option>
+            </select>
+            <label className="check-line">
+              历史对比次数
+              <select
+                aria-label="历史对比次数"
+                value={history}
+                onChange={(e) => setHistory(Number(e.target.value))}
+              >
+                <option value={0}>不展示</option>
+                <option value={1}>1 次</option>
+                <option value={2}>2 次</option>
+                <option value={3}>3 次</option>
+              </select>
+            </label>
+            {[2025, 2024, 2023].map((year) => (
+              <label className="check-line" key={year}>
+                <input
+                  type="checkbox"
+                  checked={years.includes(year)}
+                  onChange={(e) =>
+                    setYears(
+                      e.target.checked
+                        ? [...years, year].sort((a, b) => b - a)
+                        : years.filter((y) => y !== year),
+                    )
+                  }
+                />
+                {year} 年订单
+              </label>
+            ))}
+          </div>
+          <article className="report-paper" id="report-print">
+            <div className="report-mark">青禾 · 健康管理中心</div>
+            <h2>{template}</h2>
+            <p className="report-warning">
+              合成数据 / 展示样本 / 不作为诊疗依据
+            </p>
+            <div className="detail-grid">
+              <div>
+                姓名：{state.patients.find((p) => p.id === a.patientId)?.name}
+              </div>
+              <div>体检号：{a.id}</div>
+              <div>体检日期：{a.date}</div>
+              <div>院区：{a.campus}</div>
+            </div>
+            <h3>检查结果</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>项目</th>
+                  <th>本次</th>
+                  {years.slice(0, history).map((year) => (
+                    <th key={year}>{year}年</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {a.items.map((x) => (
+                  <tr key={x}>
+                    <td>{x}</td>
+                    <td>{a.results[x]}</td>
+                    {years.slice(0, history).map((year) => (
+                      <td key={year}>
+                        {a.history?.[x]?.[2025 - year] || "— 未收录"}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <h3>综合结论</h3>
+            <p>{a.conclusion}</p>
+            <div className="report-sign">
+              审核医生：{a.doctor || "周医生"}（模拟）
+              <span>本报告仅用于软件流程展示</span>
+            </div>
+          </article>
+          <div className="form-grid">
+            <label>
+              报告柜位置
+              <input
+                value={a.cabinet || ""}
+                placeholder="例如 A区-02柜-03格"
+                onChange={(e) =>
+                  act({
+                    type: "UPDATE_APPOINTMENT",
+                    payload: { id: a.id, cabinet: e.target.value },
+                  })
+                }
+              />
+            </label>
+            <label>
+              领取方式
+              <select
+                value={a.deliveryMethod || "个人领取"}
+                onChange={(e) =>
+                  act({
+                    type: "UPDATE_APPOINTMENT",
+                    payload: { id: a.id, deliveryMethod: e.target.value },
+                  })
+                }
+              >
+                <option>个人领取</option>
+                <option>单位领取</option>
+                <option>邮寄（模拟）</option>
+                <option>线上查询</option>
+              </select>
+            </label>
+          </div>
+          <div className="actions">
+            <button
+              className="btn"
+              onClick={() => download(a.id + "-演示报告.txt", reportText(a))}
+            >
+              <Download size={15} />
+              导出文本报告
+            </button>
+            <button className="btn" onClick={() => window.print()}>
+              <Printer size={15} />
+              浏览器打印 / 存 PDF
+            </button>
+            <button
+              className="btn"
+              onClick={() => act({ type: "PRINT", payload: { id: a.id } })}
+            >
+              模拟打印装订
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={a.delivered}
+              onClick={() =>
+                act({
+                  type: "UPDATE_APPOINTMENT",
+                  payload: {
+                    id: a.id,
+                    delivered: true,
+                    deliveredAt: new Date().toISOString(),
+                  },
+                })
+              }
+            >
+              登记领取
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+export { default as Queue } from "./Queue";
+const seedBills = [
+  {
+    id: "B001",
+    name: "星辰科技",
+    total: 125000,
+    paid: 80000,
+    days: 24,
+    deadline: "2026-10-30",
+  },
+  {
+    id: "B002",
+    name: "云海设计",
+    total: 68000,
+    paid: 20000,
+    days: 45,
+    deadline: "2026-09-30",
+  },
+  {
+    id: "B003",
+    name: "远帆制造",
+    total: 98000,
+    paid: 60000,
+    days: 78,
+    deadline: "2026-08-30",
+  },
+  {
+    id: "B004",
+    name: "晨光文创",
+    total: 36000,
+    paid: 0,
+    days: 125,
+    deadline: "2026-07-30",
+  },
+  {
+    id: "B005",
+    name: "同济商贸",
+    total: 19000,
+    paid: 0,
+    days: 210,
+    deadline: "2026-04-30",
+  },
+];
+export function Finance() {
+  const { state, act } = useDemo();
+  const [tab, setTab] = useState("团检账期");
+  const [bill, setBill] = useState("");
+  const [amount, setAmount] = useState(0);
+  const [method, setMethod] = useState("银行回款（模拟）");
+  const [error, setError] = useState("");
+  const bills = seedBills.map((b) => ({
+    ...b,
+    ...state.records.bills?.find((r) => r.id === b.id),
+  }));
+  const selected = bills.find((b) => b.id === bill);
+  const aging = [
+    bills.filter((b) => b.days <= 30),
+    bills.filter((b) => b.days > 30 && b.days <= 60),
+    bills.filter((b) => b.days > 60 && b.days <= 90),
+    bills.filter((b) => b.days > 90 && b.days <= 180),
+    bills.filter((b) => b.days > 180),
+  ].map((bs) => bs.reduce((s, b) => s + b.total - b.paid, 0));
+  return (
+    <>
+      <PageTitle
+        eyebrow="FINANCE / 财务与结算"
+        title="财务结算中心"
+        description="收款、退款、团检分批结算与账龄分析。全部为账务状态模拟。"
+        actions={
+          <button
+            className="btn"
+            onClick={() => exportCsv("团检账龄.csv", bills)}
+          >
+            <Download size={16} />
+            导出结算报表
+          </button>
+        }
+      />
+      <div className="metrics">
+        <Metric
+          label="订单应收总额"
+          value={
+            "¥" +
+            state.appointments
+              .filter((a) => a.status !== "cancelled")
+              .reduce((s, a) => s + a.amount, 0)
+              .toLocaleString()
+          }
+        >
+          <Wallet size={20} />
+        </Metric>
+        <Metric
+          label="团检未结算"
+          value={
+            "¥" +
+            bills.reduce((s, b) => s + b.total - b.paid, 0).toLocaleString()
+          }
+        />
+        <Metric
+          label="逾期 90 天以上"
+          value={"¥" + (aging[3] + aging[4]).toLocaleString()}
+        />
+        <Metric
+          label="开票 / 支付接口"
+          value="模拟状态"
+          note="不产生真实财务凭证"
+        />
+      </div>
+      <div className="tabs">
+        {["团检账期", "个检收退费", "会员卡与开票"].map((t) => (
+          <button
+            key={t}
+            className={t === tab ? "active" : ""}
+            onClick={() => setTab(t)}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+      {tab === "团检账期" ? (
+        <div className="finance-layout">
+          <section className="panel">
+            <div className="panel-heading">
+              <h2>单位结算与回款</h2>
+              <Badge tone="amber">★ 账期 / 账龄</Badge>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>体检单位</th>
+                  <th>合同 / 已回款</th>
+                  <th>未结算金额</th>
+                  <th>账龄</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bills.map((b) => (
+                  <tr key={b.id}>
+                    <td>
+                      <strong>{b.name}</strong>
+                      <small>到期 {b.deadline}</small>
+                    </td>
+                    <td>
+                      ¥{b.total.toLocaleString()}
+                      <small>已回款 ¥{b.paid.toLocaleString()}</small>
+                    </td>
+                    <td>
+                      <strong>¥{(b.total - b.paid).toLocaleString()}</strong>
+                    </td>
+                    <td>
+                      <Badge
+                        tone={
+                          b.days > 90 ? "red" : b.days > 30 ? "amber" : "green"
+                        }
+                      >
+                        {b.days} 天
+                      </Badge>
+                    </td>
+                    <td>
+                      <button
+                        className="text-btn"
+                        disabled={b.paid >= b.total}
+                        onClick={() => {
+                          setBill(b.id);
+                          setAmount(b.total - b.paid);
+                          setError("");
+                        }}
+                      >
+                        分批结算
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+          <section className="panel">
+            <h2>未结算账龄分布</h2>
+            <Bars
+              values={aging.map((v) => v / 1000)}
+              labels={["≤30天", "31–60", "61–90", "91–180", ">180"]}
+            />
+            <p className="muted">
+              单位：千元。原条款 0–30 / 30–60
+              等边界重叠；本演示使用互斥区间，正式计龄规则待院方确认。
+            </p>
+          </section>
+        </div>
+      ) : tab === "个检收退费" ? (
+        <section className="panel">
+          <table>
+            <thead>
+              <tr>
+                <th>客户 / 订单</th>
+                <th>应收</th>
+                <th>单位支付 / 个人支付</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.appointments
+                .filter((a) => a.status !== "cancelled")
+                .map((a) => (
+                  <tr key={a.id}>
+                    <td>
+                      <strong>
+                        {state.patients.find((p) => p.id === a.patientId)?.name}
+                      </strong>
+                      <small>{a.id}</small>
+                    </td>
+                    <td>¥{a.amount}</td>
+                    <td>¥0 / ¥{a.amount}</td>
+                    <td>
+                      <StatusBadge status={a.status} />
+                      {a.refunded && <Badge tone="amber">已模拟退款</Badge>}
+                    </td>
+                    <td>
+                      {a.status === "booked" ? (
+                        <button
+                          className="text-btn"
+                          onClick={() =>
+                            act({
+                              type: "PAYMENT",
+                              payload: { id: a.id, method: "模拟收款" },
+                            })
+                          }
+                        >
+                          模拟收费
+                        </button>
+                      ) : (
+                        <button
+                          className="text-btn"
+                          disabled={a.refunded}
+                          onClick={() =>
+                            act({
+                              type: "UPDATE_APPOINTMENT",
+                              payload: {
+                                id: a.id,
+                                refunded: true,
+                                refundAmount: a.amount,
+                              },
+                            })
+                          }
+                        >
+                          模拟全退
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </section>
+      ) : (
+        <section className="panel">
+          <div className="panel-heading">
+            <h2>会员卡、套餐卡与电子发票</h2>
+            <button
+              className="btn btn-primary"
+              onClick={() =>
+                act({
+                  type: "UPSERT_RECORD",
+                  payload: {
+                    collection: "cards",
+                    record: {
+                      name: "演示会员卡",
+                      balance: 1000,
+                      status: "有效",
+                    },
+                  },
+                })
+              }
+            >
+              新增模拟会员卡
+            </button>
+          </div>
+          {(state.records.cards || []).map((c) => (
+            <div className="queue-row" key={c.id}>
+              <Wallet size={20} />
+              <span>
+                {c.name} · {c.id}
+              </span>
+              <strong>¥{c.balance}</strong>
+              <Badge>{c.status}</Badge>
+              <button
+                className="text-btn"
+                disabled={c.balance <= 0}
+                onClick={() =>
+                  act({
+                    type: "UPSERT_RECORD",
+                    payload: {
+                      collection: "cards",
+                      record: { ...c, balance: Math.max(0, c.balance - 100) },
+                    },
+                  })
+                }
+              >
+                模拟抵扣 ¥100
+              </button>
+            </div>
+          ))}
+          <div className="notice">
+            会员抵扣仅修改本地余额，无真实储值；验证码、税务开票需要生产接口。
+          </div>
+          <div className="actions">
+            {["模拟合并开票", "模拟拆分开票", "模拟发票作废"].map((label) => (
+              <button
+                key={label}
+                className="btn"
+                onClick={() =>
+                  act({
+                    type: "UPSERT_RECORD",
+                    payload: {
+                      collection: "invoices",
+                      record: { title: label, status: "已记录", date: today() },
+                    },
+                  })
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {(state.records.invoices || []).map((x) => (
+            <div className="queue-row" key={x.id}>
+              <span>{x.title}</span>
+              <span>{x.date}</span>
+              <Badge>{x.status}</Badge>
+            </div>
+          ))}
+        </section>
+      )}
+      {selected && (
+        <Modal
+          title={`回款登记 · ${selected.name}`}
+          onClose={() => setBill("")}
+        >
+          <div className="notice">
+            模拟记账，不执行资金转移。剩余应收 ¥{selected.total - selected.paid}
+          </div>
+          <label className="field">
+            本批次回款金额
+            <input
+              type="number"
+              min="0"
+              max={selected.total - selected.paid}
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
+            />
+          </label>
+          <label className="field">
+            付款方式
+            <select value={method} onChange={(e) => setMethod(e.target.value)}>
+              <option>银行回款（模拟）</option>
+              <option>预付款抵扣（模拟）</option>
+              <option>单位自费结算（模拟）</option>
+            </select>
+          </label>
+          {error && <p className="error">{error}</p>}
+          <div className="modal-actions">
+            <button className="btn" onClick={() => setBill("")}>
+              取消
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                if (amount <= 0 || amount > selected.total - selected.paid)
+                  return setError("金额须大于 0，且不能超过剩余应收");
+                act({
+                  type: "UPSERT_RECORD",
+                  payload: {
+                    collection: "bills",
+                    record: {
+                      ...selected,
+                      paid: selected.paid + amount,
+                      method,
+                    },
+                  },
+                });
+                setBill("");
+              }}
+            >
+              登记模拟回款
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+export function Quality() {
+  const { state, act } = useDemo();
+  const [tab, setTab] = useState("质控看板");
+  const [q, setQ] = useState("");
+  const [dismiss, setDismiss] = useState<string[]>([]);
+  const checks = [
+    {
+      id: "Q1",
+      title: "未回传结果检查",
+      level: "提醒",
+      count: state.appointments.filter(
+        (a) =>
+          ["checked", "in_exam"].includes(a.status) &&
+          Object.keys(a.results).length < a.items.length,
+      ).length,
+      desc: "检索在检订单中的未完成项目，避免报告遗漏。",
+      route: "/exam",
+    },
+    {
+      id: "Q2",
+      title: "报告审核积案",
+      level: "待办",
+      count: state.appointments.filter((a) => a.status === "review").length,
+      desc: "按初审 / 主检 / 总检责任医生追踪报告。",
+      route: "/review",
+    },
+    {
+      id: "Q3",
+      title: "A / B 类异常跟进",
+      level: "重点",
+      count: state.tasks.filter(
+        (t) => t.status !== "已完成" && ["A类", "B类"].includes(t.risk),
+      ).length,
+      desc: "异常处置记录、跟踪随访与处理结果。",
+      route: "/health",
+    },
+  ];
+  return (
+    <>
+      <PageTitle
+        eyebrow="QUALITY / 安全与质控"
+        title="质控与操作追踪"
+        description="从检前到报告发放的全过程留痕。生产级安全、审计防篡改与合规需服务端验证。"
+      />
+      <div className="tabs">
+        {["质控看板", "操作追踪", "接口模拟"].map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={tab === t ? "active" : ""}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+      {tab === "质控看板" ? (
+        <>
+          <div className="quality-grid">
+            {checks.map((c) => (
+              <section className="panel" key={c.id}>
+                <div className="panel-heading">
+                  <ShieldCheck size={24} />
+                  <Badge tone={c.level === "重点" ? "red" : "amber"}>
+                    {c.level}
+                  </Badge>
+                </div>
+                <h2>{c.title}</h2>
+                <div className="big-number">
+                  {c.count}
+                  <small>项</small>
+                </div>
+                <p className="muted">{c.desc}</p>
+                <LinkButton href={c.route}>处理相关记录</LinkButton>
+              </section>
+            ))}
+          </div>
+          <section className="panel">
+            <h2>质控配置</h2>
+            <div className="form-grid">
+              <label>
+                报告超期阈值（天）
+                <input
+                  type="number"
+                  min={1}
+                  value={state.config.reportDeadline}
+                  onChange={(e) =>
+                    act({
+                      type: "UPDATE_CONFIG",
+                      payload: {
+                        reportDeadline: Math.max(1, Number(e.target.value)),
+                      },
+                    })
+                  }
+                />
+              </label>
+              <label>
+                异常规则：血糖阈值（演示）
+                <input
+                  type="number"
+                  step="0.1"
+                  value={state.config.criticalGlucose}
+                  onChange={(e) =>
+                    act({
+                      type: "UPDATE_CONFIG",
+                      payload: {
+                        criticalGlucose: Math.max(0, Number(e.target.value)),
+                      },
+                    })
+                  }
+                />
+              </label>
+              <label>
+                报告审核流程
+                <select
+                  value={state.config.reviewStages}
+                  onChange={(e) =>
+                    act({
+                      type: "UPDATE_CONFIG",
+                      payload: { reviewStages: Number(e.target.value) },
+                    })
+                  }
+                >
+                  <option value={3}>初审 → 主检 → 总检</option>
+                  <option value={2}>初审 → 总检（两级演示）</option>
+                </select>
+              </label>
+            </div>
+            <div className="notice">
+              规则仅用于交互展示，未经临床验证；实际 A / B
+              类共识字典、临床知识库和自动诊断不在纯前端验证范围内。
+            </div>
+          </section>
+        </>
+      ) : tab === "操作追踪" ? (
+        <section className="panel">
+          <div className="toolbar">
+            <div className="search-field">
+              <Search size={16} />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                aria-label="搜索审计"
+                placeholder="搜索订单、操作人、行为"
+              />
+            </div>
+            <span className="spacer" />
+            <button
+              className="btn"
+              onClick={() => exportCsv("操作追踪.csv", state.audit)}
+            >
+              导出日志
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>操作角色</th>
+                <th>变更内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.audit
+                .filter((x) => [x.message, x.actor].join("").includes(q))
+                .slice(0, 100)
+                .map((x) => (
+                  <tr key={x.id}>
+                    <td>{new Date(x.time).toLocaleString("zh-CN")}</td>
+                    <td>
+                      <Badge tone="gray">{x.actor}</Badge>
+                    </td>
+                    <td>
+                      {x.message}
+                      {x.before && (
+                        <details>
+                          <summary>查看变更前后</summary>
+                          <pre className="audit-diff">
+                            {JSON.stringify(
+                              {
+                                对象: x.entity,
+                                操作: x.action,
+                                变更前: x.before,
+                                变更后: x.after,
+                              },
+                              null,
+                              2,
+                            )}
+                          </pre>
+                        </details>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </section>
+      ) : (
+        <section className="panel">
+          <h2>接口连接测试台</h2>
+          <p className="muted">
+            以下接口都未连接医院；点击后生成可追踪的本地模拟结果。
+          </p>
+          {[
+            "HIS 医嘱推送",
+            "LIS 检验结果回传",
+            "PACS 影像报告",
+            "微信支付回调",
+            "短信通知服务",
+            "设备采集工作站",
+          ].map((x, i) => (
+            <div className="queue-row" key={x}>
+              <span className="tile-icon teal">
+                <Activity size={18} />
+              </span>
+              <div>
+                <strong>{x}</strong>
+                <small>Mock adapter · 无外部网络请求</small>
+              </div>
+              <span className="spacer" />
+              <Badge tone={dismiss.includes(x) ? "green" : "gray"}>
+                {dismiss.includes(x) ? "模拟成功" : "未连接"}
+              </Badge>
+              <button
+                className="btn"
+                onClick={() => {
+                  setDismiss([...dismiss, x]);
+                  act({
+                    type: "ADD_AUDIT",
+                    payload: { message: `接口模拟：${x} 返回示例成功` },
+                  });
+                }}
+              >
+                测试模拟响应
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+    </>
+  );
+}

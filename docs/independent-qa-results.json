@@ -1,0 +1,690 @@
+{
+  "numTotalTestSuites": 1,
+  "numPassedTestSuites": 1,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 50,
+  "numPassedTests": 50,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791852363160,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "independent QA: cross-surface lifecycle and persistence"
+          ],
+          "fullName": "independent QA: cross-surface lifecycle and persistence runs H5 booking/payment → kiosk check-in → exam → three-stage review → report printing/binding → followup",
+          "status": "passed",
+          "title": "runs H5 booking/payment → kiosk check-in → exam → three-stage review → report printing/binding → followup",
+          "duration": 2531.057032,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: cross-surface lifecycle and persistence"
+          ],
+          "fullName": "independent QA: cross-surface lifecycle and persistence supports cancel/back without cancelling until confirmed, survives remount, and blocks cancelled check-in",
+          "status": "passed",
+          "title": "supports cancel/back without cancelling until confirmed, survives remount, and blocks cancelled check-in",
+          "duration": 317.54525399999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: cross-surface lifecycle and persistence"
+          ],
+          "fullName": "independent QA: cross-surface lifecycle and persistence shows a patient H5 follow-up request in the management task board",
+          "status": "passed",
+          "title": "shows a patient H5 follow-up request in the management task board",
+          "duration": 249.5842279999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: role and safety presentation"
+          ],
+          "fullName": "independent QA: role and safety presentation reception role blocks a route outside its navigation after reload",
+          "status": "passed",
+          "title": "reception role blocks a route outside its navigation after reload",
+          "duration": 36.04939899999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: role and safety presentation"
+          ],
+          "fullName": "independent QA: role and safety presentation doctor role blocks a route outside its navigation after reload",
+          "status": "passed",
+          "title": "doctor role blocks a route outside its navigation after reload",
+          "duration": 27.723267999999734,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: role and safety presentation"
+          ],
+          "fullName": "independent QA: role and safety presentation reviewer role blocks a route outside its navigation after reload",
+          "status": "passed",
+          "title": "reviewer role blocks a route outside its navigation after reload",
+          "duration": 31.00240699999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: role and safety presentation"
+          ],
+          "fullName": "independent QA: role and safety presentation manager role blocks a route outside its navigation after reload",
+          "status": "passed",
+          "title": "manager role blocks a route outside its navigation after reload",
+          "duration": 32.10008000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: role and safety presentation"
+          ],
+          "fullName": "independent QA: role and safety presentation finance role blocks a route outside its navigation after reload",
+          "status": "passed",
+          "title": "finance role blocks a route outside its navigation after reload",
+          "duration": 33.24573599999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: role and safety presentation"
+          ],
+          "fullName": "independent QA: role and safety presentation enterprise role blocks a route outside its navigation after reload",
+          "status": "passed",
+          "title": "enterprise role blocks a route outside its navigation after reload",
+          "duration": 27.414271999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: role and safety presentation"
+          ],
+          "fullName": "independent QA: role and safety presentation service role blocks a route outside its navigation after reload",
+          "status": "passed",
+          "title": "service role blocks a route outside its navigation after reload",
+          "duration": 29.160973000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: role and safety presentation"
+          ],
+          "fullName": "independent QA: role and safety presentation persists same-origin storage changes sent by another tab",
+          "status": "passed",
+          "title": "persists same-origin storage changes sent by another tab",
+          "duration": 68.5301730000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: audit of exposed mutation guards"
+          ],
+          "fullName": "independent QA: audit of exposed mutation guards locked exam must not report apparent success or create alerts when results are not saved",
+          "status": "passed",
+          "title": "locked exam must not report apparent success or create alerts when results are not saved",
+          "duration": 96.04860199999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: audit of exposed mutation guards"
+          ],
+          "fullName": "independent QA: audit of exposed mutation guards locked appointment details disable item additions and cancellation",
+          "status": "passed",
+          "title": "locked appointment details disable item additions and cancellation",
+          "duration": 74.42550300000039,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: selected star-clause interactions and regression cases"
+          ],
+          "fullName": "independent QA: selected star-clause interactions and regression cases T0015 group entry carries an explicit unit identifier and renders a real QR SVG (scan not tested)",
+          "status": "passed",
+          "title": "T0015 group entry carries an explicit unit identifier and renders a real QR SVG (scan not tested)",
+          "duration": 459.35308199999963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: selected star-clause interactions and regression cases"
+          ],
+          "fullName": "independent QA: selected star-clause interactions and regression cases T0025 compares selected packages and exposes differing project meanings",
+          "status": "passed",
+          "title": "T0025 compares selected packages and exposes differing project meanings",
+          "duration": 209.77306900000076,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: selected star-clause interactions and regression cases"
+          ],
+          "fullName": "independent QA: selected star-clause interactions and regression cases T0237/38/39 and T0415/16 display global alert and persist four handling fields with optional followup",
+          "status": "passed",
+          "title": "T0237/38/39 and T0415/16 display global alert and persist four handling fields with optional followup",
+          "duration": 166.49737499999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: selected star-clause interactions and regression cases"
+          ],
+          "fullName": "independent QA: selected star-clause interactions and regression cases T0239 lets staff opt out of creating a followup task",
+          "status": "passed",
+          "title": "T0239 lets staff opt out of creating a followup task",
+          "duration": 131.3382620000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: selected star-clause interactions and regression cases"
+          ],
+          "fullName": "independent QA: selected star-clause interactions and regression cases T0342 hides unselected synthetic history years and never fills missing history with normal",
+          "status": "passed",
+          "title": "T0342 hides unselected synthetic history years and never fills missing history with normal",
+          "duration": 117.08699699999943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: selected star-clause interactions and regression cases"
+          ],
+          "fullName": "independent QA: selected star-clause interactions and regression cases T0434/35 validates nonzero and excessive repayments before updating a single persistent bill",
+          "status": "passed",
+          "title": "T0434/35 validates nonzero and excessive repayments before updating a single persistent bill",
+          "duration": 242.27724800000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: selected star-clause interactions and regression cases"
+          ],
+          "fullName": "independent QA: selected star-clause interactions and regression cases H5 double activation of one confirmation does not create two appointments",
+          "status": "passed",
+          "title": "H5 double activation of one confirmation does not create two appointments",
+          "duration": 255.35482599999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: selected star-clause interactions and regression cases"
+          ],
+          "fullName": "independent QA: selected star-clause interactions and regression cases an accidental double activation cannot skip two report-review stages",
+          "status": "passed",
+          "title": "an accidental double activation cannot skip two report-review stages",
+          "duration": 60.67771499999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: multi-campus and locked self-service regression"
+          ],
+          "fullName": "independent QA: multi-campus and locked self-service regression T0090 preserves the selected appointment campus at identification and check-in",
+          "status": "passed",
+          "title": "T0090 preserves the selected appointment campus at identification and check-in",
+          "duration": 109.34932599999956,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: multi-campus and locked self-service regression"
+          ],
+          "fullName": "independent QA: multi-campus and locked self-service regression T0090 allows an explicit check-in campus change and persists it",
+          "status": "passed",
+          "title": "T0090 allows an explicit check-in campus change and persists it",
+          "duration": 122.58518800000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: multi-campus and locked self-service regression"
+          ],
+          "fullName": "independent QA: multi-campus and locked self-service regression a locked appointment cannot appear to check-in successfully",
+          "status": "passed",
+          "title": "a locked appointment cannot appear to check-in successfully",
+          "duration": 98.05563499999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /dashboard mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/dashboard mounts without an exception and renders a page heading",
+          "duration": 59.44283499999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /appointments mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/appointments mounts without an exception and renders a page heading",
+          "duration": 52.35370700000021,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /queue mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/queue mounts without an exception and renders a page heading",
+          "duration": 155.21595199999956,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /exam mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/exam mounts without an exception and renders a page heading",
+          "duration": 51.037694999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /review mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/review mounts without an exception and renders a page heading",
+          "duration": 34.85468000000037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /reports mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/reports mounts without an exception and renders a page heading",
+          "duration": 27.719192000000476,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /health mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/health mounts without an exception and renders a page heading",
+          "duration": 44.010049999999865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /enterprise mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/enterprise mounts without an exception and renders a page heading",
+          "duration": 55.59985699999925,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /services mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/services mounts without an exception and renders a page heading",
+          "duration": 330.8616899999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /commerce mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/commerce mounts without an exception and renders a page heading",
+          "duration": 55.38756300000023,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /content mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/content mounts without an exception and renders a page heading",
+          "duration": 46.29932800000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /finance mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/finance mounts without an exception and renders a page heading",
+          "duration": 40.68635500000073,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /analytics mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/analytics mounts without an exception and renders a page heading",
+          "duration": 326.01399799999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /support mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/support mounts without an exception and renders a page heading",
+          "duration": 45.478657999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /quality mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/quality mounts without an exception and renders a page heading",
+          "duration": 27.734034999999494,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /settings mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/settings mounts without an exception and renders a page heading",
+          "duration": 41.801009000000704,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /controls mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/controls mounts without an exception and renders a page heading",
+          "duration": 350.14775999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /coverage mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/coverage mounts without an exception and renders a page heading",
+          "duration": 826.8928450000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /patient mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/patient mounts without an exception and renders a page heading",
+          "duration": 63.53187600000092,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /kiosk mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/kiosk mounts without an exception and renders a page heading",
+          "duration": 20.487358999998833,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: route render smoke (DOM only)"
+          ],
+          "fullName": "independent QA: route render smoke (DOM only) /kiosk?mode=report mounts without an exception and renders a page heading",
+          "status": "passed",
+          "title": "/kiosk?mode=report mounts without an exception and renders a page heading",
+          "duration": 17.856346000000485,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: positive critical-result reporting"
+          ],
+          "fullName": "independent QA: positive critical-result reporting T0237 links an actual abnormal exam submission to the global handling dialog",
+          "status": "passed",
+          "title": "T0237 links an actual abnormal exam submission to the global handling dialog",
+          "duration": 121.18299400000069,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: positive critical-result reporting"
+          ],
+          "fullName": "independent QA: positive critical-result reporting does not carry another patient’s abnormal-result confirmation into a new exam",
+          "status": "passed",
+          "title": "does not carry another patient’s abnormal-result confirmation into a new exam",
+          "duration": 70.83718000000044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: final entrypoint integration"
+          ],
+          "fullName": "independent QA: final entrypoint integration opens the actual appointment CSV import entry, validates a sample, and persists its booking once",
+          "status": "passed",
+          "title": "opens the actual appointment CSV import entry, validates a sample, and persists its booking once",
+          "duration": 512.2093679999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: final entrypoint integration"
+          ],
+          "fullName": "independent QA: final entrypoint integration opens workload analytics through the navigation and displays structured change details",
+          "status": "passed",
+          "title": "opens workload analytics through the navigation and displays structured change details",
+          "duration": 191.14741799999865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": [
+            "independent QA: final entrypoint integration"
+          ],
+          "fullName": "independent QA: final entrypoint integration T0103 updates the synthetic historical reference when the selected booking patient changes",
+          "status": "passed",
+          "title": "T0103 updates the synthetic historical reference when the selected booking patient changes",
+          "duration": 123.405295999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        }
+      ],
+      "startTime": 1791852364645,
+      "endTime": 1791852373865.4053,
+      "status": "passed",
+      "message": "",
+      "name": "/workspace/scratch/a2368a7aae38/bookTickets/tests/independent-qa.test.tsx"
+    }
+  ]
+}
