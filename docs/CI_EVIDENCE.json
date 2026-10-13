@@ -19,5 +19,15 @@
     "screenshotsActuallyOpened": 24,
     "visualReview": "No obvious page-level horizontal overflow or overlapping primary controls. Mobile administrative tables intentionally scroll within their container. Not an accessibility or physical-device acceptance test."
   },
-  "finalSource": "Pending its corresponding run; prior success is not extrapolated."
+  "finalSource": "Pending its corresponding run; prior success is not extrapolated.",
+  "extensionSnapshot": {
+    "commit": "7521d965dc7970a8947732b971e487b583460d55",
+    "run": "https://github.com/RedCreationTech/bookTickets/actions/runs/38336988898",
+    "conclusion": "failure",
+    "vitest": 335,
+    "chromiumPassed": 20,
+    "chromiumSkipped": 1,
+    "chromiumFailed": 1,
+    "failure": "Mobile queue tables without overflow wrappers expanded the layout viewport to 744px; pause-modal click was intercepted. Fixed local table scrolling, min-width, portal and scroll lock; corresponding replacement run pending."
+  }
 }

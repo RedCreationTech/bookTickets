@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X, ArrowUpRight, ChevronRight } from "lucide-react";
 import { statusNames } from "./model";
 export function Badge({
@@ -47,6 +48,9 @@ export function PageTitle({
     </div>
   );
 }
+let openModalCount = 0;
+let previousBodyOverflow = "";
+
 export function Modal({
   title,
   children,
@@ -58,7 +62,17 @@ export function Modal({
   onClose: () => void;
   wide?: boolean;
 }) {
-  return (
+  useEffect(() => {
+    if (openModalCount++ === 0) {
+      previousBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      if (--openModalCount === 0)
+        document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+  return createPortal(
     <div
       className="modal-backdrop"
       onMouseDown={(e) => {
@@ -79,7 +93,8 @@ export function Modal({
         </div>
         {children}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 export function Metric({

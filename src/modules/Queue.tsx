@@ -269,73 +269,78 @@ function GuideUsers() {
           保存导检用户
         </button>
       </details>
-      <table className="ops-table">
-        <thead>
-          <tr>
-            <th>用户</th>
-            <th>角色 / 授权</th>
-            <th>会话</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <tr key={u.id}>
-              <td>
-                {u.name} · {u.enabled ? "已启用" : "已停用"}
-              </td>
-              <td>
-                {u.role} ·{" "}
-                {u.queueIds
-                  .map(
-                    (id: string) => queues.find((q) => q.id === id)?.name || id,
-                  )
-                  .join("、")}
-              </td>
-              <td>
-                {u.enabled &&
-                sessions.some((s) => s.userId === u.id && s.status === "online")
-                  ? "本地在线"
-                  : "离线"}
-              </td>
-              <td>
-                <button
-                  className="btn"
-                  onClick={() => setDraft({ ...blank(), ...u })}
-                >
-                  编辑用户 {u.name}
-                </button>
-                <button
-                  className="btn"
-                  disabled={!u.enabled}
-                  onClick={() => login(u)}
-                >
-                  模拟登录 {u.name}
-                </button>
-                <button
-                  className="btn"
-                  onClick={() =>
-                    act({
-                      type: "UPSERT_RECORD",
-                      payload: {
-                        collection: "guideSessions",
-                        record: {
-                          id: `SESSION-${u.id}`,
-                          userId: u.id,
-                          status: "offline",
-                          at: new Date().toISOString(),
-                        },
-                      },
-                    })
-                  }
-                >
-                  退出会话 {u.name}
-                </button>
-              </td>
+      <div className="table-scroll">
+        <table className="ops-table">
+          <thead>
+            <tr>
+              <th>用户</th>
+              <th>角色 / 授权</th>
+              <th>会话</th>
+              <th>操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.id}>
+                <td>
+                  {u.name} · {u.enabled ? "已启用" : "已停用"}
+                </td>
+                <td>
+                  {u.role} ·{" "}
+                  {u.queueIds
+                    .map(
+                      (id: string) =>
+                        queues.find((q) => q.id === id)?.name || id,
+                    )
+                    .join("、")}
+                </td>
+                <td>
+                  {u.enabled &&
+                  sessions.some(
+                    (s) => s.userId === u.id && s.status === "online",
+                  )
+                    ? "本地在线"
+                    : "离线"}
+                </td>
+                <td>
+                  <button
+                    className="btn"
+                    onClick={() => setDraft({ ...blank(), ...u })}
+                  >
+                    编辑用户 {u.name}
+                  </button>
+                  <button
+                    className="btn"
+                    disabled={!u.enabled}
+                    onClick={() => login(u)}
+                  >
+                    模拟登录 {u.name}
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={() =>
+                      act({
+                        type: "UPSERT_RECORD",
+                        payload: {
+                          collection: "guideSessions",
+                          record: {
+                            id: `SESSION-${u.id}`,
+                            userId: u.id,
+                            status: "offline",
+                            at: new Date().toISOString(),
+                          },
+                        },
+                      })
+                    }
+                  >
+                    退出会话 {u.name}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <button
         className="btn"
         onClick={() =>
@@ -651,56 +656,59 @@ function FocusedQueueProgress() {
           </label>
         ))}
       </div>
-      <table className="ops-table" aria-label="重点科室进度统计">
-        <thead>
-          <tr>
-            <th>科室</th>
-            <th>候检 / 呼叫</th>
-            <th>过号 / 暂停</th>
-            <th>完成 / 总记录</th>
-            <th>完成进度</th>
-          </tr>
-        </thead>
-        <tbody>
-          {queues
-            .filter((q) => focused.includes(q.id))
-            .map((q) => {
-              const rows = (state.records.queueTickets || []).filter(
-                (t) =>
-                  t.department === q.id &&
-                  ["waiting", "calling", "missed", "paused", "done"].includes(
-                    t.status,
-                  ),
-              );
-              const done = rows.filter((t) => t.status === "done").length;
-              return (
-                <tr key={q.id}>
-                  <td>{q.department}</td>
-                  <td>
-                    {
-                      rows.filter((t) =>
-                        ["waiting", "calling"].includes(t.status),
-                      ).length
-                    }
-                  </td>
-                  <td>
-                    {
-                      rows.filter((t) =>
-                        ["missed", "paused"].includes(t.status),
-                      ).length
-                    }
-                  </td>
-                  <td>
-                    {done} / {rows.length}
-                  </td>
-                  <td>
-                    {rows.length ? Math.round((done / rows.length) * 100) : 0}%
-                  </td>
-                </tr>
-              );
-            })}
-        </tbody>
-      </table>
+      <div className="table-scroll">
+        <table className="ops-table" aria-label="重点科室进度统计">
+          <thead>
+            <tr>
+              <th>科室</th>
+              <th>候检 / 呼叫</th>
+              <th>过号 / 暂停</th>
+              <th>完成 / 总记录</th>
+              <th>完成进度</th>
+            </tr>
+          </thead>
+          <tbody>
+            {queues
+              .filter((q) => focused.includes(q.id))
+              .map((q) => {
+                const rows = (state.records.queueTickets || []).filter(
+                  (t) =>
+                    t.department === q.id &&
+                    ["waiting", "calling", "missed", "paused", "done"].includes(
+                      t.status,
+                    ),
+                );
+                const done = rows.filter((t) => t.status === "done").length;
+                return (
+                  <tr key={q.id}>
+                    <td>{q.department}</td>
+                    <td>
+                      {
+                        rows.filter((t) =>
+                          ["waiting", "calling"].includes(t.status),
+                        ).length
+                      }
+                    </td>
+                    <td>
+                      {
+                        rows.filter((t) =>
+                          ["missed", "paused"].includes(t.status),
+                        ).length
+                      }
+                    </td>
+                    <td>
+                      {done} / {rows.length}
+                    </td>
+                    <td>
+                      {rows.length ? Math.round((done / rows.length) * 100) : 0}
+                      %
+                    </td>
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+      </div>
       <small>
         按当前保留的实际队列记录统计；清空记录不纳入分母，不冒充临床疗效或优化预测。
       </small>
@@ -1359,7 +1367,7 @@ export default function Queue({ screen = false }: { screen?: boolean }) {
             演示负荷 = 候检 / 呼叫人数 × 单人配置分钟数；达到{" "}
             {bottleneckMinutes} 分钟显示瓶颈，不代表智能优化或临床判断。
           </p>
-          <div className="table-wrap">
+          <div className="table-scroll">
             <table aria-label="队列筛选结果">
               <thead>
                 <tr>

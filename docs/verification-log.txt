@@ -1,10 +1,5 @@
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
-> hongchuang-health-demo@1.0.0 check
-> npm run lint && npm run typecheck && npm test && npm run build
-
-npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
-
 > hongchuang-health-demo@1.0.0 lint
 > eslint src
 
@@ -21,20 +16,183 @@ npm notice
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
 > hongchuang-health-demo@1.0.0 test
-> vitest run
+> vitest run --reporter=default --reporter=json --outputFile.json=docs/all-test-results.json
 
 
  RUN  v5.0.4 /workspace/scratch/a2368a7aae38/bookTickets
 
+ ✓ tests/devices.test.tsx (49 tests) 12287ms
+   ✓ 患者 H5 业务流程 (6)
+     ✓ 从预约进入套餐比较，展示不同项目的具体检查意义 482ms
+     ✓ 预约需确认须知，创建后可模拟支付并在电子导检中查看 583ms
+     ✓ 单位入口二维码是真实 SVG，单位链接直接进入对应预约并拆分单位/自费金额 467ms
+     ✓ 改期与取消保留订单及操作记录 544ms
+     ✓ 报告可选择历史对比次数，并使用保存的合成指标 370ms
+   ✓ 预约规则与防重复提交 (7)
+     ✓ H5 开放增删时实际保留选择项目，重复确认只创建一单且新流程可再次预约 522ms
+   ✓ 自助终端业务与异常状态 (5)
+     ✓ 离线识别失败、恢复可重试，120秒无操作后清除身份 302ms
+   ✓ 单位排期、时钟、问卷与门户配置闭环 (11)
+     ✓ 必填问卷阻止H5预约，完成后写入问卷答案且推荐关闭不加项目 387ms
+     ✓ 问卷可跳过、关闭不拦截，开启推荐会选入对应参考项目 348ms
+   ✓ 合成身份、来源二维码与患者排队 (4)
+     ✓ 合成注册拒绝真实号码格式，新增体检人及常用关联并可移除关联 435ms
+   ✓ 共享单位订单与问卷上下游 (4)
+     ✓ 共享单位订单限制套餐及自选数量，按共享规则计算单位与个人分摊 367ms
+   ✓ 共享医院项目字典的患者端消费 (3)
+     ✓ 医院维护项目可在 H5 加选并按维护价格计费，套餐既有项目不重复加购 301ms
+   ✓ 最终患者端问卷、多套餐与门户媒体 (7)
+     ✓ 满意度五个维度必答，双击仅保存一次并在刷新后回看原结果 525ms
+     ✓ 不同订单独立评价，切换后评分重置，建议允许留空 437ms
+     ✓ N选M严格计数，已选套餐限额，重叠检查项目去重计价 472ms
+     ✓ 单位套餐选择数量优先于全局配置并复用去重后的单位个人分摊 365ms
+     ✓ 组合套餐默认自动过滤互斥项目并保留原因 341ms
+   ✓ 套餐数量配置即时生效边界 (2)
+     ✓ 切回单套餐配置后清除多选对计价及提交的影响 379ms
+stderr | tests/independent-qa.test.tsx > independent QA: cross-surface lifecycle and persistence > runs H5 booking/payment → kiosk check-in → exam → three-stage review → report printing/binding → followup
+Encountered two children with the same key, `TJmv6e4u80416d`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
 
- Test Files  19 passed (19)
-      Tests  335 passed (335)
-   Start at  11:21:35
-   Duration  77.77s (tests 77%, environment 16%, import 4%, setup 3%, transform 1%)
+stderr | tests/independent-qa.test.tsx > independent QA: cross-surface lifecycle and persistence > runs H5 booking/payment → kiosk check-in → exam → three-stage review → report printing/binding → followup
+Encountered two children with the same key, `TJmv6e4u80416d`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJmv6e4u80416d`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
 
-    Isolate  19 workers spawned · ~769ms startup each (spawn + environment, per file)
-             at least ~13.84s faster with isolate: false — reuses workers across files instead of one per file
+stderr | tests/independent-qa.test.tsx > independent QA: audit of exposed mutation guards > locked exam must not report apparent success or create alerts when results are not saved
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
 
+stderr | tests/independent-qa.test.tsx > independent QA: audit of exposed mutation guards > locked exam must not report apparent success or create alerts when results are not saved
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+
+stderr | tests/independent-qa.test.tsx > independent QA: route render smoke (DOM only) > /exam mounts without an exception and renders a page heading
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+
+stderr | tests/independent-qa.test.tsx > independent QA: positive critical-result reporting > T0237 links an actual abnormal exam submission to the global handling dialog
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+
+stderr | tests/independent-qa.test.tsx > independent QA: positive critical-result reporting > T0237 links an actual abnormal exam submission to the global handling dialog
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+
+stderr | tests/independent-qa.test.tsx > independent QA: positive critical-result reporting > does not carry another patient’s abnormal-result confirmation into a new exam
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+
+stderr | tests/independent-qa.test.tsx > independent QA: positive critical-result reporting > does not carry another patient’s abnormal-result confirmation into a new exam
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100002`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+
+ ✓ tests/independent-qa.test.tsx (50 tests) 8640ms
+   ✓ independent QA: cross-surface lifecycle and persistence (3)
+     ✓ runs H5 booking/payment → kiosk check-in → exam → three-stage review → report printing/binding → followup 2329ms
+     ✓ supports cancel/back without cancelling until confirmed, survives remount, and blocks cancelled check-in 355ms
+   ✓ independent QA: selected star-clause interactions and regression cases (8)
+     ✓ T0015 group entry carries an explicit unit identifier and renders a real QR SVG (scan not tested) 431ms
+   ✓ independent QA: route render smoke (DOM only) (21)
+     ✓ /analytics mounts without an exception and renders a page heading 333ms
+     ✓ /controls mounts without an exception and renders a page heading 328ms
+     ✓ /coverage mounts without an exception and renders a page heading 453ms
+   ✓ independent QA: final entrypoint integration (3)
+     ✓ opens the actual appointment CSV import entry, validates a sample, and persists its booking once 531ms
+ ✓ tests/operations.test.tsx (39 tests) 5689ms
+   ✓ Operations working business flows (9)
+     ✓ advances a service order only through its permitted lifecycle and retains history 432ms
+ ✓ tests/queue-controls.test.tsx (17 tests) 4971ms
+   ✓ Queue controls and display effects (6)
+     ✓ batch closing suspends calls and prevents adding/calling; reopening permits dispatch 783ms
+     ✓ creates a genuine configured queue and uses its project rule to select eligible appointments 332ms
+   ✓ Final queue filter and resume-slip workflows (3)
+     ✓ issues a unique QR slip, persists pause history and restores the original queue once 374ms
+     ✓ blocks unknown tokens and does not consume a slip while its original queue is closed 455ms
+   ✓ Precise final queue requirements (3)
+     ✓ guards pause and resume against two synchronous clicks within the same React batch 364ms
+   ✓ C-group guide workflow requirements (4)
+     ✓ preserves fixed ultrasound numbers while masking names and uses configured pronunciation for simulated calls 333ms
+     ✓ enforces guide-user queue scopes, counts actual local doctor sessions, and disables logins immediately 619ms
+ ✓ tests/booking-extension.test.tsx (20 tests) 4338ms
+   ✓ A组分类、院区与套餐自选包 (6)
+     ✓ T0021 医院分类配置被患者筛选与加项计价消费 482ms
+     ✓ T0023 院区切换会失效旧套餐选择且仅显示对应院区套餐 643ms
+     ✓ T0482 切换套餐只带出该套餐自选包，旧选择不能混入新单 475ms
+     ✓ T0482 多套餐各自满足必选数，共同自选项目只计一次费用 481ms
+   ✓ A组亲属单位权益 (4)
+     ✓ T0037 非单位亲属关联有效员工后使用专属套餐和单位折扣 393ms
+     ✓ T0039 单位承担策略按折后金额及预算拆分，非全部自动免费 467ms
+   ✓ A组取消保留删除与恢复安全边界 (4)
+     ✓ T0029/T0042 H5 明确删除策略，归档回看并只恢复取消历史 353ms
+   ✓ A组前端状态与可解释过滤边界 (3)
+     ✓ T0113 默认展示自动过滤原因，关闭自动过滤后互斥阻断提交 339ms
+ ✓ tests/independent-v2.test.tsx (20 tests) 3322ms
+   ✓ Independent v2: scopes and repeat-activation regressions (4)
+     ✓ does not expose or let a scoped role handle another patient’s global alert 372ms
+   ✓ Independent v2: unit budget and personnel consumers (5)
+     ✓ H5 consumes the active unit contract and subgroup package, not the old fixed 800 budget 599ms
+   ✓ Independent v2: additional scope and cancellation edges (3)
+     ✓ scoped workload logs do not reveal another patient’s structured before/after snapshot 323ms
+ ✓ tests/review-tools.test.tsx (33 tests) 2494ms
+   ✓ dedicated review controls and report operations (33)
+     ✓ RT01 / T0286 T0288 saves date schedules, assigns shared orders, updates workload and prevents duplicate assignments 302ms
+ ✓ tests/control-center.test.tsx (18 tests) 1885ms
+   ✓ Dedicated local service and quality controls (8)
+     ✓ validates recipients, previews resolved messages, and records per-recipient failure and retry history 421ms
+stderr | tests/ordering-clinical.test.tsx > atomic ordering and clinical details > O09 Ctrl+Enter uses the same completeness guard and then submits valid results
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100006`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+
+ ✓ tests/ordering-clinical.test.tsx (20 tests) 1472ms
+   ✓ atomic ordering and clinical details (20)
+     ✓ O20 the finance page mounts real invoice-reminder controls 352ms
+ ✓ tests/execution-desk.test.tsx (9 tests) 1359ms
+   ✓ Print execution desk (4)
+     ✓ consumes automatic order-created tasks then confirms local execution with persisted target and prevents repeats 377ms
+     ✓ applies photo visibility, column ordering and chosen targets to the actual guide preview 351ms
+stderr | tests/core.test.tsx > core frontend interactions > U03 blocks nonnumeric clinical results and incomplete submissions
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+Encountered two children with the same key, `TJ2026100006`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+
+stderr | tests/core.test.tsx > core frontend interactions > U06 role switching changes workbench and denies direct unauthorized route
+Encountered two children with the same key, `TJ2026100001`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+
+ ✓ tests/core.test.tsx (7 tests) 1339ms
+   ✓ core frontend interactions (7)
+     ✓ U01 creates a booking, persists it and records payment 462ms
+ ✓ tests/advanced-core.test.tsx (7 tests) 1140ms
+   ✓ advanced frontend scenarios (7)
+     ✓ A01 queue departments have independent membership and completion 547ms
+ ✓ tests/independent-brand.test.tsx (5 tests) 655ms
+   ✓ Independent brand migration: existing business data preserved (5)
+     ✓ loads legacy data into the new key, replaces visible portal/template branding and preserves business identifiers and values 372ms
+ ✓ tests/research-reminders.test.tsx (8 tests) 648ms
+ ✓ tests/advanced.test.tsx (7 tests) 442ms
+ ✓ tests/reliability.test.tsx (3 tests) 525ms
+   ✓ storage and explanation reliability (3)
+     ✓ R02 malformed persisted schema recovers initial synthetic data 327ms
+ ✓ tests/registration-consents.test.tsx (8 tests) 455ms
+ ✓ tests/settlement-details.test.tsx (6 tests) 240ms
+ ✓ tests/modal-layout.test.tsx (2 tests) 151ms
+ ✓ tests/model.test.ts (9 tests) 23ms
+
+ Test Files  20 passed (20)
+      Tests  337 passed (337)
+   Start at  11:38:41
+   Duration  72.14s (tests 75%, environment 17%, import 4%, setup 3%)
+
+    Isolate  20 workers spawned · ~714ms startup each (spawn + environment, per file)
+             at least ~13.56s faster with isolate: false — reuses workers across files instead of one per file
+
+JSON report written to /workspace/scratch/a2368a7aae38/bookTickets/docs/all-test-results.json
 npm notice
 npm notice New major version of npm available! 11.9.0 -> 12.2.0
 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
@@ -52,23 +210,23 @@ rendering chunks...
 computing gzip size...
 dist/index.html                                  0.67 kB │ gzip:   0.50 kB
 dist/assets/devices-B8IuIHRz.css                50.66 kB │ gzip:  10.96 kB
-dist/assets/index-DJGUvhtu.css                  53.01 kB │ gzip:  12.00 kB
+dist/assets/index-C5PHSTl1.css                  53.22 kB │ gzip:  12.05 kB
 dist/assets/chart-column-Cb9znGYo.js             0.25 kB │ gzip:   0.19 kB
 dist/assets/heart-BSR9J6_-.js                    0.58 kB │ gzip:   0.34 kB
 dist/assets/fingerprint-pattern-Im0iCyJs.js      0.61 kB │ gzip:   0.35 kB
 dist/assets/devices-DzlnauQc.js                  0.73 kB │ gzip:   0.42 kB
-dist/assets/InvoiceReminder-BPekg21a.js          9.03 kB │ gzip:   3.70 kB
-dist/assets/SettlementDetails-BkJRbmO3.js        9.28 kB │ gzip:   3.36 kB
-dist/assets/Advanced--qp2cGs_.js                18.66 kB │ gzip:   6.71 kB
+dist/assets/InvoiceReminder-CZwzFU4G.js          9.03 kB │ gzip:   3.70 kB
+dist/assets/SettlementDetails-C67e6L57.js        9.28 kB │ gzip:   3.36 kB
+dist/assets/Advanced-DRXOf9kc.js                18.66 kB │ gzip:   6.71 kB
 dist/assets/createLucideIcon-DJQlMj-G.js        21.11 kB │ gzip:   8.44 kB
-dist/assets/Kiosk-h_8Czj_N.js                   29.66 kB │ gzip:   9.43 kB
-dist/assets/ControlCenter-DklnpbwD.js           59.02 kB │ gzip:  17.88 kB
-dist/assets/Patient-ChnW1XEJ.js                 77.88 kB │ gzip:  23.69 kB
-dist/assets/Health-PHjmYHPx.js                  86.60 kB │ gzip:  25.00 kB
-dist/assets/index-DXTwoUoY.js                  604.35 kB │ gzip: 179.01 kB
-dist/assets/Coverage-Cuq78luJ.js             1,352.15 kB │ gzip: 113.79 kB
+dist/assets/Kiosk-B15bEtZx.js                   29.66 kB │ gzip:   9.43 kB
+dist/assets/ControlCenter-DyYf3xCU.js           59.02 kB │ gzip:  17.88 kB
+dist/assets/Patient-BqopVRLm.js                 77.88 kB │ gzip:  23.69 kB
+dist/assets/Health-DbjeQiFp.js                  86.60 kB │ gzip:  25.00 kB
+dist/assets/index--rM3NdYj.js                  604.70 kB │ gzip: 179.11 kB
+dist/assets/Coverage-N-V1acRc.js             1,352.15 kB │ gzip: 113.79 kB
 
-✓ built in 571ms
+✓ built in 459ms
 [plugin builtin:vite-reporter] 
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
@@ -79,10 +237,3 @@ npm notice New major version of npm available! 11.9.0 -> 12.2.0
 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
 npm notice To update run: npm install -g npm@12.2.0
 npm notice
-npm notice
-npm notice New major version of npm available! 11.9.0 -> 12.2.0
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
-npm notice To update run: npm install -g npm@12.2.0
-npm notice
-
-Coverage structure check: PASS (see coverage-check-result.json).

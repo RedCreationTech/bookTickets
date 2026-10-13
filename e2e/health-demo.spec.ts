@@ -240,11 +240,24 @@ test("pause slip resumes its original queue only once after reload", async ({
   page,
 }) => {
   await page.goto("/#/queue");
+  await expect(
+    page.getByRole("heading", { name: "智能导检与队列调度" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(page.viewportSize()!.width);
   await page
     .getByRole("button", { name: "暂停并生成凭条", exact: true })
     .first()
     .click();
   await page.getByLabel("中断检查原因").fill("合成临时离开");
+  const pauseDialog = page.getByRole("dialog", { name: "暂停检查与凭条" });
+  await expect(pauseDialog).toBeInViewport({ ratio: 1 });
+  const dialogBox = await pauseDialog.boundingBox();
+  expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
+  expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(
+    page.viewportSize()!.width,
+  );
   await page.getByRole("button", { name: "确认暂停并生成凭条" }).click();
   const token = await page.getByLabel("演示凭条编号").inputValue();
   expect(token).toMatch(/^DEMO-RESUME-/);
