@@ -2750,74 +2750,76 @@ export function Reports() {
             导出档案
           </button>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  aria-label="全选报告"
-                  checked={list.length > 0 && batch.length === list.length}
-                  onChange={(e) =>
-                    setBatch(e.target.checked ? list.map((a) => a.id) : [])
-                  }
-                />
-              </th>
-              <th>体检客户</th>
-              <th>报告日期</th>
-              <th>审核状态</th>
-              <th>打印次数</th>
-              <th>存放位置</th>
-              <th>领取状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((a) => (
-              <tr key={a.id}>
-                <td>
+        <div className="table-scroll report-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>
                   <input
                     type="checkbox"
-                    aria-label={"选择报告" + a.id}
-                    checked={batch.includes(a.id)}
+                    aria-label="全选报告"
+                    checked={list.length > 0 && batch.length === list.length}
                     onChange={(e) =>
-                      setBatch(
-                        e.target.checked
-                          ? [...batch, a.id]
-                          : batch.filter((x) => x !== a.id),
-                      )
+                      setBatch(e.target.checked ? list.map((a) => a.id) : [])
                     }
                   />
-                </td>
-                <td>
-                  <strong>
-                    {state.patients.find((p) => p.id === a.patientId)?.name}
-                  </strong>
-                  <small>{a.id}</small>
-                </td>
-                <td>{a.date}</td>
-                <td>
-                  <StatusBadge status={a.status} />
-                </td>
-                <td>{a.printCount || 0}</td>
-                <td>{a.cabinet || "未入库"}</td>
-                <td>
-                  <Badge tone={a.delivered ? "green" : "gray"}>
-                    {a.delivered ? "已领取" : "待领取"}
-                  </Badge>
-                </td>
-                <td>
-                  <button
-                    className="text-btn"
-                    onClick={() => setSelected(a.id)}
-                  >
-                    预览 / 管理
-                  </button>
-                </td>
+                </th>
+                <th>体检客户</th>
+                <th>报告日期</th>
+                <th>审核状态</th>
+                <th>打印次数</th>
+                <th>存放位置</th>
+                <th>领取状态</th>
+                <th>操作</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {list.map((a) => (
+                <tr key={a.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={"选择报告" + a.id}
+                      checked={batch.includes(a.id)}
+                      onChange={(e) =>
+                        setBatch(
+                          e.target.checked
+                            ? [...batch, a.id]
+                            : batch.filter((x) => x !== a.id),
+                        )
+                      }
+                    />
+                  </td>
+                  <td>
+                    <strong>
+                      {state.patients.find((p) => p.id === a.patientId)?.name}
+                    </strong>
+                    <small>{a.id}</small>
+                  </td>
+                  <td>{a.date}</td>
+                  <td>
+                    <StatusBadge status={a.status} />
+                  </td>
+                  <td>{a.printCount || 0}</td>
+                  <td>{a.cabinet || "未入库"}</td>
+                  <td>
+                    <Badge tone={a.delivered ? "green" : "gray"}>
+                      {a.delivered ? "已领取" : "待领取"}
+                    </Badge>
+                  </td>
+                  <td>
+                    <button
+                      className="text-btn"
+                      onClick={() => setSelected(a.id)}
+                    >
+                      预览 / 管理
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {!list.length && <Empty />}
       </section>
       {a && (
@@ -2851,22 +2853,24 @@ export function Reports() {
               appointment={a}
             />
             <h3>检查结果</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>项目</th>
-                  <th>本次</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clinicalItems(state, a).map((x) => (
-                  <tr key={x}>
-                    <td>{x}</td>
-                    <td>{a.results[x]}</td>
+            <div className="table-scroll report-table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>项目</th>
+                    <th>本次</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {clinicalItems(state, a).map((x) => (
+                    <tr key={x}>
+                      <td>{x}</td>
+                      <td>{a.results[x]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <h3>综合结论</h3>
             <p>{a.conclusion}</p>
             <div className="report-sign">

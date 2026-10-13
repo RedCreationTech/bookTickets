@@ -43,3 +43,26 @@ describe("viewport modal isolation", () => {
     document.body.style.overflow = "";
   });
 });
+
+describe("report mobile overflow containment", () => {
+  it("keeps the report list and preview tables in local scroll containers", async () => {
+    const { DemoProvider } = await import("../src/store");
+    const { Reports } = await import("../src/modules/Core");
+    render(
+      <DemoProvider>
+        <Reports />
+      </DemoProvider>,
+    );
+    const list = screen
+      .getByRole("checkbox", { name: "全选报告" })
+      .closest("table");
+    expect(list?.parentElement).toHaveClass(
+      "table-scroll",
+      "report-table-scroll",
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "预览 / 管理" })[0]);
+    const dialog = await screen.findByRole("dialog");
+    const resultTable = dialog.querySelector(".report-paper table");
+    expect(resultTable?.parentElement).toHaveClass("table-scroll");
+  });
+});

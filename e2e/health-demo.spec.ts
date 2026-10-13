@@ -138,7 +138,10 @@ test("all role workbenches produce real browser visual evidence", async ({
       });
     }
     const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > window.innerWidth + 2,
+      (width) =>
+        document.documentElement.scrollWidth > width + 2 ||
+        innerWidth > width + 2,
+      page.viewportSize()!.width,
     );
     expect(overflow, `page horizontal overflow for ${role}`).toBe(false);
   }
@@ -168,7 +171,10 @@ test("patient, kiosk, report kiosk and queue visual evidence", async ({
     });
     expect(
       await page.evaluate(
-        () => document.documentElement.scrollWidth > window.innerWidth + 2,
+        (width) =>
+          document.documentElement.scrollWidth > width + 2 ||
+          innerWidth > width + 2,
+        page.viewportSize()!.width,
       ),
       name + " horizontal overflow",
     ).toBe(false);
@@ -364,7 +370,10 @@ test("expanded report workspace creates an actual PDF download without recording
   ).toBe(before);
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
+      (width) =>
+        document.documentElement.scrollWidth <= width + 1 &&
+        innerWidth <= width + 1,
+      page.viewportSize()!.width,
     ),
   ).toBe(true);
   await page.screenshot({
@@ -402,7 +411,10 @@ test("expanded specimen station generates barcode history for a started order", 
   expect(rows[0].status).toBe("已采集");
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
+      (width) =>
+        document.documentElement.scrollWidth <= width + 1 &&
+        innerWidth <= width + 1,
+      page.viewportSize()!.width,
     ),
   ).toBe(true);
   await page.screenshot({
@@ -415,6 +427,9 @@ test("expanded group report saves a population snapshot and downloads editable W
   page,
 }) => {
   await page.goto("/#/reports");
+  expect(await page.evaluate(() => innerWidth)).toBe(
+    page.viewportSize()!.width,
+  );
   await page.getByText("团体健康报告与Word导出", { exact: true }).click();
   await page.getByLabel("团检报告单位").selectOption("远帆制造");
   await page
@@ -438,7 +453,10 @@ test("expanded group report saves a population snapshot and downloads editable W
   expect(Buffer.concat(chunks).subarray(0, 2).toString()).toBe("PK");
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
+      (width) =>
+        document.documentElement.scrollWidth <= width + 1 &&
+        innerWidth <= width + 1,
+      page.viewportSize()!.width,
     ),
   ).toBe(true);
   await page.screenshot({

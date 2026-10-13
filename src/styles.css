@@ -1024,7 +1024,7 @@ tr:last-child td {
 }
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin: 16px 0;
 }
@@ -1938,5 +1938,27 @@ tr:last-child td {
   .main-content details:not(.requirement) {
     padding: 12px;
     overflow: auto;
+  }
+}
+
+/* Keep native inputs and report tables inside the actual mobile viewport. */
+.form-grid > * {
+  min-width: 0;
+}
+.form-grid input:not([type="checkbox"]):not([type="radio"]),
+.form-grid select,
+.form-grid textarea {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+.report-table-scroll {
+  width: 100%;
+  max-width: 100%;
+}
+@media (max-width: 700px) {
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

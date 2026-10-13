@@ -106,7 +106,7 @@
       "baselineArtifactUnchanged": true
     },
     "verificationCaveat": "Vitest是jsdom/逻辑及文件格式测试；附件owner浏览器/Word/硬件声明不能替代独立执行。本轮未执行Chromium。成功测试不消除真实外部、临床、硬件和未澄清边界；固定220项关闭的是可操作本地演示差异。",
-    "integrationUpdatedAt": "2026-10-13T04:15:09.074785+00:00",
+    "integrationUpdatedAt": "2026-10-13T04:26:32.152364+00:00",
     "integrationParentCommit": "a401d469070306e28d6c7b0d58175ce157a3d3fd"
   },
   "items": [
@@ -1116,7 +1116,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         }
@@ -2317,7 +2317,7 @@
       "implementationEvidence": [
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -4395,7 +4395,7 @@
       "implementationEvidence": [
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -6173,7 +6173,7 @@
       "implementationEvidence": [
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": "PreExamContext",
           "line": 64
         },
@@ -6389,7 +6389,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": "PreExamContext",
           "line": 64
         }
@@ -6445,7 +6445,7 @@
       "implementationEvidence": [
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": "PreExamContext",
           "line": 64
         },
@@ -6498,7 +6498,7 @@
       "implementationEvidence": [
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": "PreExamContext",
           "line": 64
         },
@@ -7016,7 +7016,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         }
@@ -7137,7 +7137,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         }
@@ -8262,7 +8262,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -8515,7 +8515,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": "PreExamContext",
           "line": 64
         }
@@ -8561,7 +8561,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -8657,7 +8657,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -8834,7 +8834,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         }
@@ -8975,7 +8975,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -9075,7 +9075,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -9204,7 +9204,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -9304,7 +9304,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -9444,7 +9444,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -9788,7 +9788,7 @@
       "implementationEvidence": [
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -9944,7 +9944,7 @@
       "implementationEvidence": [
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -10031,7 +10031,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         }
@@ -10077,7 +10077,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -10177,7 +10177,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -10277,7 +10277,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -10377,7 +10377,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -10492,7 +10492,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -10601,7 +10601,7 @@
       "implementationEvidence": [
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -13900,7 +13900,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         }
@@ -13966,7 +13966,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         }
@@ -15869,7 +15869,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },
@@ -15973,7 +15973,7 @@
         },
         {
           "file": "src/modules/Core.tsx",
-          "sha256": "fe10bb74e847122017ed785421e38816eb1835dd2d1394786bcceb034a0b6fb7",
+          "sha256": "122055d907a55d49d43cebf2b4077e658f239ff12d8e99aa12b9ee12e3b4a525",
           "anchor": null,
           "line": null
         },

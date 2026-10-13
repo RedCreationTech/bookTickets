@@ -26,201 +26,202 @@ npm warn Unknown env config "http-proxy". This will stop working in the next maj
 
  RUN  v5.0.4 /workspace/scratch/a2368a7aae38/bookTickets
 
- ✓ tests/devices.test.tsx (49 tests) 14383ms
+ ✓ tests/modal-layout.test.tsx (3 tests) 658ms
+   ✓ report mobile overflow containment (1)
+     ✓ keeps the report list and preview tables in local scroll containers 390ms
+ ✓ tests/devices.test.tsx (49 tests) 14769ms
    ✓ 患者 H5 业务流程 (6)
-     ✓ 从预约进入套餐比较，展示不同项目的具体检查意义 467ms
-     ✓ 预约需确认须知，创建后可模拟支付并在电子导检中查看 465ms
-     ✓ 单位入口二维码是真实 SVG，单位链接直接进入对应预约并拆分单位/自费金额 608ms
-     ✓ 改期与取消保留订单及操作记录 519ms
-     ✓ 报告可选择历史对比次数，并使用保存的合成指标 400ms
+     ✓ 从预约进入套餐比较，展示不同项目的具体检查意义 767ms
+     ✓ 预约需确认须知，创建后可模拟支付并在电子导检中查看 670ms
+     ✓ 单位入口二维码是真实 SVG，单位链接直接进入对应预约并拆分单位/自费金额 567ms
+     ✓ 改期与取消保留订单及操作记录 609ms
+     ✓ 服务申请统一使用后台待处理状态 412ms
+     ✓ 报告可选择历史对比次数，并使用保存的合成指标 437ms
    ✓ 预约规则与防重复提交 (7)
-     ✓ H5 开放增删时实际保留选择项目，重复确认只创建一单且新流程可再次预约 668ms
-   ✓ 自助终端业务与异常状态 (5)
-     ✓ 纸张不足阻止报告打印，恢复后打印和装订只记录一次 355ms
+     ✓ H5 日容量满或周末禁约时不可提交 369ms
+     ✓ H5 增删项目与价格开关实际影响展示及订单 343ms
+     ✓ H5 开放增删时实际保留选择项目，重复确认只创建一单且新流程可再次预约 660ms
    ✓ 单位排期、时钟、问卷与门户配置闭环 (11)
-     ✓ 必填问卷阻止H5预约，完成后写入问卷答案且推荐关闭不加项目 421ms
-     ✓ 问卷可跳过、关闭不拦截，开启推荐会选入对应参考项目 497ms
+     ✓ 必填问卷阻止H5预约，完成后写入问卷答案且推荐关闭不加项目 604ms
+     ✓ 问卷可跳过、关闭不拦截，开启推荐会选入对应参考项目 517ms
    ✓ 合成身份、来源二维码与患者排队 (4)
-     ✓ 合成注册拒绝真实号码格式，新增体检人及常用关联并可移除关联 541ms
-     ✓ 个人推广二维码编码来源且新订单实时计入来源统计 360ms
+     ✓ 合成注册拒绝真实号码格式，新增体检人及常用关联并可移除关联 475ms
+     ✓ 个人推广二维码编码来源且新订单实时计入来源统计 314ms
    ✓ 共享单位订单与问卷上下游 (4)
-     ✓ 共享单位订单限制套餐及自选数量，按共享规则计算单位与个人分摊 520ms
-     ✓ 问卷保存明确的合成既往史用药家族史，未填写保留空白 514ms
-     ✓ 线上停用套餐与年龄不适用套餐从患者及自助机中移除 350ms
+     ✓ 共享单位订单限制套餐及自选数量，按共享规则计算单位与个人分摊 405ms
+     ✓ 问卷保存明确的合成既往史用药家族史，未填写保留空白 319ms
+     ✓ 线上停用套餐与年龄不适用套餐从患者及自助机中移除 378ms
    ✓ 最终患者端问卷、多套餐与门户媒体 (7)
-     ✓ 满意度五个维度必答，双击仅保存一次并在刷新后回看原结果 584ms
-     ✓ 不同订单独立评价，切换后评分重置，建议允许留空 605ms
-     ✓ N选M严格计数，已选套餐限额，重叠检查项目去重计价 562ms
-     ✓ 单位套餐选择数量优先于全局配置并复用去重后的单位个人分摊 353ms
-     ✓ 组合套餐默认自动过滤互斥项目并保留原因 339ms
+     ✓ 满意度五个维度必答，双击仅保存一次并在刷新后回看原结果 573ms
+     ✓ 不同订单独立评价，切换后评分重置，建议允许留空 552ms
+     ✓ N选M严格计数，已选套餐限额，重叠检查项目去重计价 599ms
+     ✓ 单位套餐选择数量优先于全局配置并复用去重后的单位个人分摊 303ms
    ✓ 套餐数量配置即时生效边界 (2)
-     ✓ 切回单套餐配置后清除多选对计价及提交的影响 581ms
- ✓ tests/independent-qa.test.tsx (50 tests) 10714ms
+     ✓ 切回单套餐配置后清除多选对计价及提交的影响 420ms
+ ✓ tests/independent-qa.test.tsx (50 tests) 11065ms
    ✓ independent QA: cross-surface lifecycle and persistence (3)
-     ✓ runs H5 booking/payment → kiosk check-in → exam → three-stage review → report printing/binding → followup 2609ms
-     ✓ supports cancel/back without cancelling until confirmed, survives remount, and blocks cancelled check-in 377ms
-     ✓ shows a patient H5 follow-up request in the management task board 444ms
+     ✓ runs H5 booking/payment → kiosk check-in → exam → three-stage review → report printing/binding → followup 2807ms
+     ✓ supports cancel/back without cancelling until confirmed, survives remount, and blocks cancelled check-in 513ms
+     ✓ shows a patient H5 follow-up request in the management task board 452ms
    ✓ independent QA: selected star-clause interactions and regression cases (8)
-     ✓ T0015 group entry carries an explicit unit identifier and renders a real QR SVG (scan not tested) 345ms
-     ✓ T0434/35 validates nonzero and excessive repayments before updating a single persistent bill 363ms
+     ✓ T0015 group entry carries an explicit unit identifier and renders a real QR SVG (scan not tested) 332ms
+     ✓ T0342 compares selected actual stored history and never fills missing results with normal 318ms
+     ✓ T0434/35 validates nonzero and excessive repayments before updating a single persistent bill 396ms
    ✓ independent QA: route render smoke (DOM only) (21)
-     ✓ /analytics mounts without an exception and renders a page heading 336ms
-     ✓ /controls mounts without an exception and renders a page heading 336ms
-     ✓ /coverage mounts without an exception and renders a page heading 554ms
+     ✓ /analytics mounts without an exception and renders a page heading 335ms
+     ✓ /controls mounts without an exception and renders a page heading 339ms
+     ✓ /coverage mounts without an exception and renders a page heading 570ms
    ✓ independent QA: positive critical-result reporting (2)
-     ✓ T0237 links an actual abnormal exam submission to the global handling dialog 335ms
+     ✓ T0237 links an actual abnormal exam submission to the global handling dialog 339ms
    ✓ independent QA: final entrypoint integration (3)
-     ✓ opens the actual appointment CSV import entry, validates a sample, and persists its booking once 719ms
-     ✓ opens workload analytics through the navigation and displays structured change details 425ms
- ✓ tests/pdf-delivery.test.tsx (18 tests) 6926ms
+     ✓ opens the actual appointment CSV import entry, validates a sample, and persists its booking once 728ms
+     ✓ opens workload analytics through the navigation and displays structured change details 386ms
+ ✓ tests/pdf-delivery.test.tsx (18 tests) 7072ms
    ✓ 真实PDF字节、字体与交付隔离 (8)
-     ✓ 生成可解析真实PDF及内嵌中文字体，不是改后缀文本 466ms
-     ✓ 长结论自动分页，批量合并每份独立页面并消除重复选择 1041ms
-     ✓ 批量保留成功文件并列出单份失败，不把失败内容混进合并PDF 479ms
-     ✓ 单份预取消与批量中途取消均停止后续生成 398ms
+     ✓ 生成可解析真实PDF及内嵌中文字体，不是改后缀文本 511ms
+     ✓ 长结论自动分页，批量合并每份独立页面并消除重复选择 931ms
+     ✓ 批量保留成功文件并列出单份失败，不把失败内容混进合并PDF 494ms
+     ✓ 单份预取消与批量中途取消均停止后续生成 415ms
    ✓ PDF交付组件状态与下载 (6)
-     ✓ 生成后在本地iframe查看并请求真实PDF下载，关闭时释放URL 783ms
-     ✓ 批量提供一个合并下载按钮，不自动触发多次浏览器下载 917ms
-     ✓ 单份失败后可重试，错误状态不会提供无效文件 453ms
+     ✓ 生成后在本地iframe查看并请求真实PDF下载，关闭时释放URL 863ms
+     ✓ 批量提供一个合并下载按钮，不自动触发多次浏览器下载 1033ms
+     ✓ 单份失败后可重试，错误状态不会提供无效文件 509ms
    ✓ T0329/T0356 genuine report-purpose layouts (2)
-     ✓ same visit produces different section structure and an actual extra VIP page 827ms
-     ✓ changing purpose updates preview content, clears old generated files and exports chosen purpose 495ms
-   ✓ PDF and layout preview expand the shared clinical parent-to-report-child mapping 426ms
+     ✓ same visit produces different section structure and an actual extra VIP page 789ms
+     ✓ changing purpose updates preview content, clears old generated files and exports chosen purpose 537ms
+   ✓ PDF and layout preview expand the shared clinical parent-to-report-child mapping 402ms
    ✓ PDF content version invalidation (1)
-     ✓ invalidates downloaded bytes and iframe when approved report content changes without changing status 544ms
- ✓ tests/operations.test.tsx (39 tests) 6659ms
+     ✓ invalidates downloaded bytes and iframe when approved report content changes without changing status 487ms
+ ✓ tests/operations.test.tsx (39 tests) 6656ms
    ✓ Operations working business flows (9)
-     ✓ advances a service order only through its permitted lifecycle and retains history 456ms
- ✓ tests/queue-controls.test.tsx (17 tests) 6195ms
+     ✓ advances a service order only through its permitted lifecycle and retains history 385ms
+     ✓ records a support response and follows triage, resolution, closure, and reopen 306ms
+   ✓ Rule-linked commerce, media and account administration (6)
+     ✓ applies edited doctor permissions and saves the shared patient booking blacklist 428ms
+ ✓ tests/queue-controls.test.tsx (17 tests) 5858ms
    ✓ Queue controls and display effects (6)
-     ✓ batch closing suspends calls and prevents adding/calling; reopening permits dispatch 750ms
-     ✓ clears passed clients only after confirmation while preserving waiting/done and audit history 407ms
-     ✓ creates a genuine configured queue and uses its project rule to select eligible appointments 445ms
+     ✓ batch closing suspends calls and prevents adding/calling; reopening permits dispatch 730ms
+     ✓ clears passed clients only after confirmation while preserving waiting/done and audit history 400ms
+     ✓ creates a genuine configured queue and uses its project rule to select eligible appointments 457ms
    ✓ Final queue filter and resume-slip workflows (3)
-     ✓ issues a unique QR slip, persists pause history and restores the original queue once 546ms
-     ✓ blocks unknown tokens and does not consume a slip while its original queue is closed 591ms
+     ✓ issues a unique QR slip, persists pause history and restores the original queue once 571ms
+     ✓ blocks unknown tokens and does not consume a slip while its original queue is closed 494ms
    ✓ Precise final queue requirements (3)
-     ✓ combines queue type and actual passed/completed lower and upper bounds 417ms
-     ✓ guards pause and resume against two synchronous clicks within the same React batch 479ms
+     ✓ combines queue type and actual passed/completed lower and upper bounds 439ms
+     ✓ guards pause and resume against two synchronous clicks within the same React batch 422ms
    ✓ C-group guide workflow requirements (4)
-     ✓ preserves fixed ultrasound numbers while masking names and uses configured pronunciation for simulated calls 411ms
-     ✓ executes queue schedules against an explicit clock, closing on the boundary and avoiding repeated writes 394ms
-     ✓ enforces guide-user queue scopes, counts actual local doctor sessions, and disables logins immediately 638ms
- ✓ tests/booking-extension.test.tsx (20 tests) 4196ms
+     ✓ preserves fixed ultrasound numbers while masking names and uses configured pronunciation for simulated calls 388ms
+     ✓ enforces guide-user queue scopes, counts actual local doctor sessions, and disables logins immediately 619ms
+ ✓ tests/booking-extension.test.tsx (20 tests) 4120ms
    ✓ A组分类、院区与套餐自选包 (6)
-     ✓ T0021 医院分类配置被患者筛选与加项计价消费 573ms
-     ✓ T0023 院区切换会失效旧套餐选择且仅显示对应院区套餐 574ms
-     ✓ T0482 切换套餐只带出该套餐自选包，旧选择不能混入新单 476ms
-     ✓ T0482 多套餐各自满足必选数，共同自选项目只计一次费用 546ms
+     ✓ T0021 医院分类配置被患者筛选与加项计价消费 509ms
+     ✓ T0023 院区切换会失效旧套餐选择且仅显示对应院区套餐 634ms
+     ✓ T0482 切换套餐只带出该套餐自选包，旧选择不能混入新单 421ms
+     ✓ T0482 多套餐各自满足必选数，共同自选项目只计一次费用 435ms
    ✓ A组亲属单位权益 (4)
-     ✓ T0037 非单位亲属关联有效员工后使用专属套餐和单位折扣 402ms
+     ✓ T0037 非单位亲属关联有效员工后使用专属套餐和单位折扣 350ms
+     ✓ T0039 单位承担策略按折后金额及预算拆分，非全部自动免费 465ms
    ✓ A组前端状态与可解释过滤边界 (3)
-     ✓ T0113 默认展示自动过滤原因，关闭自动过滤后互斥阻断提交 301ms
-     ✓ T0482 已选自选包不能绕过后来关闭的增项开关 416ms
- ✓ tests/independent-v2.test.tsx (20 tests) 3802ms
+     ✓ T0113 默认展示自动过滤原因，关闭自动过滤后互斥阻断提交 312ms
+     ✓ T0482 已选自选包不能绕过后来关闭的增项开关 325ms
+ ✓ tests/independent-v2.test.tsx (20 tests) 3717ms
    ✓ Independent v2: scopes and repeat-activation regressions (4)
-     ✓ does not expose or let a scoped role handle another patient’s global alert 365ms
+     ✓ does not expose or let a scoped role handle another patient’s global alert 374ms
    ✓ Independent v2: unit budget and personnel consumers (5)
-     ✓ H5 consumes the active unit contract and subgroup package, not the old fixed 800 budget 550ms
+     ✓ H5 consumes the active unit contract and subgroup package, not the old fixed 800 budget 546ms
    ✓ Independent v2: additional scope and cancellation edges (3)
-     ✓ scoped workload logs do not reveal another patient’s structured before/after snapshot 326ms
- ✓ tests/patient-completion.test.tsx (15 tests) 3747ms
+     ✓ scoped workload logs do not reveal another patient’s structured before/after snapshot 319ms
+ ✓ tests/patient-completion.test.tsx (15 tests) 3616ms
    ✓ T0005/T0011 published education and persistent two-way conversations (3)
-     ✓ two different published article bodies are shared with H5; draft/future/withdrawn bodies never appear 651ms
+     ✓ two different published article bodies are shared with H5; draft/future/withdrawn bodies never appear 594ms
    ✓ T0051 resource quotas and T0054 date selection (5)
-     ✓ settings persist live quota rules; H5 blocks selected package and self-service blocks shared item 340ms
-     ✓ weekend dates are absent and rejected by date control until enabled for H5 and kiosk 478ms
-   ✓ T0066 independent displayed prices and T0081 actual package types (4)
-     ✓ 执行价 display does not change booked execution amount 305ms
-     ✓ 不显示 display does not change booked execution amount 393ms
-     ✓ settings edit original/execution independently including free execution, and persisted type filters H5 options 348ms
+     ✓ settings persist live quota rules; H5 blocks selected package and self-service blocks shared item 499ms
+     ✓ weekend dates are absent and rejected by date control until enabled for H5 and kiosk 514ms
    ✓ T0485 own published report inclusive date range (1)
-     ✓ inclusive start/end, empty range and selected record fallback do not expose other people or pending reports 373ms
-   ✓ independent project price editor preserves shared mandatory rules; displayed original is never charged 350ms
- ✓ tests/review-tools.test.tsx (33 tests) 2376ms
- ✓ tests/completion-health.test.tsx (31 tests) 1965ms
- ✓ tests/control-center.test.tsx (18 tests) 2469ms
+     ✓ inclusive start/end, empty range and selected record fallback do not expose other people or pending reports 360ms
+ ✓ tests/control-center.test.tsx (18 tests) 2178ms
    ✓ Dedicated local service and quality controls (8)
-     ✓ validates recipients, previews resolved messages, and records per-recipient failure and retry history 539ms
- ✓ tests/ordering-clinical.test.tsx (20 tests) 1921ms
-   ✓ atomic ordering and clinical details (20)
-     ✓ O20 the finance page mounts real invoice-reminder controls 355ms
- ✓ tests/core.test.tsx (7 tests) 1942ms
-   ✓ core frontend interactions (7)
-     ✓ U01 creates a booking, persists it and records payment 437ms
-     ✓ U05 report compares actual same-patient stored orders and records issuance 312ms
-     ✓ U06 role switching changes workbench and denies direct unauthorized route 448ms
- ✓ tests/followup-allocation.test.tsx (8 tests) 2151ms
+     ✓ validates recipients, previews resolved messages, and records per-recipient failure and retry history 467ms
+ ✓ tests/review-tools.test.tsx (33 tests) 2514ms
+ ✓ tests/followup-allocation.test.tsx (8 tests) 1595ms
    ✓ T0277–278 deterministic visible followup allocation (5)
-     ✓ cancels without writes, permits manual row exclusion, confirms once and persists after remount 1070ms
-     ✓ rejects the entire preview after a new customer lock instead of partially committing 325ms
+     ✓ cancels without writes, permits manual row exclusion, confirms once and persists after remount 684ms
    ✓ T0725 applied assessment template rendering (3)
-     ✓ saves a configured template, applies it to preview/archive/export, and preserves old snapshots when edited 363ms
- ✓ tests/advanced-core.test.tsx (7 tests) 1661ms
+     ✓ saves a configured template, applies it to preview/archive/export, and preserves old snapshots when edited 316ms
+ ✓ tests/completion-health.test.tsx (31 tests) 2950ms
+   ✓ Health completion: ID relations and actual local messages (7)
+     ✓ sends 短信 only after explicit preview, once, and separates sent history from drafts 341ms
+     ✓ applies two structured assessment packages to different metric inputs and saved report sections 399ms
+ ✓ tests/core.test.tsx (7 tests) 2264ms
+   ✓ core frontend interactions (7)
+     ✓ U01 creates a booking, persists it and records payment 604ms
+     ✓ U03 blocks nonnumeric clinical results and incomplete submissions 424ms
+     ✓ U05 report compares actual same-patient stored orders and records issuance 343ms
+     ✓ U06 role switching changes workbench and denies direct unauthorized route 328ms
+ ✓ tests/ordering-clinical.test.tsx (20 tests) 2096ms
+   ✓ atomic ordering and clinical details (20)
+     ✓ O04 group contract saves specific members, budget and options and guards negative deposit 308ms
+     ✓ O20 the finance page mounts real invoice-reminder controls 356ms
+ ✓ tests/advanced-core.test.tsx (7 tests) 1379ms
    ✓ advanced frontend scenarios (7)
-     ✓ A01 queue departments have independent membership and completion 582ms
-     ✓ A06 batch report inventory uses stable cabinet IDs and selected orders only 361ms
- ✓ tests/analytics-completion.test.tsx (31 tests) 1221ms
-   ✓ actual appointment and price data (4)
-     ✓ renders chart changes and exports the exact filtered people 312ms
- ✓ tests/queue-automation.test.tsx (23 tests) 1496ms
+     ✓ A01 queue departments have independent membership and completion 572ms
+ ✓ tests/queue-automation.test.tsx (23 tests) 1359ms
    ✓ Completion controls are live shared-state UI (2)
-     ✓ recommendation button creates ticket and customer query clears stale detail when query changes 436ms
-     ✓ notification rules, preview/commit, recheck save/edit/cancel, followup dates and handling all mutate shared data 346ms
- ✓ tests/execution-desk.test.tsx (9 tests) 1434ms
+     ✓ recommendation button creates ticket and customer query clears stale detail when query changes 372ms
+ ✓ tests/execution-desk.test.tsx (9 tests) 1798ms
    ✓ Print execution desk (4)
-     ✓ consumes automatic order-created tasks then confirms local execution with persisted target and prevents repeats 356ms
- ✓ tests/clinical-completion.test.tsx (26 tests) 1431ms
+     ✓ consumes automatic order-created tasks then confirms local execution with persisted target and prevents repeats 546ms
+     ✓ applies photo visibility, column ordering and chosen targets to the actual guide preview 380ms
+ ✓ tests/clinical-completion.test.tsx (26 tests) 1570ms
    ✓ independent clinical correction and parent-child report rules (6)
-     ✓ C05 Core Exam renders mapped child fields and actually blocks invalid/incomplete before saving aggregated results 363ms
- ✓ tests/group-report-builder.test.tsx (11 tests) 865ms
- ✓ tests/group-payment-regression.test.tsx (12 tests) 725ms
-   ✓ same-scope group financial closure regressions (12)
-     ✓ GP05 unit settlement UI cancellation is non-mutating and confirmation dispatches atomic shared reducer 340ms
- ✓ tests/report-archive.test.tsx (17 tests) 959ms
-   ✓ Report archive actual controls (2)
-     ✓ creates and renames categories/slots, then previews, cancels and commits actual batch flow 445ms
- ✓ tests/independent-brand.test.tsx (5 tests) 1048ms
+     ✓ C05 Core Exam renders mapped child fields and actually blocks invalid/incomplete before saving aggregated results 504ms
+     ✓ C06 Core Exam independently checks configured text dictionary and all critical results require confirmation 305ms
+ ✓ tests/analytics-completion.test.tsx (31 tests) 1044ms
+   ✓ actual appointment and price data (4)
+     ✓ renders chart changes and exports the exact filtered people 310ms
+ ✓ tests/independent-brand.test.tsx (5 tests) 974ms
    ✓ Independent brand migration: existing business data preserved (5)
-     ✓ loads legacy data into the new key, replaces visible portal/template branding and preserves business identifiers and values 386ms
-     ✓ reloads the migrated key without losing later edits or duplicating the migration event 453ms
- ✓ tests/reliability.test.tsx (3 tests) 707ms
-   ✓ storage and explanation reliability (3)
-     ✓ R02 malformed persisted schema recovers initial synthetic data 376ms
-     ✓ R03 tutorial provides actual video, captions and chapter seeking without claiming a recording 318ms
- ✓ tests/audit-closure.test.tsx (6 tests) 685ms
-   ✓ fixed exhaustive audit gap closure (6)
-     ✓ T0483 H5 consumes the chosen unit order's own capacity instead of only the company schedule 412ms
- ✓ tests/ordering-completion.test.tsx (26 tests) 793ms
+     ✓ loads legacy data into the new key, replaces visible portal/template branding and preserves business identifiers and values 372ms
+     ✓ reloads the migrated key without losing later edits or duplicating the migration event 436ms
+ ✓ tests/report-archive.test.tsx (17 tests) 948ms
+   ✓ Report archive actual controls (2)
+     ✓ creates and renames categories/slots, then previews, cancels and commits actual batch flow 414ms
+ ✓ tests/group-report-builder.test.tsx (11 tests) 1039ms
+ ✓ tests/ordering-completion.test.tsx (26 tests) 826ms
    ✓ ordering fixed completion scope (26)
-     ✓ OC03 / T0093 every required independent certificate type persists and initials are saved 399ms
- ✓ tests/research-reminders.test.tsx (8 tests) 773ms
-   ✓ Invoice-time-linked local salesperson reminders T0196 (5)
-     ✓ opens a targeted popup when demo time reaches the invoice due date and retains acknowledgements 335ms
- ✓ tests/batch-ordering.test.tsx (22 tests) 631ms
- ✓ tests/clinical-integration.test.tsx (7 tests) 496ms
- ✓ tests/clinical-templates.test.tsx (4 tests) 424ms
- ✓ tests/advanced.test.tsx (7 tests) 555ms
-   ✓ Validated group CSV import (5)
-     ✓ requires preview and explicit confirmation, creates mapped appointments once, and rejects reimport duplicates 344ms
- ✓ tests/appointment-completion.test.tsx (6 tests) 406ms
-   ✓ appointment source actions audit and group identity integration (6)
-     ✓ T0050 phone source is persisted and filters only the matching orders 342ms
- ✓ tests/project-statistics.test.tsx (8 tests) 392ms
+     ✓ OC03 / T0093 every required independent certificate type persists and initials are saved 453ms
+ ✓ tests/research-reminders.test.tsx (8 tests) 603ms
+ ✓ tests/group-payment-regression.test.tsx (12 tests) 743ms
+   ✓ same-scope group financial closure regressions (12)
+     ✓ GP05 unit settlement UI cancellation is non-mutating and confirmation dispatches atomic shared reducer 328ms
+ ✓ tests/reliability.test.tsx (3 tests) 732ms
+   ✓ storage and explanation reliability (3)
+     ✓ R02 malformed persisted schema recovers initial synthetic data 387ms
+     ✓ R03 tutorial provides actual video, captions and chapter seeking without claiming a recording 333ms
+ ✓ tests/audit-closure.test.tsx (6 tests) 700ms
+   ✓ fixed exhaustive audit gap closure (6)
+     ✓ T0483 H5 consumes the chosen unit order's own capacity instead of only the company schedule 402ms
+ ✓ tests/batch-ordering.test.tsx (22 tests) 546ms
+ ✓ tests/registration-consents.test.tsx (8 tests) 391ms
+ ✓ tests/advanced.test.tsx (7 tests) 467ms
 Not implemented: navigation to another Document
- ✓ tests/order-finance-completion.test.tsx (18 tests) 508ms
- ✓ tests/registration-consents.test.tsx (8 tests) 564ms
- ✓ tests/settlement-details.test.tsx (6 tests) 237ms
- ✓ tests/modal-layout.test.tsx (2 tests) 149ms
- ✓ tests/model.test.ts (9 tests) 20ms
+ ✓ tests/order-finance-completion.test.tsx (18 tests) 382ms
+ ✓ tests/clinical-integration.test.tsx (7 tests) 645ms
+ ✓ tests/clinical-templates.test.tsx (4 tests) 531ms
+ ✓ tests/appointment-completion.test.tsx (6 tests) 436ms
+   ✓ appointment source actions audit and group identity integration (6)
+     ✓ T0050 phone source is persisted and filters only the matching orders 373ms
+ ✓ tests/project-statistics.test.tsx (8 tests) 396ms
+ ✓ tests/settlement-details.test.tsx (6 tests) 226ms
+ ✓ tests/model.test.ts (9 tests) 23ms
 
  Test Files  38 passed (38)
-      Tests  626 passed (626)
-   Start at  13:13:05
-   Duration  129.48s (tests 71%, environment 19%, import 5%, setup 3%, transform 1%)
+      Tests  627 passed (627)
+   Start at  13:24:45
+   Duration  130.32s (tests 72%, environment 18%, import 5%, setup 3%, transform 1%)
 
-    Isolate  38 workers spawned · ~769ms startup each (spawn + environment, per file)
-             at least ~28.47s faster with isolate: false — reuses workers across files instead of one per file
+    Isolate  38 workers spawned · ~741ms startup each (spawn + environment, per file)
+             at least ~27.42s faster with isolate: false — reuses workers across files instead of one per file
 
 JSON report written to /workspace/scratch/a2368a7aae38/bookTickets/docs/all-test-results.json
 npm notice
@@ -240,7 +241,7 @@ rendering chunks...
 computing gzip size...
 dist/index.html                                     0.83 kB │ gzip:   0.54 kB
 dist/assets/devices-B8IuIHRz.css                   50.66 kB │ gzip:  10.96 kB
-dist/assets/index-C5PHSTl1.css                     53.22 kB │ gzip:  12.05 kB
+dist/assets/index-BxK2naOZ.css                     53.53 kB │ gzip:  12.11 kB
 dist/assets/chart-column-D_FpBB99.js                0.25 kB │ gzip:   0.19 kB
 dist/assets/file-check-corner-BFUk83jU.js           0.31 kB │ gzip:   0.23 kB
 dist/assets/devices-DIZkhGGD.js                     0.48 kB │ gzip:   0.32 kB
@@ -248,25 +249,25 @@ dist/assets/heart-USb05Rre.js                       0.58 kB │ gzip:   0.34 kB
 dist/assets/fingerprint-pattern-DaLtUJEn.js         0.61 kB │ gzip:   0.35 kB
 dist/assets/rolldown-runtime-Dd_uD5pT.js            1.10 kB │ gzip:   0.62 kB
 dist/assets/store-PAaLKnpi.js                       4.83 kB │ gzip:   2.27 kB
-dist/assets/qualityAnalyticsRules-CajT6qCe.js       7.00 kB │ gzip:   3.01 kB
+dist/assets/qualityAnalyticsRules-Cx4ox8cd.js       7.00 kB │ gzip:   3.01 kB
 dist/assets/InvoiceReminder-DmhIrqbN.js             9.16 kB │ gzip:   3.76 kB
-dist/assets/SettlementDetails-CJFXX3EQ.js           9.20 kB │ gzip:   3.36 kB
-dist/assets/QueueAutomation-DzGY0prP.js            13.12 kB │ gzip:   4.32 kB
-dist/assets/InvoiceAging-BjOcRyJ_.js               14.06 kB │ gzip:   5.68 kB
-dist/assets/GroupReportBuilder-Dz7n-fbj.js         16.26 kB │ gzip:   5.49 kB
-dist/assets/OrderFinanceCompletion-2J6dRD0W.js     16.57 kB │ gzip:   4.67 kB
-dist/assets/BatchOrdering-BsrsytAy.js              16.68 kB │ gzip:   5.24 kB
-dist/assets/OrderProgress-DiB4rla1.js              17.71 kB │ gzip:   4.94 kB
-dist/assets/Kiosk-B-SD_raF.js                      30.64 kB │ gzip:   9.80 kB
-dist/assets/ControlCenter-C36Tg3Ao.js              59.21 kB │ gzip:  18.02 kB
-dist/assets/Advanced-Cos7lxBW.js                   68.92 kB │ gzip:  19.24 kB
-dist/assets/Patient-BoH9SWXF.js                    82.42 kB │ gzip:  25.46 kB
-dist/assets/Health-BG4IrG_5.js                    104.54 kB │ gzip:  30.45 kB
+dist/assets/SettlementDetails-D8nGDjlD.js           9.20 kB │ gzip:   3.36 kB
+dist/assets/QueueAutomation-B4cKhyHc.js            13.12 kB │ gzip:   4.32 kB
+dist/assets/InvoiceAging-BonICejP.js               14.06 kB │ gzip:   5.68 kB
+dist/assets/GroupReportBuilder-DlDblr7P.js         16.26 kB │ gzip:   5.49 kB
+dist/assets/OrderFinanceCompletion-BFACJCNX.js     16.57 kB │ gzip:   4.67 kB
+dist/assets/BatchOrdering-C6K2Ymcm.js              16.68 kB │ gzip:   5.24 kB
+dist/assets/OrderProgress-Cl8TiB_P.js              17.71 kB │ gzip:   4.94 kB
+dist/assets/Kiosk-4QhuCyLL.js                      30.64 kB │ gzip:   9.80 kB
+dist/assets/ControlCenter-CgFFxjxp.js              59.21 kB │ gzip:  18.02 kB
+dist/assets/Advanced-CFMoEl2e.js                   68.92 kB │ gzip:  19.24 kB
+dist/assets/Patient-BMvlbIcO.js                    82.42 kB │ gzip:  25.46 kB
+dist/assets/Health-CaTpDdk1.js                    104.54 kB │ gzip:  30.45 kB
 dist/assets/createLucideIcon-ChvwUqVj.js          135.98 kB │ gzip:  44.87 kB
 dist/assets/groupReportDocx-BCilcDpk.js           422.42 kB │ gzip: 123.37 kB
-dist/assets/index-BNf_HriB.js                     822.39 kB │ gzip: 230.49 kB
-dist/assets/ReportDelivery-CKBVcU3Q.js          1,149.58 kB │ gzip: 513.57 kB
-dist/assets/Coverage-D5Rzpx4s.js                1,632.20 kB │ gzip: 148.13 kB
+dist/assets/index-CHGOA18f.js                     822.54 kB │ gzip: 230.52 kB
+dist/assets/ReportDelivery-BKi4fcqa.js          1,149.58 kB │ gzip: 513.57 kB
+dist/assets/Coverage-DHH8MuNX.js                1,632.20 kB │ gzip: 148.13 kB
 
 [33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/modules/Queue.tsx is dynamically imported by src/modules/Core.tsx but also statically imported by src/modules/Core.tsx, src/modules/Patient.tsx, dynamic import will not move module into another chunk.
 
@@ -275,7 +276,7 @@ dist/assets/Coverage-D5Rzpx4s.js                1,632.20 kB │ gzip: 148.13 kB
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 674ms
+✓ built in 1.10s
 npm notice
 npm notice New major version of npm available! 11.9.0 -> 12.2.0
 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
