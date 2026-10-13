@@ -9,7 +9,7 @@ import {
 import { DemoProvider, createInitialState, reducer, today } from "../src/store";
 import { Appointments, Review, Reports } from "../src/modules/Core";
 import Queue from "../src/modules/Queue";
-const KEY = "qinghe.health.demo.v1";
+const KEY = "hongchuang.health.demo.v1";
 const data = () => JSON.parse(localStorage.getItem(KEY)!);
 const mount = (x: React.ReactNode) => render(<DemoProvider>{x}</DemoProvider>);
 describe("advanced frontend scenarios", () => {

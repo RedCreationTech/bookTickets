@@ -13,12 +13,13 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useDemo } from "../store";
-import type { Appointment } from "../model";
+import type { Appointment, DemoState } from "../model";
 import { analyzeDemoResults } from "../rules";
 import { PageTitle, Badge, Empty, Modal } from "../ui";
 import { Banner, Metrics, RecordWorkspace } from "./Operations";
 import type { WorkspaceSpec } from "./Operations";
 import "./operations.css";
+import { UnitBookingCalendar } from "./Patient";
 
 const uid = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -110,7 +111,10 @@ function abnormalItems(a: Appointment) {
 function Notifications() {
   const { state, act } = useDemo();
   const [template, setTemplate] = useState<TemplateKey>("appointment");
-  const [body, setBody] = useState(templates.appointment.text);
+  const [body, setBody] = useState(
+    state.records.notificationTemplates?.find((r) => r.id === "appointment")
+      ?.text || templates.appointment.text,
+  );
   const [channel, setChannel] = useState("短信（本地模拟）");
   const [selected, setSelected] = useState<string[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -211,6 +215,36 @@ function Notifications() {
     setSelected([]);
     setSelectedItems([]);
   };
+  const saveTemplate = () => {
+    if (
+      !body.trim() ||
+      body.length > 500 ||
+      /\{(?!姓名\}|体检号\}|日期\}|时段\}|院区\}|异常项目\})[^}]+\}/.test(body)
+    ) {
+      setError("模板需为 1–500 字，且不能包含未知占位符。");
+      return;
+    }
+    const existing = state.records.notificationTemplates?.find(
+      (r) => r.id === template,
+    );
+    act({
+      type: "UPSERT_RECORD",
+      payload: {
+        collection: "notificationTemplates",
+        record: {
+          id: template,
+          name: templates[template].label,
+          text: body.trim(),
+          version: (existing?.version || 0) + 1,
+          actor: state.config.role,
+        },
+      },
+    });
+    setError("");
+    setNotice(
+      "当前模板已保存；切换模板或刷新后可再次套用，历史发送内容保持原样。",
+    );
+  };
   const retry = (row: Delivery) => {
     act({
       type: "UPSERT_RECORD",
@@ -260,7 +294,10 @@ function Notifications() {
               onChange={(e) => {
                 const key = e.target.value as TemplateKey;
                 setTemplate(key);
-                setBody(templates[key].text);
+                setBody(
+                  state.records.notificationTemplates?.find((r) => r.id === key)
+                    ?.text || templates[key].text,
+                );
                 setSelected([]);
                 setSelectedItems([]);
                 setError("");
@@ -273,6 +310,29 @@ function Notifications() {
               ))}
             </select>
           </label>
+          <div className="actions">
+            <button className="btn" onClick={saveTemplate}>
+              保存为当前通知模板
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                setBody(
+                  state.records.notificationTemplates?.find(
+                    (r) => r.id === template,
+                  )?.text || templates[template].text,
+                );
+                setNotice("已套用本地模板库的最新版本。");
+              }}
+            >
+              重新套用已存模板
+            </button>
+          </div>
+          <p className="muted">
+            本地模板版本：
+            {state.records.notificationTemplates?.find((r) => r.id === template)
+              ?.version || "内置"}
+          </p>
           <label className="field">
             通知渠道
             <select
@@ -512,6 +572,31 @@ function AbstractAvatar({ onsite = false }: { onsite?: boolean }) {
     </svg>
   );
 }
+export function IdentityPhotoViewer({
+  appointmentId,
+}: {
+  appointmentId: string;
+}) {
+  const { state } = useDemo();
+  const a = state.appointments.find((order) => order.id === appointmentId);
+  if (!a) return null;
+  return (
+    <section aria-label="共享身份核验资料">
+      <div style={columns}>
+        <figure style={{ margin: 0 }}>
+          <AbstractAvatar />
+          <figcaption>证件照 · 合成示意</figcaption>
+        </figure>
+        <figure style={{ margin: 0 }}>
+          <AbstractAvatar onsite />
+          <figcaption>现场照 · 合成示意</figcaption>
+        </figure>
+      </div>
+      <p>同一订单核验状态：{a.identityVerification?.outcome || "未核验"}</p>
+      <small>只显示抽象示意及人工核验记录，不进行真实身份识别。</small>
+    </section>
+  );
+}
 function IdentityQuality() {
   const { state, act } = useDemo();
   const [id, setId] = useState(state.appointments[0]?.id || "");
@@ -519,7 +604,18 @@ function IdentityQuality() {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("全部");
   const a = state.appointments.find((x) => x.id === id);
+  const matchingOrders = state.appointments.filter((order) => {
+    const name =
+      state.patients.find((p) => p.id === order.patientId)?.name || "";
+    const outcome = order.identityVerification?.outcome || "未核验";
+    return (
+      (!query || `${name} ${order.id}`.includes(query)) &&
+      (status === "全部" || outcome === status)
+    );
+  });
   const records = (state.records.controlIdentity || []).filter(
     (r) => r.appointmentId === id,
   );
@@ -536,11 +632,29 @@ function IdentityQuality() {
       id: uid("ID"),
       appointmentId: id,
       outcome,
+      status: outcome.includes("不一致") ? "待复核" : "已核验",
       note: note.trim(),
       actor: state.config.role,
       at: new Date().toISOString(),
       synthetic: true,
     };
+    if (outcome === "一致")
+      (state.records.controlIdentity || [])
+        .filter((r) => r.appointmentId === id && r.status === "待复核")
+        .forEach((r) =>
+          act({
+            type: "UPSERT_RECORD",
+            payload: {
+              collection: "controlIdentity",
+              record: {
+                ...r,
+                status: "复核已关闭",
+                resolvedBy: record.id,
+                resolvedAt: record.at,
+              },
+            },
+          }),
+        );
     act({
       type: "UPSERT_RECORD",
       payload: { collection: "controlIdentity", record },
@@ -634,11 +748,67 @@ function IdentityQuality() {
         {notice && <Notice>{notice}</Notice>}
       </section>
       <section className="panel">
-        <h2>核验历史</h2>
+        <h2>核验查询与状态</h2>
+        <div className="form-grid">
+          <label>
+            核验查询
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="姓名或体检号"
+            />
+          </label>
+          <label>
+            核验状态
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option>全部</option>
+              <option>未核验</option>
+              <option>一致</option>
+              <option>不一致，待复核</option>
+            </select>
+          </label>
+        </div>
+        <div className="ops-table-wrap">
+          <table className="ops-table">
+            <thead>
+              <tr>
+                <th>体检对象</th>
+                <th>核验状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matchingOrders.map((order) => (
+                <tr key={order.id}>
+                  <td>
+                    {state.patients.find((p) => p.id === order.patientId)?.name}
+                    <small>{order.id}</small>
+                  </td>
+                  <td>{order.identityVerification?.outcome || "未核验"}</td>
+                  <td>
+                    <button
+                      className="btn"
+                      onClick={() => {
+                        setId(order.id);
+                        setConfirmed(false);
+                        setNote("");
+                      }}
+                    >
+                      打开核验记录
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <h2 style={{ marginTop: 24 }}>当前订单核验历史</h2>
         {records.map((r) => (
           <div key={r.id} className="callout">
             <div>
-              <strong>{r.outcome}</strong>
+              <strong>
+                {r.outcome} · {r.status || "历史记录"}
+              </strong>
               <p>
                 {r.note || "人工确认合成示意"} · {r.actor} · {dateTime(r.at)}
               </p>
@@ -703,6 +873,11 @@ function Signatures() {
   const { state, act } = useDemo();
   const [id, setId] = useState(state.appointments[0]?.id || "");
   const [operation, setOperation] = useState("弃检确认");
+  const [execute, setExecute] = useState(false);
+  const [waiveItem, setWaiveItem] = useState("");
+  const activeOrder = state.appointments.find((a) => a.id === id);
+  const waivable =
+    activeOrder?.items.filter((item) => !activeOrder.results[item]) || [];
   const [note, setNote] = useState("");
   const [mode, setMode] = useState("typed");
   const [typed, setTyped] = useState("");
@@ -758,12 +933,71 @@ function Signatures() {
       setError("请先选择有效体检订单。");
       return;
     }
+    if (execute && state.config.role !== "admin") {
+      setError("执行本地业务动作仅限管理员演示角色。");
+      return;
+    }
+    if (
+      execute &&
+      operation === "弃检确认" &&
+      (a.locked || !waivable.includes(waiveItem) || a.items.length <= 1)
+    ) {
+      setError("只能弃检未锁定订单中的未完成项目，且必须保留至少一项。");
+      return;
+    }
+    if (
+      execute &&
+      operation === "特殊报告领取" &&
+      !["approved", "printed"].includes(a.status)
+    ) {
+      setError("特殊报告领取需要已审核或已打印的报告。");
+      return;
+    }
+    if (
+      execute &&
+      operation === "替检核验确认" &&
+      a.identityVerification?.outcome !== "一致"
+    ) {
+      setError("请先完成当前订单的一致性人工核验，再执行确认。");
+      return;
+    }
+    const signatureId = uid("SIGN");
+    if (execute) {
+      const patch =
+        operation === "弃检确认"
+          ? {
+              items: a.items.filter((item) => item !== waiveItem),
+              waived: [...(a.waived || []), waiveItem],
+            }
+          : operation === "特殊报告领取"
+            ? {
+                specialReportCollected: true,
+                specialReportCollectedAt: new Date().toISOString(),
+              }
+            : operation === "导检单回收"
+              ? {
+                  guideRecovered: true,
+                  guideRecoveredAt: new Date().toISOString(),
+                }
+              : { identityOperationConfirmed: true };
+      act({
+        type: "UPDATE_APPOINTMENT",
+        payload: {
+          id,
+          ...patch,
+          signatureArchiveIds: [...(a.signatureArchiveIds || []), signatureId],
+        },
+      });
+    }
     act({
       type: "UPSERT_RECORD",
       payload: {
         collection: "controlSignatures",
         record: {
-          id: uid("SIGN"),
+          id: signatureId,
+          executed: execute,
+          executedItem:
+            execute && operation === "弃检确认" ? waiveItem : undefined,
           appointmentId: id,
           patientName:
             state.patients.find((p) => p.id === a.patientId)?.name ||
@@ -779,10 +1013,12 @@ function Signatures() {
       },
     });
     setNotice(
-      `${operation}的演示签名已归档。仅本地保存，不更改订单、不具备法律效力。`,
+      `${operation}的演示签名已归档。${execute ? "已同步执行所选本地订单动作。" : "未更改订单。"}不具备签章法律效力。`,
     );
     setError("");
     setTyped("");
+    setExecute(false);
+    setWaiveItem("");
     setStrokes([]);
     setNote("");
     setConfirmed(false);
@@ -817,6 +1053,36 @@ function Signatures() {
               <option>导检单回收</option>
             </select>
           </label>
+          {state.config.role === "admin" && (
+            <label className="check-line">
+              <input
+                type="checkbox"
+                checked={execute}
+                onChange={(e) => {
+                  setExecute(e.target.checked);
+                  setConfirmed(false);
+                }}
+              />
+              同时执行所选本地订单动作（仅模拟，不是真实签章）
+            </label>
+          )}
+          {execute && operation === "弃检确认" && (
+            <label className="field">
+              签名确认弃检项目
+              <select
+                value={waiveItem}
+                onChange={(e) => {
+                  setWaiveItem(e.target.value);
+                  setConfirmed(false);
+                }}
+              >
+                <option value="">请选择未完成项目</option>
+                {waivable.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="field">
             本次操作说明
             <textarea
@@ -1391,7 +1657,7 @@ function PortalConfiguration() {
   return (
     <>
       <Banner>
-        配置只保存在本浏览器，预览仅代表当前模块内容；未连接或发布微信小程序，导检配置未对接真实设备。
+        配置只保存在本浏览器。科室项目、区域及诊室已影响前端队列映射和呼叫分配；未连接微信小程序或真实导检设备。
       </Banner>
       <div className="ops-tabbar" role="tablist" aria-label="门户与导检配置">
         <button
@@ -1602,6 +1868,142 @@ function PasswordDemo() {
   );
 }
 
+export function getControlTodos(state: DemoState) {
+  return [
+    {
+      id: "notification-failures",
+      label: "模拟通知待重试",
+      count: (state.records.controlNotifications || []).filter(
+        (r) => r.status === "模拟失败",
+      ).length,
+      href: "#/controls?section=notifications",
+    },
+    {
+      id: "identity-rechecks",
+      label: "身份核验待复核",
+      count: state.appointments.filter(
+        (a) => a.identityVerification?.outcome === "不一致，待复核",
+      ).length,
+      href: "#/controls?section=identity",
+    },
+    {
+      id: "rejected-results",
+      label: "驳回结果待补正",
+      count: state.appointments.filter(
+        (a) => a.status === "in_exam" && a.rejectReason,
+      ).length,
+      href: "#/review",
+    },
+  ].filter((item) => item.count > 0);
+}
+const defaultAbnormalLevels = [
+  { id: "A类", name: "A 类 · 优先复核", color: "#bf554e" },
+  { id: "B类", name: "B 类 · 重点随访", color: "#b88935" },
+  { id: "C类", name: "C 类 · 常规跟进", color: "#4278a4" },
+  { id: "低风险", name: "常规健康管理", color: "#27806e" },
+];
+export function getAbnormalLevel(state: DemoState, id: string) {
+  return (
+    (state.config.abnormalLevels || defaultAbnormalLevels).find(
+      (level: { id: string }) => level.id === id,
+    ) || defaultAbnormalLevels[3]
+  );
+}
+function AbnormalLevels() {
+  const { state, act } = useDemo();
+  const [draft, setDraft] = useState<
+    { id: string; name: string; color: string }[]
+  >(state.config.abnormalLevels || defaultAbnormalLevels);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  return (
+    <section className="panel">
+      <h2>异常等级名称与颜色</h2>
+      <p>只修改演示展示语义，不更改医学阈值或替代临床判断。</p>
+      {draft.map((level, index) => (
+        <div className="form-grid" key={level.id}>
+          <label>
+            {level.id}显示名称
+            <input
+              value={level.name}
+              onChange={(e) =>
+                setDraft(
+                  draft.map((r, i) =>
+                    i === index ? { ...r, name: e.target.value } : r,
+                  ),
+                )
+              }
+            />
+          </label>
+          <label>
+            {level.id}展示颜色
+            <input
+              type="color"
+              value={level.color}
+              onChange={(e) =>
+                setDraft(
+                  draft.map((r, i) =>
+                    i === index ? { ...r, color: e.target.value } : r,
+                  ),
+                )
+              }
+            />
+          </label>
+        </div>
+      ))}
+      <button
+        className="btn btn-primary"
+        onClick={() => {
+          if (
+            draft.some(
+              (r) => !r.name.trim() || !/^#[0-9a-f]{6}$/i.test(r.color),
+            )
+          ) {
+            setError("名称不能为空，颜色须为有效六位色值。");
+            return;
+          }
+          act({ type: "UPDATE_CONFIG", payload: { abnormalLevels: draft } });
+          setError("");
+          setNotice("异常等级展示已保存，以下合成客户标签已同步。");
+        }}
+      >
+        保存异常等级展示
+      </button>
+      {error && <Notice error>{error}</Notice>}
+      {notice && <Notice>{notice}</Notice>}
+      <div className="ops-table-wrap">
+        <table className="ops-table">
+          <thead>
+            <tr>
+              <th>合成客户</th>
+              <th>等级显示</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.patients.map((p) => {
+              const level = getAbnormalLevel(state, p.risk);
+              return (
+                <tr key={p.id}>
+                  <td>{p.name}</td>
+                  <td>
+                    <span
+                      style={{
+                        borderLeft: `5px solid ${level.color}`,
+                        paddingLeft: 10,
+                      }}
+                    >
+                      {level.name}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
 const tabs = [
   { id: "notifications", label: "通知工作台", icon: Bell },
   { id: "identity", label: "替检核验", icon: Fingerprint },
@@ -1609,6 +2011,8 @@ const tabs = [
   { id: "rejections", label: "驳回质控", icon: ShieldCheck },
   { id: "portal", label: "门户与导检配置", icon: Smartphone },
   { id: "password", label: "密码演练", icon: KeyRound },
+  { id: "unit-calendar", label: "单位排期", icon: Smartphone },
+  { id: "abnormal-levels", label: "异常等级展示", icon: ShieldCheck },
 ];
 export default function ControlCenter({ section }: { section?: string }) {
   const [tab, setTab] = useState(
@@ -1653,7 +2057,11 @@ export default function ControlCenter({ section }: { section?: string }) {
         {tab === "rejections" && <RejectionQuality />}
         {tab === "portal" && <PortalConfiguration />}
         {tab === "password" && <PasswordDemo />}
+        {tab === "unit-calendar" && <UnitBookingCalendar editable />}
+        {tab === "abnormal-levels" && <AbnormalLevels />}
       </div>
     </div>
   );
 }
+
+export function ControlTodoList({onNavigate}:{onNavigate:()=>void}){const {state}=useDemo();return <div>{getControlTodos(state).filter(t=>t.count>0).map(t=><a className="notification" key={t.id} href={t.href} onClick={onNavigate}><strong>{t.label}</strong><Badge>{t.count}</Badge></a>)}</div>}

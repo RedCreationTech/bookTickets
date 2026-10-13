@@ -322,6 +322,23 @@ export function reducer(state: DemoState, action: Action): DemoState {
       message = `更新演示客户 ${patient.name}`;
       break;
     }
+    case "UPSERT_PACKAGE": {
+      if (
+        !p.id ||
+        !p.name?.trim() ||
+        !Array.isArray(p.items) ||
+        !p.items.length ||
+        !Number.isFinite(p.price) ||
+        p.price < 0
+      )
+        return state;
+      const pack = { ...p, items: [...new Set(p.items)] };
+      next.packages = state.packages.some((x) => x.id === p.id)
+        ? state.packages.map((x) => (x.id === p.id ? pack : x))
+        : [...state.packages, pack];
+      message = `维护套餐 ${pack.name}`;
+      break;
+    }
     case "CREATE_APPOINTMENT": {
       if (p.id && state.appointments.some((x) => x.id === p.id)) return state;
       const pack =
@@ -345,6 +362,19 @@ export function reducer(state: DemoState, action: Action): DemoState {
         },
         ...state.appointments,
       ];
+      next.records = {
+        ...state.records,
+        printTasks: [
+          ...(state.records.printTasks || []),
+          ...["导检单", "项目单", "检验条码"].map((kind) => ({
+            id: "PRINT-" + id + "-" + kind,
+            appointmentId: id,
+            kind,
+            status: "待模拟打印",
+            createdAt: new Date().toISOString(),
+          })),
+        ],
+      };
       message = `创建预约 ${id}`;
       break;
     }
@@ -374,8 +404,21 @@ export function reducer(state: DemoState, action: Action): DemoState {
         results: { ...a.results, ...p.results },
         status: p.complete ? "review" : "in_exam",
         conclusion: p.conclusion ?? a.conclusion,
+        submittedAt: p.complete ? new Date().toISOString() : a.submittedAt,
       });
       message = `${p.complete ? "完成分检并提交审核" : "保存分检结果"} ${p.id}`;
+      break;
+    case "UNDO_RESULTS":
+      if (
+        !a ||
+        a.locked ||
+        a.status !== "review" ||
+        (a.reviewStage || 0) > 0 ||
+        !p.reason?.trim()
+      )
+        return state;
+      update({ status: "in_exam", submittedAt: null, undoReason: p.reason });
+      message = `撤销分检提交 ${p.id}：${p.reason}`;
       break;
     case "REVIEW":
       if (
@@ -427,6 +470,7 @@ export function reducer(state: DemoState, action: Action): DemoState {
         .join("、")}`;
       break;
     case "ADD_TASK":
+      if (p.id && state.tasks.some((t) => t.id === p.id)) return state;
       next.tasks = [
         { id: uid("TASK"), status: "待处理", date: today(), ...p },
         ...state.tasks,
@@ -482,6 +526,7 @@ export function reducer(state: DemoState, action: Action): DemoState {
         "PAYMENT",
         "CHECKIN",
         "SAVE_RESULTS",
+        "UNDO_RESULTS",
         "REVIEW",
         "REJECT",
         "PRINT",
@@ -491,6 +536,10 @@ export function reducer(state: DemoState, action: Action): DemoState {
       entity = p.id || next.appointments[0]?.id;
       before = state.appointments.find((x) => x.id === entity) || null;
       after = next.appointments.find((x) => x.id === entity) || null;
+    } else if (action.type === "UPSERT_PACKAGE") {
+      entity = p.id;
+      before = state.packages.find((x) => x.id === p.id) || null;
+      after = next.packages.find((x) => x.id === p.id) || null;
     } else if (action.type === "UPDATE_CONFIG") {
       entity = "config";
       before = state.config;

@@ -33,7 +33,27 @@ import {
 } from "lucide-react";
 import { useDemo } from "../store";
 import "./devices.css";
-import { getBookingAvailability } from "../bookingRules";
+import {
+  getOrderingIssues,
+  packageIsApplicable,
+  getOrderRules,
+  quoteOrder,
+} from "../orderingRules";
+import { deriveQueueDefinitions } from "./Queue";
+import { applicableGroup, splitGroupAmount } from "./Groups";
+import {
+  getBookingAvailability,
+  getOnlineExtraCatalog,
+  getGroupBookingSchedules,
+  getBookingNow,
+  bookingDateOffset,
+  groupAppointmentCompany,
+  getBookingSlots,
+  getBookingDates,
+  hasCompletedQuestionnaire,
+  recommendedBookingItems,
+  QUESTIONNAIRE_OPTIONS,
+} from "../bookingRules";
 
 type View =
   | "home"
@@ -49,7 +69,8 @@ type View =
   | "shop"
   | "messages"
   | "profile"
-  | "article";
+  | "article"
+  | "portal";
 const titles: Record<View, string> = {
   home: "健康，从每一天开始",
   booking: "预约体检",
@@ -65,6 +86,7 @@ const titles: Record<View, string> = {
   messages: "消息与留言",
   profile: "我的健康档案",
   article: "健康课堂",
+  portal: "健康中心与服务指引",
 };
 const statuses: Record<string, string> = {
   booked: "待支付",
@@ -76,11 +98,6 @@ const statuses: Record<string, string> = {
   printed: "已领取报告",
   cancelled: "已取消",
 };
-const extras = [
-  { name: "甲状腺彩超", price: 120, detail: "了解甲状腺形态与结构" },
-  { name: "糖化血红蛋白", price: 65, detail: "评估近期血糖整体水平" },
-  { name: "骨密度检查", price: 95, detail: "了解骨量变化情况" },
-];
 const meanings: Record<string, string> = {
   一般检查: "记录身高、体重、血压等基础健康指标",
   血常规: "了解血细胞数量与分类等基础信息",
@@ -105,26 +122,101 @@ export default function Patient() {
   const entranceGroup = new URLSearchParams(
     window.location.hash.split("?")[1] || window.location.search,
   ).get("group");
-  const [view, setView] = useState<View>(entranceGroup ? "group" : "home");
+  const entryParams = new URLSearchParams(
+    window.location.hash.split("?")[1] || window.location.search,
+  );
+  const queueEntry = entryParams.get("queue") || "";
+  const [distributorId, setDistributorId] = useState(
+    entryParams.get("distributor") || "",
+  );
+  const [shareDistributor, setShareDistributor] = useState(
+    `D-${state.patients[0]?.id || "P001"}`,
+  );
+  const [accountId] = useState(
+    state.config.patientAccountId ||
+      state.patients.find((p) => p.id === "P001")?.id ||
+      state.patients[0]?.id ||
+      "P001",
+  );
+  const [personDraft, setPersonDraft] = useState({
+    name: "",
+    sex: "女",
+    age: 30,
+    phone: "",
+  });
+  const [queueDepartment, setQueueDepartment] = useState("");
+  const unitSchedules = getGroupBookingSchedules(state);
+  const [groupCompany, setGroupCompany] = useState(
+    unitSchedules.find((row) => row.id === entranceGroup)?.company ||
+      "星辰科技",
+  );
+  const [view, setView] = useState<View>(
+    queueEntry ? "guide" : entranceGroup ? "group" : "home",
+  );
   const [bookingReturn, setBookingReturn] = useState<"booking" | "group">(
     entranceGroup ? "group" : "booking",
   );
-  const [patientId, setPatientId] = useState(state.patients[0]?.id || "");
+  const [patientId, setPatientId] = useState(
+    state.appointments.find((a) => a.id === queueEntry)?.patientId ||
+      state.patients[0]?.id ||
+      "",
+  );
   const patient =
     state.patients.find((p) => p.id === patientId) || state.patients[0];
   const orders = state.appointments.filter((a) => a.patientId === patient?.id);
-  const upcoming = orders.find(
-    (a) => !["cancelled", "approved", "printed"].includes(a.status),
-  );
+  const upcoming =
+    orders.find((a) => a.id === queueEntry) ||
+    orders.find(
+      (a) => !["cancelled", "approved", "printed"].includes(a.status),
+    );
   const reports = orders.filter((a) =>
     ["approved", "printed"].includes(a.status),
   );
-  const [packageId, setPackageId] = useState(state.packages[0]?.id || "");
-  const selectedPackage = state.packages.find((p) => p.id === packageId);
   const [date, setDate] = useState(upcomingDate());
+  const inGroupFlow =
+    view === "group" ||
+    (["compare", "questionnaire"].includes(view) && bookingReturn === "group");
+  const activeGroup = inGroupFlow
+    ? applicableGroup(state, patient.id, date)
+    : undefined;
+  const groupContractBlocked =
+    inGroupFlow &&
+    (state.records.groupOrders || []).some((g) => g.company === groupCompany) &&
+    (!activeGroup || activeGroup.company !== groupCompany);
+  const [packageId, setPackageId] = useState(state.packages[0]?.id || "");
+  const bookingExtras = getOnlineExtraCatalog(
+    state,
+    patient.id,
+    activeGroup ? activeGroup.optionalItems || [] : undefined,
+  ).filter(
+    (extra) =>
+      !state.packages
+        .find((pack) => pack.id === packageId)
+        ?.items.includes(extra.name),
+  );
+  const applicablePackages = state.packages.filter(
+    (p) =>
+      (!activeGroup || activeGroup.packages?.includes(p.id)) &&
+      packageIsApplicable(state, patient, p.id) &&
+      (state.records.packageRules || []).find((r) => r.packageId === p.id)
+        ?.onlineEnabled !== false &&
+      p.onlineEnabled !== false,
+  );
+  const selectedPackage = applicablePackages.find((p) => p.id === packageId);
+  const requiredItems = getOrderRules(state)
+    .filter((r) => r.required && r.enabled !== false && r.ruleEnabled !== false)
+    .map((r) => r.item);
   const [time, setTime] = useState("08:00-08:30");
+  useEffect(() => {
+    const slots = getBookingSlots(state);
+    if (!slots.some((slot) => slot.time === time))
+      setTime(slots[0]?.time || "");
+  }, [state.config.timeSlots]);
   const [campus, setCampus] = useState(state.config.campus || "中心院区");
   const [simple, setSimple] = useState(false);
+  useEffect(() => {
+    if (activeGroup) setSimple(false);
+  }, [activeGroup?.id]);
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [excludedItems, setExcludedItems] = useState<string[]>([]);
   const bookingSubmitted = useRef(false);
@@ -134,13 +226,33 @@ export default function Patient() {
     state.config.showPrices !== false &&
     !["不显示", "不显示价格"].includes(state.config.priceMode);
   const baseItems = (selectedPackage?.items || []).filter(
-    (item) => !allowRemove || !excludedItems.includes(item),
+    (item) => !excludedItems.includes(item),
   );
-  const activeExtras = allowAdd && !simple ? selectedExtras : [];
-  const availability = getBookingAvailability(state, date);
+  const activeExtras =
+    allowAdd && !simple
+      ? selectedExtras.filter((name) =>
+          bookingExtras.some((extra: { name: string }) => extra.name === name),
+        )
+      : [];
+  const availability = getBookingAvailability(state, date, undefined, {
+    patientId: patient?.id,
+    company: groupCompany,
+    kind: view === "group" ? "group" : "individual",
+    time,
+  });
+  const questionnaireEnabled = state.config.questionnaireEnabled !== false;
+  const questionnaireSkippable = state.config.questionnaireSkippable !== false;
+  const recommendationEnabled = state.config.recommendationEnabled !== false;
+  const questionnaireCompleted = hasCompletedQuestionnaire(state, patient?.id);
   useEffect(() => {
-    setExcludedItems([]);
-  }, [packageId]);
+    setExcludedItems(
+      state.config.defaultSelected === false
+        ? (selectedPackage?.items || []).filter(
+            (item) => !requiredItems.includes(item),
+          )
+        : [],
+    );
+  }, [packageId, state.config.defaultSelected]);
   const [compare, setCompare] = useState<string[]>(
     state.packages.slice(0, 2).map((p) => p.id),
   );
@@ -153,10 +265,20 @@ export default function Patient() {
   const [reportId, setReportId] = useState("");
   const [historyCount, setHistoryCount] = useState(3);
   const [answers, setAnswers] = useState<string[]>([]);
+  const [questionContext, setQuestionContext] = useState({
+    history: "",
+    medication: "",
+    family: "",
+  });
+  useEffect(() => {
+    setAnswers([]);
+    setQuestionContext({ history: "", medication: "", family: "" });
+    setQuestionDone(false);
+  }, [patientId]);
   const [questionDone, setQuestionDone] = useState(false);
   const [consent, setConsent] = useState(false);
   const [groupVerified, setGroupVerified] = useState(
-    entranceGroup === "xingchen-2026",
+    unitSchedules.some((row) => row.id === entranceGroup),
   );
   const [groupCode, setGroupCode] = useState("DEMO2026");
   const [groupMode, setGroupMode] = useState("定额自选");
@@ -170,15 +292,27 @@ export default function Patient() {
   const [service, setService] = useState("");
   const [serviceDate, setServiceDate] = useState(upcomingDate());
   const [reminders, setReminders] = useState(true);
-  const groupUrl = `${window.location.origin}${window.location.pathname}#/patient?group=xingchen-2026`;
+  const groupUrl = `${window.location.origin}${window.location.pathname}#/patient?group=${encodeURIComponent(unitSchedules.find((row) => row.company === groupCompany)?.id || "xingchen-2026")}`;
   useEffect(() => {
     const enterGroup = () => {
+      const params = new URLSearchParams(window.location.hash.split("?")[1]);
+      setDistributorId(params.get("distributor") || "");
+      const queueOrder = state.appointments.find(
+        (a) => a.id === params.get("queue"),
+      );
+      if (queueOrder) {
+        setPatientId(queueOrder.patientId);
+        setView("guide");
+      }
       const group = new URLSearchParams(window.location.hash.split("?")[1]).get(
         "group",
       );
       if (group) {
         setView("group");
-        setGroupVerified(group === "xingchen-2026");
+        setGroupVerified(unitSchedules.some((row) => row.id === group));
+        setGroupCompany(
+          unitSchedules.find((row) => row.id === group)?.company || "星辰科技",
+        );
       }
     };
     window.addEventListener("hashchange", enterGroup);
@@ -206,20 +340,56 @@ export default function Patient() {
         ? values.filter((v) => v !== value)
         : [...values, value],
     );
-  const addPrice = extras
+  const addPrice = bookingExtras
     .filter((e) => activeExtras.includes(e.name))
     .reduce((sum, e) => sum + e.price, 0);
-  const total = (simple ? 0 : selectedPackage?.price || 0) + addPrice;
+  const groupQuote = activeGroup
+    ? quoteOrder(state, [packageId], 100, {}, activeExtras)
+    : null;
+  const total = groupQuote
+    ? groupQuote.amount
+    : (simple ? 0 : selectedPackage?.price || 0) + addPrice;
+  const groupCharge = activeGroup
+    ? groupRelative
+      ? { unit: 0, personal: total }
+      : splitGroupAmount(activeGroup, groupQuote?.rows || [])
+    : {
+        unit: groupRelative ? 0 : Math.min(total, 800),
+        personal: groupRelative ? total : Math.max(0, total - 800),
+      };
   const createOrder = (isGroup = false) => {
     if (bookingSubmitted.current) return;
     if (!consent) return tell("请先确认已阅读预约须知");
+    if (activeGroup && simple)
+      return tell("单位订单必须选择已配置的体检套餐，不能使用简单预约");
+    if (groupContractBlocked)
+      return tell("当前体检人不在单位订单有效名单或预约日期内");
+    if (activeGroup && activeExtras.length !== Number(activeGroup.choose || 0))
+      return tell(`单位自选项目需选择 ${Number(activeGroup.choose || 0)} 项`);
     if (!patient || (!simple && !selectedPackage))
       return tell("请选择体检人和套餐");
     if (!availability.allowed) return tell(availability.error);
+    if (
+      isGroup &&
+      groupRelative &&
+      unitSchedules.find((row) => row.company === groupCompany)
+        ?.allowRelatives === false
+    )
+      return tell("该单位已关闭亲属预约");
+    const itemIssues = simple
+      ? []
+      : getOrderingIssues(
+          state,
+          patient.id,
+          [...baseItems, ...activeExtras],
+          [packageId],
+        );
+    if (itemIssues.length) return tell(itemIssues.join("；"));
     if (!simple && baseItems.length + activeExtras.length === 0)
       return tell("请至少保留一个检查项目");
     if (
       isGroup &&
+      !activeGroup &&
       groupMode === "N 选 M" &&
       allowAdd &&
       activeExtras.length !== 2
@@ -239,12 +409,25 @@ export default function Patient() {
         results: {},
         conclusion: "",
         source: isGroup ? "H5团检" : "H5个检",
-        groupBudget: isGroup ? 800 : 0,
-        selfPay: isGroup
-          ? groupRelative
-            ? total
-            : Math.max(0, total - 800)
-          : total,
+        bookingKind: isGroup ? "group" : "individual",
+        groupCompany: isGroup ? groupCompany : "",
+        questionnaireCompleted,
+        distributorId: state.patients.some((p) => `D-${p.id}` === distributorId)
+          ? distributorId
+          : "",
+        questionnaireAnswers:
+          state.records.bookingQuestionnaires?.find(
+            (row) => row.patientId === patient.id,
+          )?.answers || [],
+        groupBudget: isGroup
+          ? activeGroup
+            ? Number(activeGroup.budget) || groupCharge.unit
+            : 800
+          : 0,
+        groupOrderId: isGroup ? activeGroup?.id : undefined,
+        groupSplit: isGroup ? groupCharge : undefined,
+        pricing: groupQuote?.rows,
+        selfPay: isGroup ? groupCharge.personal : total,
       },
     });
     setConsent(false);
@@ -254,7 +437,7 @@ export default function Patient() {
   const payOrder = state.appointments.find((a) => a.id === payId);
   const currentReport =
     reports.find((r) => r.id === reportId) || reports[reports.length - 1];
-  const commonServices = [
+  const baseServices = [
     {
       icon: CalendarDays,
       title: "预约体检",
@@ -281,6 +464,148 @@ export default function Patient() {
     },
   ] as const;
 
+  const referralUrl = `${window.location.origin}${window.location.pathname}#/patient?distributor=${encodeURIComponent(shareDistributor)}`;
+  const commonPeople = (state.records.patientCommonPeople || []).filter(
+    (row) => row.ownerPatientId === accountId && row.status === "active",
+  );
+  const saveCommon = (id: string, active: boolean) =>
+    act({
+      type: "UPSERT_RECORD",
+      payload: {
+        collection: "patientCommonPeople",
+        record: {
+          id: `COMMON-${accountId}-${id}`,
+          ownerPatientId: accountId,
+          patientId: id,
+          status: active ? "active" : "removed",
+        },
+      },
+    });
+  const registerPerson = () => {
+    if (!/^演示.{1,10}$/.test(personDraft.name.trim()))
+      return tell("称呼须以“演示”开头，且总长 3–12 字");
+    if (!/^DEMO-\d{4,8}$/.test(personDraft.phone))
+      return tell("手机号标识仅允许 DEMO- 加 4–8 位数字");
+    if (
+      !Number.isInteger(Number(personDraft.age)) ||
+      personDraft.age < 18 ||
+      personDraft.age > 99
+    )
+      return tell("演示年龄范围为 18–99 岁");
+    if (state.patients.some((p) => p.phone === personDraft.phone))
+      return tell("该演示手机号标识已注册");
+    const id = `P-DEMO-${Date.now().toString(36)}`;
+    act({
+      type: "UPSERT_PATIENT",
+      payload: {
+        id,
+        ...personDraft,
+        name: personDraft.name.trim(),
+        company: "个检",
+        risk: "未评估（演示）",
+        demoIdentity: `DEMO-${id}`,
+        demoAccount: true,
+      },
+    });
+    saveCommon(id, true);
+    setPersonDraft({ name: "", sex: "女", age: 30, phone: "" });
+    tell("合成体检人已注册并保存为常用体检人");
+  };
+  const queueDefinitions = deriveQueueDefinitions(state).filter(
+    (q) =>
+      q.enabled &&
+      (!patient || q.sex === "不限" || q.sex === patient.sex) &&
+      upcoming?.items.some(
+        (item) => q.items.includes(item) && !upcoming.results[item],
+      ),
+  );
+  const selectedQueue =
+    queueDefinitions.find((q) => q.id === queueDepartment) ||
+    queueDefinitions[0];
+  const currentTickets = (state.records.queueTickets || []).filter(
+    (t) =>
+      t.appointmentId === upcoming?.id &&
+      ["waiting", "calling", "missed"].includes(t.status),
+  );
+  const joinQueue = () => {
+    if (!upcoming || !["checked", "in_exam"].includes(upcoming.status))
+      return tell("请先完成到检签到，再加入排队");
+    if (
+      !selectedQueue ||
+      state.config.queueOpen?.[selectedQueue.id] === false ||
+      state.records.guideZones?.find((z) => z.name === selectedQueue.zone)
+        ?.status === "已停用"
+    )
+      return tell("当前队列未开放，请选择其他检查科室");
+    if (currentTickets.some((t) => t.department === selectedQueue.id))
+      return tell("您已在该队列，请勿重复取号");
+    const inLine = (state.records.queueTickets || []).filter(
+      (t) =>
+        t.department === selectedQueue.id &&
+        ["waiting", "calling"].includes(t.status),
+    );
+    act({
+      type: "UPSERT_RECORD",
+      payload: {
+        collection: "queueTickets",
+        record: {
+          id: `${selectedQueue.id}-${upcoming.id}`,
+          appointmentId: upcoming.id,
+          department: selectedQueue.id,
+          status: "waiting",
+          position: inLine.length
+            ? Math.max(...inLine.map((t) => Number(t.position) || 0)) + 1
+            : 0,
+          waitMinutes: inLine.length * selectedQueue.minutes,
+          zone: selectedQueue.zone,
+          createdAt: getBookingNow(state).toISOString(),
+          source: "患者H5",
+        },
+      },
+    });
+    tell("已加入演示队列，状态与导检工作台同步");
+  };
+  const publicRows = (key: string) =>
+    (state.records[key] || [])
+      .filter((row) => ["已启用", "已发布", "已通过"].includes(row.status))
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  const hospital = {
+    name: "红创 · 健康中心",
+    intro: "合成演示健康中心，提供体检预约、报告与健康管理服务。",
+    address: "演示城市 · 合成健康路 1 号（非真实地址）",
+    hotline: "DEMO-0000",
+    hours: "周一至周六 07:30—17:00",
+    ...(state.config.portalHospital || {}),
+  };
+  const portalTarget = (target: string): View =>
+    (({
+      预约体检: "booking",
+      报告查询: "reports",
+      健康科普: "article",
+      服务中心: "services",
+      常见问题: "portal",
+    })[target] as View) || "portal";
+  const menuIcons: Record<string, typeof Heart> = {
+    日历: CalendarDays,
+    报告: FileText,
+    健康: Heart,
+    客服: MessageCircle,
+  };
+  const commonServices = state.records.portalMenus
+    ? publicRows("portalMenus").map((row) => ({
+        title: row.name,
+        desc: row.target,
+        target: portalTarget(row.target),
+        icon: menuIcons[row.icon] || Heart,
+      }))
+    : baseServices;
+  const portalContent = publicRows("portalBanners").filter(
+    (row) => !row.date || row.date <= bookingDateOffset(state),
+  );
+  const configuredArticle = portalContent.find((row) => row.name === article);
+  const serviceNames = state.records.portalServices
+    ? publicRows("portalServices").map((row) => row.name as string)
+    : ["体检报告解读", "健康生活方式咨询", "体检项目咨询", "到院无障碍协助"];
   if (!patient)
     return <div className="pt-empty">暂无演示体检人，请先重置演示数据。</div>;
   return (
@@ -291,7 +616,7 @@ export default function Patient() {
             <HeartPulse size={25} />
           </span>
           <div>
-            <b>青禾 · 健康中心</b>
+            <b>{hospital.name}</b>
             <small>HEALTH, WITH CARE</small>
           </div>
         </div>
@@ -311,6 +636,11 @@ export default function Patient() {
           </button>
         </div>
       </div>
+      {state.patients.some((p) => `D-${p.id}` === distributorId) && (
+        <p className="pt-note">
+          当前通过个人推广入口访问：{distributorId}，新预约将保存该来源。
+        </p>
+      )}
       <div className="pt-page-header">
         <div>
           {view !== "home" && (
@@ -370,6 +700,40 @@ export default function Patient() {
                   </div>
                 </div>
               </section>
+              <div className="pt-section-title">
+                <button className="pt-text-button" onClick={() => go("portal")}>
+                  中心介绍 · 医院位置 · 服务与常见问题{" "}
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+              {portalContent.length > 0 && (
+                <section className="pt-stacked">
+                  {portalContent.map((row) => (
+                    <button
+                      key={row.id}
+                      className="pt-info-banner"
+                      style={{ textAlign: "left", width: "100%" }}
+                      onClick={() => {
+                        if (row.kind === "新闻" || row.target === "健康科普") {
+                          setArticle(row.name);
+                          go("article");
+                        } else go(portalTarget(row.target));
+                      }}
+                    >
+                      <Bell size={23} />
+                      <div>
+                        <small>
+                          {row.kind === "海报" ? "文字海报" : "站内新闻"} ·{" "}
+                          {row.date}
+                        </small>
+                        <h3>{row.name}</h3>
+                        <p>{row.summary}</p>
+                      </div>
+                      <ChevronRight size={18} />
+                    </button>
+                  ))}
+                </section>
+              )}
               <section className="pt-shortcuts">
                 {commonServices.map((s) => (
                   <button key={s.title} onClick={() => go(s.target)}>
@@ -437,7 +801,7 @@ export default function Patient() {
                 </button>
               </div>
               <div className="pt-package-grid">
-                {state.packages.slice(0, 3).map((p, i) => (
+                {applicablePackages.slice(0, 3).map((p, i) => (
                   <button
                     className="pt-package-card"
                     key={p.id}
@@ -515,6 +879,121 @@ export default function Patient() {
               </div>
             </>
           )}
+          {view === "portal" && (
+            <section className="pt-card">
+              <span className="pt-pill">医院门户 · 本地已启用内容</span>
+              <h2>{hospital.name}</h2>
+              <p>{hospital.intro}</p>
+              <div className="pt-info-banner">
+                <MapPin size={25} />
+                <div>
+                  <b>医院位置与到院指引</b>
+                  <p>{hospital.address}</p>
+                  <p>
+                    {hospital.hours} · 演示热线 {hospital.hotline}
+                  </p>
+                </div>
+              </div>
+              <label>
+                查看院区路线
+                <select
+                  value={campus}
+                  onChange={(e) => setCampus(e.target.value)}
+                >
+                  <option>中心院区</option>
+                  <option>东院区</option>
+                </select>
+              </label>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3,1fr)",
+                  gap: 12,
+                  margin: "20px 0",
+                }}
+              >
+                {["入口 / 服务台", "一层 / 采血区", "二层 / 检查区"].map(
+                  (text, i) => (
+                    <div className="pt-note" key={text}>
+                      <b>
+                        {i + 1}. {text}
+                      </b>
+                      <p>
+                        {i
+                          ? "沿导引标识前往，需帮助请联系服务台。"
+                          : "先核验演示预约，到检后领取导检单。"}
+                      </p>
+                    </div>
+                  ),
+                )}
+              </div>
+              <p className="pt-note">
+                以上为本地合成路线示意，不是医院实景或实时导航。
+              </p>
+              {publicRows("guideZones")
+                .filter((row) => row.campus === campus)
+                .map((row) => (
+                  <div className="pt-result-row" key={row.id}>
+                    <b>
+                      {row.name} · {row.floor}
+                    </b>
+                    <span>{row.directions}</span>
+                  </div>
+                ))}
+              <h3 className="pt-subheading">检查设备与医生团队</h3>
+              {publicRows("portalTeams").map((row) => (
+                <article className="pt-info-banner" key={row.id}>
+                  <Stethoscope size={22} />
+                  <div>
+                    <b>
+                      {row.name} · {row.kind}
+                    </b>
+                    <p>
+                      {row.department} · {row.summary}
+                    </p>
+                  </div>
+                </article>
+              ))}
+              <h3 className="pt-subheading">常见问题</h3>
+              {publicRows("portalFaq").map((row) => (
+                <details className="pt-note" key={row.id}>
+                  <summary>{row.name}</summary>
+                  <p>{row.answer}</p>
+                </details>
+              ))}
+              <h3 className="pt-subheading">服务信息</h3>
+              {publicRows("portalServices").map((row) => (
+                <div className="pt-info-banner" key={row.id}>
+                  <Heart size={22} />
+                  <div>
+                    <b>{row.name}</b>
+                    <p>{row.scope}</p>
+                    <p>
+                      {row.hours} · {row.location}
+                      {displayPrices ? ` · 演示费用 ¥${row.price}` : ""}
+                    </p>
+                    <button
+                      className="pt-text-button"
+                      onClick={() => setService(row.name)}
+                    >
+                      预约此服务
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <h3 className="pt-subheading">友情链接</h3>
+              {publicRows("portalLinks").map((row) => (
+                <details className="pt-note" key={row.id}>
+                  <summary>{row.name}</summary>
+                  <p>{row.description}</p>
+                  <p>{row.url}</p>
+                  <small>
+                    仅展示配置的链接信息，演示不会自动访问外部网站。
+                  </small>
+                </details>
+              ))}
+            </section>
+          )}
           {(view === "booking" || view === "group") && (
             <section className="pt-card">
               {view === "group" && !groupVerified ? (
@@ -562,10 +1041,12 @@ export default function Patient() {
                     <div className="pt-info-banner">
                       <Building2 size={22} />
                       <div>
-                        <b>星辰科技 · 年度体检福利</b>
+                        <b>{groupCompany} · 年度体检福利</b>
                         <p>
-                          单位额度 ¥800 /
-                          人，超额自费。亲属使用演示专属套餐并全额自费。
+                          {activeGroup
+                            ? `${activeGroup.name || activeGroup.id} · ${activeGroup.mode} · 单位预算 ${activeGroup.mode === "无限额" ? "不限" : `¥${activeGroup.budget}`}`
+                            : "单位额度 ¥800 / 人，超额自费。"}
+                          亲属预约按全额自费演示。
                         </p>
                       </div>
                     </div>
@@ -597,14 +1078,26 @@ export default function Patient() {
                   </div>
                   <div className="pt-section-title compact">
                     <h3>选择适合您的套餐</h3>
-                    <button onClick={() => go("questionnaire")}>
-                      <Sparkles size={16} /> 问卷推荐
+                    <button
+                      onClick={() =>
+                        questionnaireEnabled
+                          ? go("questionnaire")
+                          : tell("当前已关闭检前问卷")
+                      }
+                    >
+                      <Sparkles size={16} />{" "}
+                      {questionnaireEnabled
+                        ? questionnaireCompleted
+                          ? "问卷已完成"
+                          : "填写检前问卷"
+                        : "问卷已关闭"}
                     </button>
                   </div>
                   <label className="pt-check-row">
                     <input
                       type="checkbox"
                       checked={simple}
+                      disabled={!!activeGroup}
                       onChange={(e) => setSimple(e.target.checked)}
                     />{" "}
                     简单预约，仅预约到院时间
@@ -620,7 +1113,7 @@ export default function Patient() {
                         />
                       </div>
                       <div className="pt-package-options">
-                        {state.packages
+                        {applicablePackages
                           .filter((p) => p.name.includes(query))
                           .map((p) => (
                             <div
@@ -666,18 +1159,31 @@ export default function Patient() {
                       <label>
                         单位预约模式
                         <select
-                          value={groupMode}
+                          value={activeGroup?.mode || groupMode}
+                          disabled={!!activeGroup}
                           onChange={(e) => setGroupMode(e.target.value)}
                         >
                           <option>固定套餐</option>
                           <option>定额自选</option>
                           <option>N 选 M</option>
+                          <option>限额自选</option>
+                          <option>无限额</option>
                         </select>
                       </label>
                       <label className="pt-check-row">
                         <input
                           type="checkbox"
-                          checked={groupRelative}
+                          disabled={
+                            unitSchedules.find(
+                              (row) => row.company === groupCompany,
+                            )?.allowRelatives === false
+                          }
+                          checked={
+                            groupRelative &&
+                            unitSchedules.find(
+                              (row) => row.company === groupCompany,
+                            )?.allowRelatives !== false
+                          }
                           onChange={(e) => setGroupRelative(e.target.checked)}
                         />{" "}
                         亲属预约（专属价自费）
@@ -699,10 +1205,18 @@ export default function Patient() {
                               type="checkbox"
                               aria-label={`套餐项目：${item}`}
                               checked={baseItems.includes(item)}
-                              disabled={!allowRemove}
-                              onChange={() =>
-                                toggle(excludedItems, item, setExcludedItems)
+                              disabled={
+                                requiredItems.includes(item) ||
+                                (!allowRemove && baseItems.includes(item))
                               }
+                              onChange={() => {
+                                if (
+                                  requiredItems.includes(item) ||
+                                  (!allowRemove && baseItems.includes(item))
+                                )
+                                  return;
+                                toggle(excludedItems, item, setExcludedItems);
+                              }}
                             />
                             {item}
                           </label>
@@ -710,29 +1224,45 @@ export default function Patient() {
                       </div>
                       <h3 className="pt-subheading">
                         按需增加检查项目{" "}
-                        {view === "group" && groupMode === "N 选 M" && (
-                          <small>3 选 2</small>
-                        )}
+                        {view === "group" &&
+                          (activeGroup ? (
+                            <small>
+                              {bookingExtras.length} 选{" "}
+                              {activeGroup.choose || 0}
+                            </small>
+                          ) : (
+                            groupMode === "N 选 M" && <small>3 选 2</small>
+                          ))}
                       </h3>
-                      {extras.map((e) => (
-                        <label className="pt-extra" key={e.name}>
-                          <input
-                            type="checkbox"
-                            disabled={!allowAdd}
-                            checked={activeExtras.includes(e.name)}
-                            onChange={() =>
-                              toggle(selectedExtras, e.name, setSelectedExtras)
-                            }
-                          />
-                          <span>
-                            <b>{e.name}</b>
-                            <small>{e.detail}</small>
-                          </span>
-                          <b>
-                            {displayPrices ? `+ ¥${e.price}` : "价格待咨询"}
-                          </b>
-                        </label>
-                      ))}
+                      {bookingExtras.map(
+                        (e: {
+                          name: string;
+                          price: number;
+                          detail: string;
+                        }) => (
+                          <label className="pt-extra" key={e.name}>
+                            <input
+                              type="checkbox"
+                              disabled={!allowAdd}
+                              checked={activeExtras.includes(e.name)}
+                              onChange={() =>
+                                toggle(
+                                  selectedExtras,
+                                  e.name,
+                                  setSelectedExtras,
+                                )
+                              }
+                            />
+                            <span>
+                              <b>{e.name}</b>
+                              <small>{e.detail}</small>
+                            </span>
+                            <b>
+                              {displayPrices ? `+ ¥${e.price}` : "价格待咨询"}
+                            </b>
+                          </label>
+                        ),
+                      )}
                       {!allowAdd && (
                         <p className="pt-note">
                           当前配置不允许增加套餐外项目。
@@ -740,7 +1270,47 @@ export default function Patient() {
                       )}
                     </>
                   )}
+                  {view === "group" && (
+                    <>
+                      <label>
+                        预约单位
+                        <select
+                          value={groupCompany}
+                          onChange={(e) => setGroupCompany(e.target.value)}
+                        >
+                          {unitSchedules.map((row) => (
+                            <option key={row.id} value={row.company}>
+                              {row.company}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <UnitBookingCalendar
+                        company={groupCompany}
+                        onSelectDate={setDate}
+                      />
+                    </>
+                  )}
                   <h3 className="pt-subheading">预约时间</h3>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 7,
+                      flexWrap: "wrap",
+                      marginBottom: 15,
+                    }}
+                  >
+                    {getBookingDates(state, 14).map((day) => (
+                      <button
+                        className="pt-secondary"
+                        style={{ padding: "7px 9px", fontSize: 10 }}
+                        key={day}
+                        onClick={() => setDate(day)}
+                      >
+                        {day.slice(5)}
+                      </button>
+                    ))}
+                  </div>
                   <div className="pt-form-grid">
                     <label>
                       预约日期
@@ -757,10 +1327,9 @@ export default function Patient() {
                         value={time}
                         onChange={(e) => setTime(e.target.value)}
                       >
-                        <option>08:00-08:30</option>
-                        <option>08:30-09:00</option>
-                        <option>09:00-09:30</option>
-                        <option>09:30-10:00</option>
+                        {getBookingSlots(state).map((slot) => (
+                          <option key={slot.time}>{slot.time}</option>
+                        ))}
                       </select>
                     </label>
                   </div>
@@ -768,8 +1337,10 @@ export default function Patient() {
                     className={`pt-capacity ${availability.allowed ? "" : "blocked"}`}
                     role="note"
                   >
-                    {availability.error ||
-                      `当日全院剩余 ${availability.remaining} / ${availability.capacity} 个预约名额`}
+                    {groupContractBlocked
+                      ? "当前体检人不在单位订单有效名单或预约日期内"
+                      : availability.error ||
+                        `当日全院剩余 ${availability.remaining} / ${availability.capacity} 个预约名额`}
                   </div>
                   <div className="pt-note">
                     请提前 10
@@ -783,13 +1354,26 @@ export default function Patient() {
                     />{" "}
                     已阅读预约须知，确认本次为本地模拟预约
                   </label>
+                  {questionnaireEnabled && !questionnaireCompleted && (
+                    <p className="pt-note">
+                      {questionnaireSkippable
+                        ? "检前问卷可选填。"
+                        : "预约前须完成检前问卷。"}
+                      <button
+                        className="pt-text-button"
+                        onClick={() => go("questionnaire")}
+                      >
+                        填写检前问卷
+                      </button>
+                    </p>
+                  )}
                   <div className="pt-checkout">
                     <div>
                       <small>
                         {!displayPrices
                           ? "价格展示已关闭"
                           : view === "group"
-                            ? `单位承担 ¥${groupRelative ? 0 : Math.min(total, 800)} / 自费 ¥${groupRelative ? total : Math.max(0, total - 800)}`
+                            ? `单位承担 ¥${groupCharge.unit} / 自费 ¥${groupCharge.personal}`
                             : "预约总金额"}
                         <br />
                       </small>
@@ -801,7 +1385,7 @@ export default function Patient() {
                     </div>
                     <button
                       className="pt-primary"
-                      disabled={!availability.allowed}
+                      disabled={!availability.allowed || groupContractBlocked}
                       onClick={() => createOrder(view === "group")}
                     >
                       确认预约 <ArrowRight size={17} />
@@ -888,80 +1472,172 @@ export default function Patient() {
           {view === "questionnaire" && (
             <section className="pt-card">
               <span className="pt-pill">
-                <Sparkles size={15} /> 1 个基础套餐 + X 个个性项目
+                <Sparkles size={15} />
+                检前健康问卷
               </span>
               <h2>先了解您，再选择检查</h2>
-              <p className="pt-muted">
-                以下为规则演示，不构成医学诊断或临床建议。实际项目由医生结合情况确认。
-              </p>
-              {[
-                "日常久坐，运动较少",
-                "经常熬夜或作息不规律",
-                "希望了解血糖情况",
-                "关注甲状腺健康",
-                "关注骨骼健康",
-              ].map((a) => (
-                <label className="pt-survey-option" key={a}>
-                  <input
-                    type="checkbox"
-                    checked={answers.includes(a)}
-                    onChange={() => {
-                      toggle(answers, a, setAnswers);
-                      setQuestionDone(false);
-                    }}
-                  />
-                  {a}
-                </label>
-              ))}
-              <button
-                className="pt-primary"
-                onClick={() => {
-                  setQuestionDone(true);
-                  act({
-                    type: "ADD_AUDIT",
-                    payload: {
-                      message: `${patient.name} 完成 H5 个性化问卷（演示），选择 ${answers.length} 项`,
-                    },
-                  });
-                }}
-              >
-                生成推荐方案 <Sparkles size={17} />
-              </button>
-              {questionDone && (
-                <div className="pt-recommendation">
-                  <h3>为您整理的参考组合</h3>
-                  <p>基础套餐：{selectedPackage?.name}</p>
-                  <p>
-                    可向医生咨询：
-                    {answers.length
-                      ? extras
-                          .filter((_, i) =>
-                            answers.some((a) =>
-                              a.includes(["甲状腺", "血糖", "骨骼"][i]),
-                            ),
-                          )
-                          .map((e) => e.name)
-                          .join("、") || "生活方式评估"
-                      : "基础健康检查"}
+              {!questionnaireEnabled ? (
+                <>
+                  <p className="pt-note">
+                    当前配置已关闭检前问卷，不采集问卷，也不生成推荐。
                   </p>
                   <button
                     className="pt-secondary"
+                    onClick={() => go(bookingReturn)}
+                  >
+                    返回预约
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="pt-muted">
+                    仅记录合成选择，规则推荐不构成诊疗建议。
+                    {questionnaireSkippable
+                      ? "本问卷可以跳过。"
+                      : "本问卷为预约必填项，不允许跳过。"}
+                  </p>
+                  <div className="pt-form-grid">
+                    {(
+                      [
+                        ["history", "合成既往史"],
+                        ["medication", "合成用药记录"],
+                        ["family", "合成家族史"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <label key={key}>
+                        {label}（可选）
+                        <select
+                          value={questionContext[key]}
+                          onChange={(e) =>
+                            setQuestionContext({
+                              ...questionContext,
+                              [key]: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="">未填写</option>
+                          <option value={`${label}样例A（非真实信息）`}>
+                            {label}样例A（非真实信息）
+                          </option>
+                          <option value="明确无相关演示记录">
+                            明确无相关演示记录
+                          </option>
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                  {QUESTIONNAIRE_OPTIONS.map((a) => (
+                    <label className="pt-survey-option" key={a}>
+                      <input
+                        type="checkbox"
+                        checked={answers.includes(a)}
+                        onChange={() => {
+                          toggle(answers, a, setAnswers);
+                          setQuestionDone(false);
+                        }}
+                      />
+                      {a}
+                    </label>
+                  ))}
+                  <button
+                    className="pt-primary"
+                    disabled={!answers.length}
                     onClick={() => {
-                      setSelectedExtras(
-                        extras
-                          .filter((_, i) =>
-                            answers.some((a) =>
-                              a.includes(["甲状腺", "血糖", "骨骼"][i]),
-                            ),
-                          )
-                          .map((e) => e.name),
-                      );
-                      go(bookingReturn);
+                      act({
+                        type: "UPSERT_RECORD",
+                        payload: {
+                          collection: "bookingQuestionnaires",
+                          record: {
+                            id: `Q-${patient.id}`,
+                            patientId: patient.id,
+                            ...questionContext,
+                            answers,
+                            status: "completed",
+                            completedAt: getBookingNow(state).toISOString(),
+                            recommended: recommendationEnabled
+                              ? recommendedBookingItems(answers)
+                              : [],
+                          },
+                        },
+                      });
+                      setQuestionDone(true);
+                      tell("检前问卷已保存");
                     }}
                   >
-                    使用方案继续预约
+                    {recommendationEnabled
+                      ? "完成问卷并生成参考方案"
+                      : "提交问卷"}
                   </button>
-                </div>
+                  {questionnaireSkippable && (
+                    <button
+                      className="pt-secondary"
+                      style={{ marginLeft: 10 }}
+                      onClick={() => {
+                        act({
+                          type: "UPSERT_RECORD",
+                          payload: {
+                            collection: "bookingQuestionnaires",
+                            record: {
+                              id: `Q-${patient.id}`,
+                              patientId: patient.id,
+                              history: "",
+                              medication: "",
+                              family: "",
+                              recommended: [],
+                              answers: [],
+                              status: "skipped",
+                              completedAt: getBookingNow(state).toISOString(),
+                            },
+                          },
+                        });
+                        go(bookingReturn);
+                      }}
+                    >
+                      跳过问卷
+                    </button>
+                  )}
+                  {questionDone && (
+                    <div className="pt-recommendation">
+                      <h3>
+                        {recommendationEnabled
+                          ? "为您整理的参考组合"
+                          : "问卷已完成"}
+                      </h3>
+                      {recommendationEnabled ? (
+                        <>
+                          <p>基础套餐：{selectedPackage?.name}</p>
+                          <p>
+                            可向医生咨询：
+                            {recommendedBookingItems(answers).join("、") ||
+                              "基础健康评估"}
+                          </p>
+                          <button
+                            className="pt-secondary"
+                            onClick={() => {
+                              if (allowAdd)
+                                setSelectedExtras(
+                                  recommendedBookingItems(answers),
+                                );
+                              go(bookingReturn);
+                            }}
+                          >
+                            使用方案继续预约
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p>当前配置关闭了问卷推荐，不会自动增加检查项目。</p>
+                          <button
+                            className="pt-secondary"
+                            onClick={() => go(bookingReturn)}
+                          >
+                            返回预约
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </section>
           )}
@@ -1084,7 +1760,97 @@ export default function Patient() {
                       <small>演示估算</small>
                     </p>
                   </div>
-                  <h3>您的检查进度</h3>
+                  <section
+                    className="pt-info-banner"
+                    style={{ alignItems: "flex-start" }}
+                  >
+                    <QRCodeSVG
+                      value={`${window.location.origin}${window.location.pathname}#/patient?queue=${encodeURIComponent(upcoming.id)}`}
+                      size={92}
+                      title="演示排队查询二维码"
+                    />
+                    <div>
+                      <b>我的排队二维码</b>
+                      <p>扫码回到此合成订单的排队页，非真实身份凭证。</p>
+                      <small>{upcoming.id}</small>
+                    </div>
+                  </section>
+                  <h3 className="pt-subheading">我的实时演示队列</h3>
+                  {currentTickets.map((ticket) => (
+                    <div className="pt-info-banner" key={ticket.id}>
+                      <div style={{ flex: 1 }}>
+                        <b>
+                          {deriveQueueDefinitions(state).find(
+                            (q) => q.id === ticket.department,
+                          )?.department || ticket.department}
+                        </b>
+                        <p>
+                          {
+                            (
+                              {
+                                waiting: "等待中",
+                                calling: "正在叫号",
+                                missed: "已过号",
+                              } as Record<string, string>
+                            )[ticket.status]
+                          }{" "}
+                          · {ticket.roomName || ticket.zone || "等候区"}
+                        </p>
+                        <small>
+                          队列位置 {Number(ticket.position) + 1} · 演示票号{" "}
+                          {ticket.id}
+                        </small>
+                      </div>
+                      <button
+                        className="pt-secondary"
+                        onClick={() => {
+                          act({
+                            type: "UPSERT_RECORD",
+                            payload: {
+                              collection: "queueTickets",
+                              record: {
+                                ...ticket,
+                                status: "cleared",
+                                endedBy: "patient",
+                                endedAt: getBookingNow(state).toISOString(),
+                                reason: "体检人主动结束排队",
+                              },
+                            },
+                          });
+                          tell("已结束本次排队，工作台队列已同步");
+                        }}
+                      >
+                        结束此排队
+                      </button>
+                    </div>
+                  ))}
+                  {!currentTickets.length && (
+                    <p className="pt-note">当前没有活动排队记录。</p>
+                  )}
+                  {selectedQueue && (
+                    <div className="pt-form-grid">
+                      <label>
+                        选择排队科室
+                        <select
+                          value={selectedQueue.id}
+                          onChange={(e) => setQueueDepartment(e.target.value)}
+                        >
+                          {queueDefinitions.map((q) => (
+                            <option key={q.id} value={q.id}>
+                              {q.department}
+                              {state.config.queueOpen?.[q.id] === false
+                                ? "（已关闭）"
+                                : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button className="pt-secondary" onClick={joinQueue}>
+                        加入演示排队
+                      </button>
+                    </div>
+                  )}
+                  <h3 className="pt-subheading">您的检查进度</h3>
                   <div className="pt-progress">
                     <i
                       style={{
@@ -1339,12 +2105,7 @@ export default function Patient() {
               <p className="pt-muted">
                 服务预约仅建立本地待处理任务，不发送外部消息。
               </p>
-              {[
-                "体检报告解读",
-                "健康生活方式咨询",
-                "体检项目咨询",
-                "到院无障碍协助",
-              ].map((name, i) => (
+              {serviceNames.map((name, i) => (
                 <button
                   className="pt-service-row"
                   key={name}
@@ -1355,7 +2116,11 @@ export default function Patient() {
                   </span>
                   <div>
                     <h3>{name}</h3>
-                    <p>专业人员协助 · 预约后联系</p>
+                    <p>
+                      {publicRows("portalServices").find(
+                        (row) => row.name === name,
+                      )?.scope || "专业人员协助 · 预约后联系"}
+                    </p>
                   </div>
                   <ChevronRight size={19} />
                 </button>
@@ -1505,7 +2270,7 @@ export default function Patient() {
                   健康随访
                 </button>
               </div>
-              <h3 className="pt-subheading">常用体检人 / 演示身份切换</h3>
+              <h3 className="pt-subheading">合成身份切换</h3>
               {state.patients.map((p) => (
                 <button
                   className={`pt-profile-person ${p.id === patient.id ? "selected" : ""}`}
@@ -1530,6 +2295,126 @@ export default function Patient() {
                   )}
                 </button>
               ))}
+              <h3 className="pt-subheading">我的常用体检人</h3>
+              {state.patients
+                .filter((p) => p.id !== accountId)
+                .map((p) => (
+                  <label className="pt-check-row" key={`common-${p.id}`}>
+                    <input
+                      type="checkbox"
+                      aria-label={`常用体检人：${p.name}`}
+                      checked={commonPeople.some(
+                        (row) => row.patientId === p.id,
+                      )}
+                      onChange={(e) => saveCommon(p.id, e.target.checked)}
+                    />
+                    {p.name} · 保存为常用体检人
+                  </label>
+                ))}
+              <p className="pt-note">
+                取消勾选仅从当前演示账户的常用列表移除，已有体检记录保持完整。
+              </p>
+              <h3 className="pt-subheading">注册合成账户 / 新增常用体检人</h3>
+              <p className="pt-muted">
+                仅接受“演示”称呼与 DEMO 手机号标识，不进行真实实名或微信登录。
+              </p>
+              <div className="pt-form-grid">
+                <label>
+                  合成称呼
+                  <input
+                    value={personDraft.name}
+                    onChange={(e) =>
+                      setPersonDraft({ ...personDraft, name: e.target.value })
+                    }
+                    placeholder="演示小青"
+                  />
+                </label>
+                <label>
+                  合成手机号标识
+                  <input
+                    value={personDraft.phone}
+                    onChange={(e) =>
+                      setPersonDraft({ ...personDraft, phone: e.target.value })
+                    }
+                    placeholder="DEMO-1001"
+                  />
+                </label>
+                <label>
+                  演示性别
+                  <select
+                    value={personDraft.sex}
+                    onChange={(e) =>
+                      setPersonDraft({ ...personDraft, sex: e.target.value })
+                    }
+                  >
+                    <option>男</option>
+                    <option>女</option>
+                  </select>
+                </label>
+                <label>
+                  演示年龄
+                  <input
+                    type="number"
+                    min={18}
+                    max={99}
+                    value={personDraft.age}
+                    onChange={(e) =>
+                      setPersonDraft({
+                        ...personDraft,
+                        age: Number(e.target.value),
+                      })
+                    }
+                  />
+                </label>
+              </div>
+              <button
+                className="pt-primary"
+                style={{ marginTop: 15 }}
+                onClick={registerPerson}
+              >
+                注册并保存合成体检人
+              </button>
+              <h3 className="pt-subheading">个人推广入口（本地演示）</h3>
+              <label>
+                演示推广人员
+                <select
+                  value={shareDistributor}
+                  onChange={(e) => setShareDistributor(e.target.value)}
+                >
+                  {state.patients.map((p) => (
+                    <option key={p.id} value={`D-${p.id}`}>
+                      {p.name} · D-{p.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="pt-unit-qr">
+                <QRCodeSVG
+                  value={referralUrl}
+                  size={128}
+                  title="个人推广预约二维码"
+                />
+              </div>
+              <a className="pt-group-link" href={referralUrl}>
+                打开个人推广预约入口
+              </a>
+              <p className="pt-note">
+                通过此推广入口创建的订单：
+                {
+                  state.appointments.filter(
+                    (a) => a.distributorId === shareDistributor,
+                  ).length
+                }{" "}
+                单；其中有效订单{" "}
+                {
+                  state.appointments.filter(
+                    (a) =>
+                      a.distributorId === shareDistributor &&
+                      a.status !== "cancelled",
+                  ).length
+                }{" "}
+                单。按已保存来源实时统计。
+              </p>
               <div className="pt-result-row">
                 <span>预约提醒（本地设置）</span>
                 <button
@@ -1550,6 +2435,9 @@ export default function Patient() {
             <section className="pt-card pt-reading">
               <span className="pt-pill">健康课堂 · 科普示例</span>
               <h2>{article}</h2>
+              {configuredArticle && (
+                <p className="pt-info-banner">{configuredArticle.summary}</p>
+              )}
               <p className="pt-muted">
                 健康中心编辑部 · 2026 年 10 月 · 3 分钟
               </p>
@@ -1650,7 +2538,7 @@ export default function Patient() {
             <p>
               体检服务时间
               <br />
-              周一至周六 07:30—17:00
+              {hospital.hours}
             </p>
             <button onClick={() => go("messages")}>
               联系健康管家 <ArrowRight size={15} />
@@ -1710,13 +2598,14 @@ export default function Patient() {
             <strong className="pt-pay-total">
               ¥{payOrder?.selfPay ?? payOrder?.amount}
             </strong>
-            {payOrder && payOrder.groupBudget > 0 && (
-              <p>
-                订单总额 ¥{payOrder.amount} · 单位承担 ¥
-                {payOrder.amount - payOrder.selfPay} · 本次自费 ¥
-                {payOrder.selfPay}
-              </p>
-            )}
+            {payOrder &&
+              (payOrder.groupOrderId || payOrder.groupBudget > 0) && (
+                <p>
+                  订单总额 ¥{payOrder.amount} · 单位承担 ¥
+                  {payOrder.amount - payOrder.selfPay} · 本次自费 ¥
+                  {payOrder.selfPay}
+                </p>
+              )}
             <label>
               演示支付方式
               <select
@@ -1809,9 +2698,9 @@ export default function Patient() {
             <label>
               新预约时段
               <select value={time} onChange={(e) => setTime(e.target.value)}>
-                <option>08:00-08:30</option>
-                <option>08:30-09:00</option>
-                <option>09:00-09:30</option>
+                {getBookingSlots(state).map((slot) => (
+                  <option key={slot.time}>{slot.time}</option>
+                ))}
               </select>
             </label>
             <div className="pt-modal-actions">
@@ -1825,6 +2714,20 @@ export default function Patient() {
                     state,
                     date,
                     editId,
+                    {
+                      patientId: patient.id,
+                      kind:
+                        state.appointments.find((a) => a.id === editId)
+                          ?.bookingKind ||
+                        (state.appointments.find((a) => a.id === editId)
+                          ?.groupBudget > 0
+                          ? "group"
+                          : "individual"),
+                      company:
+                        state.appointments.find((a) => a.id === editId)
+                          ?.groupCompany || patient.company,
+                      time,
+                    },
                   );
                   if (!nextAvailability.allowed)
                     return tell(nextAvailability.error);
@@ -1893,5 +2796,364 @@ export default function Patient() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Shared calendar: read-only in H5; editable only when mounted by the demo control center. */
+export function UnitBookingCalendar({
+  editable = false,
+  company,
+  onSelectDate,
+}: {
+  editable?: boolean;
+  company?: string;
+  onSelectDate?: (date: string) => void;
+}) {
+  const { state, act } = useDemo();
+  const schedules = getGroupBookingSchedules(state);
+  const [selectedCompany, setSelectedCompany] = useState(
+    company || schedules[0]?.company || "",
+  );
+  const selected =
+    schedules.find((row) => row.company === selectedCompany) || schedules[0];
+  const [draft, setDraft] = useState(selected);
+  const [month, setMonth] = useState(bookingDateOffset(state).slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(bookingDateOffset(state));
+  const [clockDraft, setClockDraft] = useState(
+    String(state.config.bookingClock || "").slice(0, 16),
+  );
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (company) setSelectedCompany(company);
+  }, [company]);
+  useEffect(() => {
+    setDraft(selected);
+  }, [selectedCompany]);
+  if (!selected || !draft)
+    return <p className="pt-note">暂无团检单位排期，请先建立演示单位。</p>;
+  const days = new Date(
+    Number(month.slice(0, 4)),
+    Number(month.slice(5)),
+    0,
+  ).getDate();
+  const offset = new Date(`${month}-01T12:00:00Z`).getUTCDay();
+  const dayOrders = state.appointments.filter(
+    (a) =>
+      a.date === selectedDate &&
+      a.status !== "cancelled" &&
+      groupAppointmentCompany(state, a) === selected.company,
+  );
+  const moveMonth = (delta: number) => {
+    const d = new Date(`${month}-01T12:00:00Z`);
+    d.setUTCMonth(d.getUTCMonth() + delta);
+    setMonth(d.toISOString().slice(0, 7));
+  };
+  const save = () => {
+    if (
+      draft.scheduled &&
+      (!draft.startDate || !draft.endDate || draft.startDate > draft.endDate)
+    )
+      return setNotice("请填写正确的单位排期起止日期");
+    if (
+      !Number.isInteger(Number(draft.dailyCapacity)) ||
+      Number(draft.dailyCapacity) < 0 ||
+      Number(draft.reservedCapacity) < 0 ||
+      Number(draft.reservedCapacity) > Number(draft.dailyCapacity)
+    )
+      return setNotice("单位容量须为非负整数，保留号源不能超过单位容量");
+    act({
+      type: "UPSERT_RECORD",
+      payload: {
+        collection: "groupBookingSchedules",
+        record: {
+          ...draft,
+          dailyCapacity: Number(draft.dailyCapacity),
+          reservedCapacity: Number(draft.reservedCapacity),
+        },
+      },
+    });
+    setNotice("单位排期已保存，患者端和自助机预约规则已同步");
+  };
+  return (
+    <section
+      className="pt-card"
+      style={{ marginTop: 20 }}
+      aria-label="单位预约日历"
+    >
+      <div className="pt-section-title compact">
+        <h3>单位预约日历与排期</h3>
+        <span className="pt-mini-tag">真实日期 · 本地容量联动</span>
+      </div>
+      <label>
+        查看单位
+        <select
+          value={selected.company}
+          disabled={!!company && !editable}
+          onChange={(e) => setSelectedCompany(e.target.value)}
+        >
+          {schedules.map((row) => (
+            <option key={row.id} value={row.company}>
+              {row.company}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="pt-note">
+        {selected.company} ·{" "}
+        {selected.enabled === false ? "预约已关闭" : "预约已开启"} ·{" "}
+        {selected.scheduled
+          ? `${selected.startDate} 至 ${selected.endDate}`
+          : "不设置单位日期限制"}{" "}
+        · 每日 {selected.dailyCapacity} 人 / 保留{" "}
+        {selected.reservedCapacity || 0} 个号源
+      </p>
+      <div className="pt-section-title compact">
+        <button
+          className="pt-secondary"
+          aria-label="上个月"
+          onClick={() => moveMonth(-1)}
+        >
+          ‹ 上个月
+        </button>
+        <h3>{month}</h3>
+        <button
+          className="pt-secondary"
+          aria-label="下个月"
+          onClick={() => moveMonth(1)}
+        >
+          下个月 ›
+        </button>
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7,minmax(0,1fr))",
+          gap: 5,
+        }}
+      >
+        {["日", "一", "二", "三", "四", "五", "六"].map((day) => (
+          <small style={{ textAlign: "center", padding: 8 }} key={day}>
+            {day}
+          </small>
+        ))}
+        {Array.from({ length: offset }, (_, i) => (
+          <span key={`blank${i}`} />
+        ))}
+        {Array.from({ length: days }, (_, i) => {
+          const value = `${month}-${String(i + 1).padStart(2, "0")}`;
+          const rule = getBookingAvailability(state, value, undefined, {
+            company: selected.company,
+            kind: "group",
+            checkQuestionnaire: false,
+          });
+          return (
+            <button
+              key={value}
+              aria-label={`查看 ${value} ${selected.company} 排期`}
+              className="pt-secondary"
+              style={{
+                padding: "9px 2px",
+                minHeight: 62,
+                flexDirection: "column",
+                gap: 3,
+                fontSize: 11,
+                background: value === selectedDate ? "#e4f1e8" : undefined,
+                opacity: rule.allowed ? 1 : 0.6,
+              }}
+              onClick={() => {
+                setSelectedDate(value);
+                if (rule.allowed) onSelectDate?.(value);
+              }}
+            >
+              <b>{i + 1}</b>
+              <small>
+                {rule.allowed
+                  ? `余 ${Math.min(rule.remaining, rule.groupRemaining)}`
+                  : rule.error.includes("过去")
+                    ? "已过期"
+                    : rule.error.includes("周末")
+                      ? "休息"
+                      : "不可约"}
+              </small>
+            </button>
+          );
+        })}
+      </div>
+      <h3 className="pt-subheading">
+        {selectedDate} · {selected.company} · {dayOrders.length} 人
+      </h3>
+      <p className="pt-muted">
+        {getBookingAvailability(state, selectedDate, undefined, {
+          company: selected.company,
+          kind: "group",
+          checkQuestionnaire: false,
+        }).error || "当日开放预约，点击可用日期可带入预约表单。"}
+      </p>
+      {dayOrders.length ? (
+        dayOrders.map((a) => (
+          <div className="pt-result-row" key={a.id}>
+            <span>
+              {state.patients.find((p) => p.id === a.patientId)?.name} ·{" "}
+              {a.time}
+            </span>
+            <span>
+              {a.id} · {statuses[a.status]}
+            </span>
+          </div>
+        ))
+      ) : (
+        <p className="pt-note">该单位当日暂无有效预约。</p>
+      )}
+      {editable && (
+        <>
+          <h3 className="pt-subheading">编辑选中单位的预约规则</h3>
+          <label className="pt-check-row">
+            <input
+              type="checkbox"
+              checked={draft.allowRelatives !== false}
+              onChange={(e) =>
+                setDraft({ ...draft, allowRelatives: e.target.checked })
+              }
+            />
+            允许亲属预约
+          </label>
+          <label className="pt-check-row">
+            <input
+              type="checkbox"
+              checked={draft.enabled !== false}
+              onChange={(e) =>
+                setDraft({ ...draft, enabled: e.target.checked })
+              }
+            />
+            开启单位预约
+          </label>
+          <label className="pt-check-row">
+            <input
+              type="checkbox"
+              checked={draft.scheduled}
+              onChange={(e) =>
+                setDraft({ ...draft, scheduled: e.target.checked })
+              }
+            />
+            为单位设置日期排期
+          </label>
+          <div className="pt-form-grid">
+            <label>
+              单位开始日期
+              <input
+                type="date"
+                disabled={!draft.scheduled}
+                value={draft.startDate}
+                onChange={(e) =>
+                  setDraft({ ...draft, startDate: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              单位结束日期
+              <input
+                type="date"
+                disabled={!draft.scheduled}
+                value={draft.endDate}
+                onChange={(e) =>
+                  setDraft({ ...draft, endDate: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              单位每日容量
+              <input
+                type="number"
+                min={0}
+                value={draft.dailyCapacity}
+                onChange={(e) =>
+                  setDraft({ ...draft, dailyCapacity: Number(e.target.value) })
+                }
+              />
+            </label>
+            <label>
+              团检保留号源
+              <input
+                type="number"
+                min={0}
+                value={draft.reservedCapacity}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    reservedCapacity: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+          </div>
+          <label style={{ margin: "17px 0" }}>
+            单位可预约时段（分号分隔，留空不限）
+            <input
+              value={draft.allowedTimes}
+              placeholder="08:00-08:30;08:30-09:00"
+              onChange={(e) =>
+                setDraft({ ...draft, allowedTimes: e.target.value })
+              }
+            />
+          </label>
+          <button className="pt-primary" onClick={save}>
+            保存单位排期
+          </button>
+          <h3 className="pt-subheading">预约规则模拟时钟</h3>
+          <label>
+            模拟业务时间（UTC）
+            <input
+              type="datetime-local"
+              value={clockDraft}
+              onChange={(e) => setClockDraft(e.target.value)}
+            />
+          </label>
+          <div className="pt-modal-actions">
+            <button
+              className="pt-secondary"
+              onClick={() => {
+                act({ type: "UPDATE_CONFIG", payload: { bookingClock: "" } });
+                setClockDraft("");
+                setNotice("已恢复真实时钟");
+              }}
+            >
+              使用真实时钟
+            </button>
+            <button
+              className="pt-primary"
+              disabled={!clockDraft}
+              onClick={() => {
+                if (!Number.isFinite(new Date(`${clockDraft}Z`).getTime()))
+                  return setNotice("模拟时间无效");
+                act({
+                  type: "UPDATE_CONFIG",
+                  payload: { bookingClock: `${clockDraft}:00Z` },
+                });
+                setMonth(clockDraft.slice(0, 7));
+                setSelectedDate(clockDraft.slice(0, 10));
+                setNotice("模拟时钟已生效，会实际改变日期与放号校验");
+              }}
+            >
+              应用模拟时钟
+            </button>
+          </div>
+          <p className="pt-note">
+            当前业务时间：{getBookingNow(state).toISOString()}。次日号源按
+            releaseHour 开放；团检剩余保留号源在预约当天 groupReleaseHour
+            后释放，所有判断均使用此 UTC 时钟。
+          </p>
+          <p className="pt-muted">
+            单位入口：{window.location.origin}
+            {window.location.pathname}#/patient?group=
+            {encodeURIComponent(selected.id)}
+          </p>
+        </>
+      )}
+      {notice && (
+        <p role="status" className="pt-note">
+          {notice}
+        </p>
+      )}
+    </section>
   );
 }

@@ -41,12 +41,17 @@ import {
   Finance,
   Quality,
 } from "./modules/Core";
+const ControlTodoList = lazy(() =>
+  import("./modules/ControlCenter").then((m) => ({
+    default: m.ControlTodoList,
+  })),
+);
 const ControlCenter = lazy(() => import("./modules/ControlCenter"));
 const Analytics = lazy(() =>
   import("./modules/Advanced").then((m) => ({ default: m.Analytics })),
 );
 const Health = lazy(() => import("./modules/Health"));
-const Operations = lazy(() => import("./modules/Operations"));
+import Operations from "./modules/Operations";
 const Patient = lazy(() => import("./modules/Patient"));
 const Kiosk = lazy(() => import("./modules/Kiosk"));
 const Coverage = lazy(() => import("./modules/Coverage"));
@@ -155,7 +160,21 @@ export default function App() {
   const [method, setMethod] = useState("电话联系（模拟）");
   const [globalSearch, setGlobalSearch] = useState("");
   const route = location.split("?")[0];
-  const role = roles[state.config.role] || roles.admin;
+  const configuredRole = (state.records.roles || []).find(
+    (r) => r.id === state.config.customRoleId,
+  );
+  const presetRole = roles[state.config.role] || roles.admin;
+  const role = configuredRole
+    ? {
+        ...presetRole,
+        name: configuredRole.name,
+        title: configuredRole.name + " · 自定义权限",
+        paths: (configuredRole.menuPaths || []).filter((p: string) =>
+          navigation.some((g) => g.items.some((i) => i.path === p)),
+        ),
+        home: configuredRole.menuPaths?.[0] || "/dashboard",
+      }
+    : presetRole;
   useEffect(() => {
     const listen = () => {
       setLocation(window.location.hash.slice(1) || "/dashboard");
@@ -221,7 +240,16 @@ export default function App() {
       case "/enterprise":
         return <Health section={route.slice(1)} />;
       case "/controls":
-        return <ControlCenter />;
+        return (
+          <ControlCenter
+            key={location}
+            section={
+              new URLSearchParams(location.split("?")[1] || "").get(
+                "section",
+              ) || undefined
+            }
+          />
+        );
       case "/coverage":
         return <Coverage />;
       default:
@@ -237,7 +265,7 @@ export default function App() {
           </span>
           <div>
             <strong>
-              青禾<span> HEALTH</span>
+              红创<span> HEALTH</span>
             </strong>
             <small>智慧体检一体化平台</small>
           </div>
@@ -324,9 +352,26 @@ export default function App() {
               aria-label="消息通知"
             >
               <Bell size={19} />
-              <i />
+              {(state.tasks.some((t) => t.status !== "已完成") ||
+                state.appointments.some((a) => a.status === "review") ||
+                (state.records.controlNotifications || []).some(
+                  (n) => n.status === "模拟失败",
+                )) && <i />}
             </button>
             <div className="top-divider" />
+            {configuredRole && (
+              <button
+                className="btn"
+                onClick={() =>
+                  act({
+                    type: "UPDATE_CONFIG",
+                    payload: { customRoleId: null, discountMin: 0.8 },
+                  })
+                }
+              >
+                退出自定义权限
+              </button>
+            )}
             <span className="avatar small">演示</span>
             <select
               aria-label="切换演示角色"
@@ -335,7 +380,7 @@ export default function App() {
               onChange={(e) => {
                 act({
                   type: "UPDATE_CONFIG",
-                  payload: { role: e.target.value },
+                  payload: { role: e.target.value, customRoleId: null },
                 });
                 window.location.hash = roles[e.target.value].home;
               }}
@@ -378,7 +423,7 @@ export default function App() {
           </Suspense>
         </main>
         <footer className="main-footer">
-          <span>青禾智慧体检 · 让健康管理有温度</span>
+          <span>红创智慧体检 · 让健康管理有温度</span>
           <span>纯前端交互展示 / 所有数据均为合成样例</span>
         </footer>
       </div>
@@ -511,6 +556,9 @@ export default function App() {
       )}
       {notifications && (
         <Modal title="消息与待办" onClose={() => setNotifications(false)}>
+          <Suspense fallback={<p>加载待办…</p>}>
+            <ControlTodoList onNavigate={() => setNotifications(false)} />
+          </Suspense>
           {state.audit.slice(0, 8).map((a) => (
             <div className="notification" key={a.id}>
               <CheckCircle2 size={18} />

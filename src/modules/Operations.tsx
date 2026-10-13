@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -108,11 +108,20 @@ export function useCollection(spec: WorkspaceSpec) {
 }
 export function Tag({ value }: { value: any }) {
   const v = String(value ?? "未设置");
+  const { state } = useDemo() as any;
+  const custom = (state.records.riskLevels || []).find(
+    (r: Row) => r.code === v,
+  );
   return (
     <span
+      style={
+        custom
+          ? { color: custom.color, background: `${custom.color}18` }
+          : undefined
+      }
       className={`ops-tag ${/通过|完成|启用|发布|已签收|已结算|已回复|已解决|在售|已入库/.test(v) ? "good" : /拒绝|驳回|取消|异常|紧急|高|失败/.test(v) ? "bad" : /待|处理中|服务中|中/.test(v) ? "warn" : ""}`}
     >
-      {v}
+      {custom ? `${v} · ${custom.name}` : v}
     </span>
   );
 }
@@ -227,7 +236,7 @@ export function RecordWorkspace({
   spec: WorkspaceSpec;
   compact?: boolean;
 }) {
-  const { rows, act } = useCollection(spec);
+  const { rows, act, state } = useCollection(spec);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("全部状态");
   const [selected, setSelected] = useState<string[]>([]);
@@ -318,6 +327,25 @@ export function RecordWorkspace({
       setError("数值必须有效且不能小于允许范围。");
       return;
     }
+    if (["crmContracts", "crmActivities"].includes(spec.key)) {
+      const customers = state.records.crmCustomers || crmSpecs[0].seeds;
+      const customer = customers.find(
+        (c: Row) => c.id === editor.customerId || c.name === editor.customer,
+      );
+      if (!customer) {
+        setError("请先在 CRM 客户中建立对应客户，合同和业务必须关联已有客户。");
+        return;
+      }
+      editor.customerId = customer.id;
+      editor.customer = customer.name;
+      if (
+        spec.key === "crmContracts" &&
+        Number(editor.received) > Number(editor.amount)
+      ) {
+        setError("已回款不能超过合同金额。");
+        return;
+      }
+    }
     persist(
       editor,
       rows.some((r) => r.id === editor.id) ? "资料已更新" : "已新建记录",
@@ -341,6 +369,12 @@ export function RecordWorkspace({
       {
         ...r,
         status,
+        ...(spec.key === "crmCustomers" && status === "认领待审"
+          ? { requestedOwner: state.config.crmUser || "陈晓" }
+          : {}),
+        ...(spec.key === "crmCustomers" && status === "已认领"
+          ? { owner: r.requestedOwner || state.config.crmUser || "陈晓" }
+          : {}),
         ...(spec.key === "consultations" && status === "已领取"
           ? { owner: "当前医生（演示）" }
           : {}),
@@ -852,6 +886,184 @@ export function RecordWorkspace({
                   </div>
                 </section>
               )}
+              {spec.kind === "products" && (
+                <section className="ops-inline-box">
+                  <h3>商品图片与结构化属性</h3>
+                  <p>
+                    仅保存本地图片；PNG/JPEG/WebP，每张最大 256 KB，最多 3 张。
+                  </p>
+                  <input
+                    type="file"
+                    aria-label="上传商品图片"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (
+                        !["image/png", "image/jpeg", "image/webp"].includes(
+                          file.type,
+                        ) ||
+                        file.size > 256 * 1024 ||
+                        (record.images || []).length >= 3
+                      ) {
+                        setError(
+                          "仅支持 256 KB 内的 PNG/JPEG/WebP，最多 3 张。",
+                        );
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () =>
+                        persist(
+                          {
+                            ...record,
+                            images: [
+                              ...(record.images || []),
+                              {
+                                id: uid("IMG"),
+                                name: file.name,
+                                data: reader.result,
+                              },
+                            ],
+                          },
+                          "保存本地商品图片",
+                        );
+                      reader.readAsDataURL(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                    {(record.images || []).map((img: Row) => (
+                      <div key={img.id}>
+                        <img
+                          src={img.data}
+                          alt={img.name}
+                          style={{
+                            width: 75,
+                            height: 75,
+                            objectFit: "contain",
+                            border: "1px solid #dae6dd",
+                          }}
+                        />
+                        <button
+                          className="ops-text-btn"
+                          onClick={() =>
+                            persist(
+                              {
+                                ...record,
+                                images: record.images.filter(
+                                  (i: Row) => i.id !== img.id,
+                                ),
+                              },
+                              "删除商品图片",
+                            )
+                          }
+                        >
+                          删除图片
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="ops-form-grid" style={{ padding: "15px 0" }}>
+                    {["color", "size"].map((key) => (
+                      <label className="ops-field" key={key}>
+                        <span>{key === "color" ? "颜色属性" : "规格属性"}</span>
+                        <input
+                          aria-label={
+                            key === "color" ? "商品颜色属性" : "商品规格属性"
+                          }
+                          defaultValue={record.attributes?.[key] || ""}
+                          onBlur={(e) => {
+                            if (e.target.value !== record.attributes?.[key])
+                              persist(
+                                {
+                                  ...record,
+                                  attributes: {
+                                    ...record.attributes,
+                                    [key]: e.target.value,
+                                  },
+                                },
+                                "更新结构化商品属性",
+                              );
+                          }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {spec.key === "articles" && record.category === "健康视频" && (
+                <section className="ops-inline-box">
+                  <h3>健康视频播放器</h3>
+                  <p>
+                    可上传本地 MP4/WebM（最大 1 MB），或在资料编辑中填写 HTTPS
+                    媒体地址；不自动播放。
+                  </p>
+                  <input
+                    type="file"
+                    aria-label="上传健康视频"
+                    accept="video/mp4,video/webm"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (
+                        !["video/mp4", "video/webm"].includes(file.type) ||
+                        file.size > 1024 * 1024
+                      ) {
+                        setError("仅支持 1 MB 内的 MP4/WebM 视频。");
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () =>
+                        persist(
+                          {
+                            ...record,
+                            videoData: reader.result,
+                            videoName: file.name,
+                          },
+                          "保存本地健康视频",
+                        );
+                      reader.readAsDataURL(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  {record.videoData ||
+                  /^https:\/\//.test(record.media || "") ? (
+                    <>
+                      <video
+                        aria-label="健康视频预览播放器"
+                        controls
+                        preload="metadata"
+                        src={record.videoData || record.media}
+                        style={{
+                          width: "100%",
+                          marginTop: 14,
+                          background: "#18382b",
+                          borderRadius: 8,
+                        }}
+                      />
+                      <p>{record.videoName || record.media}</p>
+                      <button
+                        className="btn"
+                        onClick={() =>
+                          persist(
+                            {
+                              ...record,
+                              videoData: "",
+                              videoName: "",
+                              media: "",
+                            },
+                            "删除健康视频媒体",
+                          )
+                        }
+                      >
+                        删除视频媒体
+                      </button>
+                    </>
+                  ) : (
+                    <p>尚未设置可播放媒体，选择演示文件后可预览。</p>
+                  )}
+                </section>
+              )}
               {spec.kind === "permissions" && (
                 <section className="ops-inline-box">
                   <h3>
@@ -1129,7 +1341,7 @@ function config(
         carrier: "演示物流",
         region: "青岛市",
         address: "演示院区服务大厅",
-        parent: "青禾健康体检中心",
+        parent: "红创健康体检中心",
         company: "星辰科技",
         customer: "林知远（演示）",
         product: "轻量运动水杯",
@@ -1186,7 +1398,7 @@ const serviceSpecs: WorkspaceSpec[] = [
         description: "标准健康报告解读，30 分钟线上预约。",
       }),
       seed("SV-2026101302", "企业健康咨询", {
-        customer: "青禾科技（演示）",
+        customer: "红创科技（演示）",
         owner: "周医生",
         amount: 299,
         status: "待服务",
@@ -1306,7 +1518,7 @@ const serviceSpecs: WorkspaceSpec[] = [
       已停用: ["待审核"],
     },
     seeds: [
-      seed("TEAM-101", "青禾健康管理团队", {
+      seed("TEAM-101", "红创健康管理团队", {
         category: "健康管理",
         owner: "王医生",
         members: "王医生、刘营养师、陈晓",
@@ -1498,7 +1710,7 @@ const commerceSpecs: WorkspaceSpec[] = [
   config(
     "stores",
     "店铺与消费码",
-    ["青禾健康官方店", "城阳院区服务店"],
+    ["红创健康官方店", "城阳院区服务店"],
     "2.2.4.64–66",
     [
       f("name", "店铺名称"),
@@ -1589,7 +1801,7 @@ const contentSpecs: WorkspaceSpec[] = [
         media: "待上传媒体资源",
         description: "视频栏目示例，未提供可播放的实际媒体文件。",
       }),
-      seed("ART-1003", "青禾十月健康主题活动报名", {
+      seed("ART-1003", "红创十月健康主题活动报名", {
         category: "社区动态",
         owner: "活动运营组",
         status: "草稿",
@@ -1629,7 +1841,7 @@ const contentSpecs: WorkspaceSpec[] = [
       }),
       seed("MSG-1003", "团检服务反馈", {
         channel: "邮件",
-        customer: "青禾科技（演示）",
+        customer: "红创科技（演示）",
         owner: "客服小青",
         status: "已回复",
         description: "所有邮件仅在本地演示，不对外传送。",
@@ -1740,7 +1952,7 @@ const ticket = (
           ? "现场引导体验反馈"
           : "服务时间协调",
       {
-        customer: "青禾科技（演示）",
+        customer: "红创科技（演示）",
         priority: "一般",
         owner: "客服小叶",
         category: "专业服务",
@@ -1760,7 +1972,7 @@ const settingsSpecs: WorkspaceSpec[] = [
   config(
     "organizations",
     "机构与企业",
-    ["青禾健康体检中心", "城阳服务分中心", "青禾科技（演示）"],
+    ["红创健康体检中心", "城阳服务分中心", "红创科技（演示）"],
     "2.2.4.92–93 / 116",
     [
       f("name", "机构名称"),
@@ -2119,6 +2331,28 @@ const crmSpecs: WorkspaceSpec[] = [
     ],
   },
 ];
+crmSpecs[1].seeds.forEach((c) => {
+  const customer = crmSpecs[0].seeds.find((r) => r.name === c.customer);
+  if (customer) c.customerId = customer.id;
+});
+crmSpecs[2].seeds.forEach((a) => {
+  const customer = crmSpecs[0].seeds.find((r) => r.name === a.customer);
+  if (customer) a.customerId = customer.id;
+  if (a.category === "实际回款") a.contractId = "CON-1002";
+});
+crmSpecs[2].seeds.push({
+  id: "PAY-SEED-1001",
+  name: "星辰科技首期合成回款",
+  customerId: "CRM-1001",
+  customer: "星辰科技",
+  contractId: "CON-1001",
+  category: "实际回款",
+  owner: "陈晓",
+  amount: 45000,
+  date: "2026-09-18",
+  status: "已完成",
+  description: "与初始合同已回款一致的合成来源记录。",
+});
 serviceSpecs.push(...crmSpecs);
 settingsSpecs.unshift({
   key: "bookingRules",
@@ -2188,43 +2422,128 @@ settingsSpecs.push(
   ),
 );
 function CrmSummary() {
-  const { state } = useDemo() as any;
-  const contracts = state.records.crmContracts || crmSpecs[1].seeds;
-  const activities = state.records.crmActivities || crmSpecs[2].seeds;
-  const total = contracts.reduce(
-      (n: number, r: Row) => n + Number(r.amount || 0),
-      0,
+  const { state, act } = useDemo() as any;
+  const customers = useCollection(crmSpecs[0]).rows;
+  const allContracts = useCollection(crmSpecs[1]).rows;
+  const allActivities = useCollection(crmSpecs[2]).rows;
+  const [year, setYear] = useState(today().slice(0, 4));
+  const [person, setPerson] = useState("全部业务员");
+  const [customerId, setCustomerId] = useState("CRM-1001");
+  const [contractName, setContractName] = useState("");
+  const [amount, setAmount] = useState(1000);
+  const [dueDate, setDueDate] = useState(today());
+  const [contractId, setContractId] = useState("CON-1001");
+  const [payment, setPayment] = useState(100);
+  const [paymentDate, setPaymentDate] = useState(today());
+  const [paymentType, setPaymentType] = useState("实际回款");
+  const [notice, setNotice] = useState("");
+  const contracts = allContracts.filter(
+    (r) =>
+      String(r.date || "").slice(0, 4) === year &&
+      (person === "全部业务员" || r.owner === person),
+  );
+  const activities = allActivities.filter(
+    (r) =>
+      String(r.date || "").slice(0, 4) === year &&
+      (person === "全部业务员" || r.owner === person),
+  );
+  const owners = [
+    ...new Set(
+      [...allContracts, ...allActivities, ...customers]
+        .map((r) => r.owner)
+        .filter(Boolean),
     ),
-    received = contracts.reduce(
-      (n: number, r: Row) => n + Number(r.received || 0),
-      0,
-    );
+  ];
+  const total = contracts.reduce((n, r) => n + Number(r.amount || 0), 0),
+    received = contracts.reduce((n, r) => n + Number(r.received || 0), 0);
   const overdue = contracts.filter(
-    (r: Row) => r.dueDate < today() && Number(r.amount) > Number(r.received),
+    (r) => r.dueDate < today() && Number(r.amount) > Number(r.received),
   );
   const monthly = Array.from({ length: 12 }, (_, i) =>
     activities
       .filter(
-        (r: Row) =>
+        (r) =>
           r.category === "实际回款" &&
+          r.status === "已完成" &&
           r.date?.slice(5, 7) === String(i + 1).padStart(2, "0"),
       )
-      .reduce((n: number, r: Row) => n + Number(r.amount || 0), 0),
+      .reduce((n, r) => n + Number(r.amount || 0), 0),
   );
   const max = Math.max(1, ...monthly);
+  const customer = customers.find((c) => c.id === customerId) || customers[0];
+  const linkedContracts = allContracts.filter(
+    (c) =>
+      c.customerId === customer?.id ||
+      (!c.customerId && c.customer === customer?.name),
+  );
+  const chosen =
+    linkedContracts.find((c) => c.id === contractId) || linkedContracts[0];
   return (
     <section className="panel ops-panel ops-crm">
       <div className="ops-panel-title">
         <div>
           <h2>个人业务看板</h2>
-          <p>本地合成合同与业务记录实时汇总</p>
+          <p>
+            客户和合同以 ID
+            关联；年度及业务员过滤同时应用于金额、完成率和月度回款。
+          </p>
         </div>
         <Tag value={`${overdue.length} 笔逾期账款`} />
+      </div>
+      <div className="ops-toolbar">
+        <label className="ops-field">
+          <span>统计年份</span>
+          <input
+            aria-label="CRM统计年份"
+            type="number"
+            value={year}
+            min={2000}
+            max={2100}
+            onChange={(e) => setYear(e.target.value)}
+          />
+        </label>
+        <label className="ops-field">
+          <span>业务负责人</span>
+          <select
+            aria-label="CRM业务负责人"
+            value={person}
+            onChange={(e) => setPerson(e.target.value)}
+          >
+            <option>全部业务员</option>
+            {owners.map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+        </label>
+        <button
+          className="btn"
+          onClick={() => setPerson(state.config.crmUser || "陈晓")}
+        >
+          仅看我的业绩
+        </button>
+        <button
+          className="btn"
+          onClick={() =>
+            downloadCsv("CRM年度合同与回款", contracts, [
+              f("id", "合同编号"),
+              f("customerId", "客户编号"),
+              f("name", "合同"),
+              f("owner", "负责人"),
+              f("amount", "合同金额"),
+              f("received", "已回款"),
+              f("date", "合同日期"),
+            ])
+          }
+        >
+          导出当前业绩
+        </button>
       </div>
       <div className="ops-crm-summary">
         <div>
           <span>年度订单金额</span>
-          <strong>¥{total.toLocaleString()}</strong>
+          <strong data-testid="crm-year-total">
+            ¥{total.toLocaleString()}
+          </strong>
         </div>
         <div>
           <span>已登记回款</span>
@@ -2235,7 +2554,7 @@ function CrmSummary() {
           <strong>
             {contracts.length
               ? Math.round(
-                  (contracts.filter((r: Row) => r.status === "已完成").length /
+                  (contracts.filter((r) => r.status === "已完成").length /
                     contracts.length) *
                     100,
                 )
@@ -2248,17 +2567,19 @@ function CrmSummary() {
           <strong>
             {
               activities.filter(
-                (r: Row) => r.category === "拜访" && r.status === "已完成",
+                (r) => r.category === "拜访" && r.status === "已完成",
               ).length
             }{" "}
             次
           </strong>
         </div>
       </div>
-      <div className="ops-month-chart" aria-label="每月实际回款柱状图">
+      <div className="ops-month-chart" aria-label="本年度每月实际回款柱状图">
         {monthly.map((v, i) => (
           <div key={i}>
-            <small>{v ? "¥" + v.toLocaleString() : ""}</small>
+            <small data-testid={`crm-month-${i + 1}`}>
+              {v ? "¥" + v.toLocaleString() : ""}
+            </small>
             <span style={{ height: `${Math.max(3, (v / max) * 65)}px` }} />
             <b>{i + 1} 月</b>
           </div>
@@ -2269,15 +2590,208 @@ function CrmSummary() {
           逾期提醒：
           {overdue
             .map(
-              (r: Row) =>
+              (r) =>
                 `${r.customer} · 待回款 ¥${(Number(r.amount) - Number(r.received)).toLocaleString()}`,
             )
             .join("；")}
         </div>
       )}
+      <details style={{ margin: "0 24px 22px" }}>
+        <summary style={{ fontSize: 12, cursor: "pointer" }}>
+          客户关联、合同立项与计划 / 实际回款登记
+        </summary>
+        <div className="ops-form-grid" style={{ padding: "20px 0" }}>
+          <label className="ops-field">
+            <span>关联客户</span>
+            <select
+              aria-label="CRM关联客户"
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+            >
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {c.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>新合同名称</span>
+            <input
+              aria-label="CRM新合同名称"
+              value={contractName}
+              onChange={(e) => setContractName(e.target.value)}
+            />
+          </label>
+          <label className="ops-field">
+            <span>合同金额</span>
+            <input
+              type="number"
+              aria-label="CRM新合同金额"
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
+            />
+          </label>
+          <label className="ops-field">
+            <span>计划回款日期</span>
+            <input
+              type="date"
+              aria-label="CRM计划回款日期"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </label>
+          <button
+            className="btn"
+            onClick={() => {
+              if (
+                !contractName.trim() ||
+                !Number.isFinite(amount) ||
+                amount <= 0 ||
+                !dueDate
+              ) {
+                setNotice("请填写合同名称、正数金额和回款日期。");
+                return;
+              }
+              const id = uid("CON");
+              act({
+                type: "UPSERT_RECORD",
+                payload: {
+                  collection: "crmContracts",
+                  record: {
+                    id,
+                    name: contractName,
+                    customerId: customer.id,
+                    customer: customer.name,
+                    owner: person === "全部业务员" ? "陈晓" : person,
+                    amount,
+                    received: 0,
+                    date: today(),
+                    dueDate,
+                    status: "待审批",
+                    description: "客户 ID 关联的本地合成合同，未经实际签署。",
+                  },
+                },
+              });
+              act({
+                type: "UPSERT_RECORD",
+                payload: {
+                  collection: "crmCustomers",
+                  record: { ...customer, project: "已立项" },
+                },
+              });
+              setContractName("");
+              setContractId(id);
+              setNotice("已创建客户关联的待审批合同。");
+            }}
+          >
+            创建关联待审合同
+          </button>
+          <div />
+          <label className="ops-field">
+            <span>回款关联合同</span>
+            <select
+              aria-label="CRM回款关联合同"
+              value={chosen?.id || ""}
+              onChange={(e) => setContractId(e.target.value)}
+            >
+              {linkedContracts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · 剩余 ¥{Number(c.amount) - Number(c.received)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>回款类型</span>
+            <select
+              aria-label="CRM回款类型"
+              value={paymentType}
+              onChange={(e) => setPaymentType(e.target.value)}
+            >
+              <option>实际回款</option>
+              <option>计划回款</option>
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>回款金额</span>
+            <input
+              type="number"
+              aria-label="CRM登记回款金额"
+              value={payment}
+              onChange={(e) => setPayment(Number(e.target.value))}
+            />
+          </label>
+          <label className="ops-field">
+            <span>回款日期</span>
+            <input
+              type="date"
+              aria-label="CRM登记回款日期"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+            />
+          </label>
+          <button
+            className="btn btn-primary"
+            disabled={!chosen}
+            onClick={() => {
+              if (
+                !Number.isFinite(payment) ||
+                payment <= 0 ||
+                !paymentDate ||
+                payment > Number(chosen.amount) - Number(chosen.received)
+              ) {
+                setNotice("回款金额须为正且不能超过合同剩余应收。");
+                return;
+              }
+              act({
+                type: "UPSERT_RECORD",
+                payload: {
+                  collection: "crmActivities",
+                  record: {
+                    id: uid("PAY"),
+                    name: `${chosen.name} · ${paymentType}`,
+                    customerId: customer.id,
+                    customer: customer.name,
+                    contractId: chosen.id,
+                    category: paymentType,
+                    owner: chosen.owner,
+                    amount: payment,
+                    date: paymentDate,
+                    status: paymentType === "实际回款" ? "已完成" : "计划中",
+                    description: "仅登记合成财务资料，不执行转账。",
+                  },
+                },
+              });
+              if (paymentType === "实际回款")
+                act({
+                  type: "UPSERT_RECORD",
+                  payload: {
+                    collection: "crmContracts",
+                    record: {
+                      ...chosen,
+                      received: Number(chosen.received) + payment,
+                    },
+                  },
+                });
+              setNotice(
+                `${paymentType}已关联到合同 ${chosen.id}，年度看板同步更新。`,
+              );
+            }}
+          >
+            登记关联合同回款
+          </button>
+        </div>
+      </details>
+      {notice && (
+        <div className="ops-feedback" role="status">
+          {notice}
+        </div>
+      )}
     </section>
   );
 }
+
 function BookingConfig() {
   const { state, act } = useDemo() as any;
   const [draft, setDraft] = useState<Row>({
@@ -2400,6 +2914,1989 @@ function BookingConfig() {
   );
 }
 
+const rewardTaskSpec: WorkspaceSpec = {
+  key: "rewardTasks",
+  label: "梦想任务规则",
+  description: "配置任务资格与一次性发放的健康豆，业务工作台实际消费这些规则。",
+  fields: [
+    f("name", "任务名称"),
+    f("condition", "完成条件", "select", ["知识学习", "随访完成"]),
+    f("points", "奖励健康豆", "number"),
+    f("description", "完成要求", "textarea"),
+  ],
+  statuses: ["已启用", "已停用"],
+  seeds: [
+    {
+      id: "RT001",
+      name: "阅读健康知识卡",
+      condition: "知识学习",
+      points: 20,
+      description: "填写本次合成阅读记录，审核后一次性领取。",
+      status: "已启用",
+    },
+    {
+      id: "RT002",
+      name: "完成一次关联随访",
+      condition: "随访完成",
+      points: 30,
+      description: "该客户存在已完成随访任务时才允许领取。",
+      status: "已启用",
+    },
+  ],
+};
+const rewardProductSpec: WorkspaceSpec = {
+  key: "rewardProducts",
+  label: "梦想商品规则",
+  description: "健康豆兑换商品与可用库存，库存按未取消兑换记录实时扣减。",
+  fields: [
+    f("name", "梦想商品"),
+    f("pointsCost", "兑换健康豆", "number"),
+    f("stock", "可兑换总库存", "number"),
+    f("description", "兑换与取消政策", "textarea"),
+  ],
+  statuses: ["已启用", "已停用"],
+  seeds: [
+    {
+      id: "RP001",
+      name: "健康主题帆布袋（合成）",
+      pointsCost: 80,
+      stock: 12,
+      description: "每日每客户限兑一次；未领取前可取消并原额退回健康豆。",
+      status: "已启用",
+    },
+    {
+      id: "RP002",
+      name: "健康知识手册（合成）",
+      pointsCost: 30,
+      stock: 30,
+      description: "仅本地模拟兑换，不配送实物。",
+      status: "已启用",
+    },
+  ],
+};
+const activitySpec: WorkspaceSpec = {
+  key: "communityActivities",
+  label: "健康活动规则",
+  description: "报名容量、审核状态与签到奖励即时约束活动报名。",
+  fields: [
+    f("name", "活动名称"),
+    f("team", "组织团队"),
+    f("date", "活动日期", "date"),
+    f("capacity", "名额上限", "number"),
+    f("points", "签到健康豆", "number"),
+    f("description", "活动说明", "textarea"),
+  ],
+  statuses: ["待审核", "已启用", "已驳回", "已结束"],
+  transitions: {
+    待审核: ["已启用", "已驳回"],
+    已驳回: ["待审核"],
+    已启用: ["已结束"],
+    已结束: [],
+  },
+  seeds: [
+    {
+      id: "ACT001",
+      name: "十月健康知识交流会",
+      team: "健康教育组",
+      date: today(),
+      capacity: 12,
+      points: 15,
+      description: "合成活动，可报名、取消及模拟签到；不组织真实活动。",
+      status: "已启用",
+    },
+    {
+      id: "ACT002",
+      name: "企业健康主题活动",
+      team: "企业服务组",
+      date: today(),
+      capacity: 2,
+      points: 25,
+      description: "用于演示名额限制与审核流程。",
+      status: "待审核",
+    },
+  ],
+};
+export function applyLoyaltyChange(
+  account: Row,
+  delta: number,
+  reason: string,
+  sourceKey: string,
+) {
+  if (!Number.isInteger(delta) || !reason.trim() || !sourceKey)
+    throw new Error("健康豆变动必须为整数且填写原因。");
+  if ((account.ledger || []).some((l: Row) => l.sourceKey === sourceKey))
+    return account;
+  const balance = Number(account.balance || 0) + delta;
+  if (balance < 0) throw new Error("健康豆余额不足，不能形成负余额。");
+  return {
+    ...account,
+    balance,
+    ledger: [
+      ...(account.ledger || []),
+      {
+        id: sourceKey,
+        sourceKey,
+        delta,
+        balance,
+        reason,
+        at: new Date().toISOString(),
+      },
+    ],
+  };
+}
+function LoyaltyCenter() {
+  const { state, act } = useDemo() as any;
+  const tasks = useCollection(rewardTaskSpec).rows,
+    products = useCollection(rewardProductSpec).rows,
+    activities = useCollection(activitySpec).rows;
+  const [patientId, setPatientId] = useState(state.patients[0]?.id);
+  const [tab, setTab] = useState("work");
+  const [evidence, setEvidence] = useState("");
+  const [notice, setNotice] = useState("");
+  const [delta, setDelta] = useState(10);
+  const [reason, setReason] = useState("");
+  const [redeem, setRedeem] = useState<Row | null>(null);
+  const [code, setCode] = useState("");
+  const accounts = state.records.loyaltyAccounts || [];
+  const account = accounts.find((a: Row) => a.patientId === patientId) || {
+    id: `LOY-${patientId}`,
+    patientId,
+    balance: 100,
+    ledger: [
+      {
+        id: "opening",
+        sourceKey: "opening",
+        delta: 100,
+        balance: 100,
+        reason: "合成开户赠送",
+        at: today(),
+      },
+    ],
+    completedTasks: [],
+    redemptions: [],
+    enrollments: [],
+  };
+  const save = (next: Row, message: string) => {
+    act({
+      type: "UPSERT_RECORD",
+      payload: { collection: "loyaltyAccounts", record: next },
+    });
+    setNotice(message);
+  };
+  const change = (delta: number, why: string, key: string, patch: Row = {}) => {
+    try {
+      const next = applyLoyaltyChange(account, delta, why, key);
+      if (next === account) {
+        setNotice("该来源已记账，不重复发放或扣除。");
+        return false;
+      }
+      save({ ...next, ...patch }, why);
+      return true;
+    } catch (e) {
+      setNotice((e as Error).message);
+      return false;
+    }
+  };
+  // Anonymous aggregates include hidden customers without exposing their account details.
+  const resourceUsed = (kind: string, resourceId: string) =>
+    Number(
+      (state.records.resourceUsage || []).find(
+        (r: Row) => r.kind === kind && r.resourceId === resourceId,
+      )?.used || 0,
+    );
+  return (
+    <>
+      <div className="ops-toolbar" style={{ padding: "0 0 20px" }}>
+        <label className="ops-field">
+          <span>健康豆客户账户</span>
+          <select
+            aria-label="健康豆客户账户"
+            value={patientId}
+            onChange={(e) => {
+              setPatientId(e.target.value);
+              setNotice("");
+              setRedeem(null);
+            }}
+          >
+            {state.patients.map((p: Row) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div style={{ marginLeft: "auto" }}>
+          <Tag value={`${account.balance} 健康豆`} />
+        </div>
+      </div>
+      <div className="health-profile-tabs">
+        {[
+          ["work", "账户与活动"],
+          ["tasks", "梦想任务规则"],
+          ["products", "梦想商品规则"],
+          ["activities", "活动规则审核"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            className={tab === key ? "active" : ""}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab !== "work" ? (
+        <RecordWorkspace
+          spec={
+            tab === "tasks"
+              ? rewardTaskSpec
+              : tab === "products"
+                ? rewardProductSpec
+                : activitySpec
+          }
+        />
+      ) : (
+        <>
+          <Metrics
+            items={[
+              {
+                label: "健康豆余额",
+                value: account.balance,
+                note: "合成积分，无现金价值",
+              },
+              { label: "已完成梦想任务", value: account.completedTasks.length },
+              {
+                label: "有效兑换记录",
+                value: account.redemptions.filter(
+                  (r: Row) => r.status !== "已取消",
+                ).length,
+              },
+              {
+                label: "已报名活动",
+                value: account.enrollments.filter(
+                  (r: Row) => r.status !== "已取消",
+                ).length,
+              },
+            ]}
+          />
+          {notice && (
+            <div className="ops-feedback" role="status">
+              {notice}
+            </div>
+          )}
+          <section className="panel ops-panel">
+            <div className="ops-panel-title">
+              <div>
+                <h2>完成梦想任务</h2>
+                <p>每个客户每项任务只发放一次；关联随访必须确实完成。</p>
+              </div>
+            </div>
+            <label className="ops-field" style={{ margin: "0 24px 18px" }}>
+              <span>任务完成记录</span>
+              <input
+                aria-label="梦想任务完成记录"
+                value={evidence}
+                onChange={(e) => setEvidence(e.target.value)}
+                placeholder="填写合成任务完成说明"
+              />
+            </label>
+            {tasks
+              .filter((t) => t.status === "已启用")
+              .map((t) => {
+                const completed = account.completedTasks.some(
+                  (c: Row) => c.taskId === t.id,
+                );
+                const eligible =
+                  t.condition !== "随访完成" ||
+                  state.tasks.some(
+                    (x: Row) =>
+                      x.patientId === patientId && x.status === "已完成",
+                  );
+                return (
+                  <div className="health-attention-row" key={t.id}>
+                    <div>
+                      <b>
+                        {t.name} · +{t.points} 豆
+                      </b>
+                      <small>
+                        {t.description}
+                        {!eligible ? " · 暂无已完成随访，不符合领取条件" : ""}
+                      </small>
+                    </div>
+                    <button
+                      className="btn"
+                      disabled={completed || !eligible}
+                      onClick={() => {
+                        if (!evidence.trim()) {
+                          setNotice("请填写任务完成记录。");
+                          return;
+                        }
+                        change(
+                          Number(t.points),
+                          `完成梦想任务：${t.name}`,
+                          `task:${t.id}`,
+                          {
+                            completedTasks: [
+                              ...account.completedTasks,
+                              {
+                                taskId: t.id,
+                                evidence,
+                                points: t.points,
+                                date: today(),
+                              },
+                            ],
+                          },
+                        );
+                      }}
+                    >
+                      {completed ? "已领取" : "完成并领取"}
+                    </button>
+                  </div>
+                );
+              })}
+          </section>
+          <section className="panel ops-panel" style={{ marginTop: 22 }}>
+            <div className="ops-panel-title">
+              <div>
+                <h2>梦想商品兑换</h2>
+                <p>每日每商品限兑一次；未领取前取消退豆，已核销不能取消。</p>
+              </div>
+            </div>
+            {products
+              .filter((p) => p.status === "已启用")
+              .map((p) => {
+                const used = resourceUsed("reward", p.id);
+                const usedToday = account.redemptions.some(
+                  (r: Row) => r.productId === p.id && r.date === today(),
+                );
+                return (
+                  <div className="health-attention-row" key={p.id}>
+                    <div>
+                      <b>{p.name}</b>
+                      <small>
+                        {p.pointsCost} 健康豆 · 可用库存{" "}
+                        {Math.max(0, p.stock - used)}
+                      </small>
+                    </div>
+                    <button
+                      className="btn"
+                      disabled={usedToday || p.stock <= used}
+                      onClick={() =>
+                        setRedeem({
+                          ...p,
+                          redemptionId: `RD-${patientId}-${p.id}-${today()}`,
+                        })
+                      }
+                    >
+                      {usedToday ? "今日已兑换" : "兑换商品"}
+                    </button>
+                  </div>
+                );
+              })}
+            {account.redemptions.map((r: Row) => (
+              <div className="health-attention-row" key={r.id}>
+                <div>
+                  <b>
+                    {r.name} · <Tag value={r.status} />
+                  </b>
+                  <small>
+                    消费码 {r.code} · {r.points} 豆
+                  </small>
+                </div>
+                {r.status === "待领取" && (
+                  <div className="ops-action-wrap">
+                    <input
+                      aria-label={`兑换核销码 ${r.id}`}
+                      placeholder="输入完整消费码"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      style={{ width: 160, fontSize: 10 }}
+                    />
+                    <button
+                      className="btn"
+                      onClick={() => {
+                        if (code !== r.code) {
+                          setNotice("消费码不匹配，未核销。");
+                          return;
+                        }
+                        save(
+                          {
+                            ...account,
+                            redemptions: account.redemptions.map((x: Row) =>
+                              x.id === r.id
+                                ? {
+                                    ...x,
+                                    status: "已领取",
+                                    redeemedAt: today(),
+                                  }
+                                : x,
+                            ),
+                          },
+                          "兑换消费码已核销，不能重复领取。",
+                        );
+                        setCode("");
+                      }}
+                    >
+                      确认核销领取
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={() =>
+                        change(
+                          r.points,
+                          `取消兑换退回：${r.name}`,
+                          `refund:${r.id}`,
+                          {
+                            redemptions: account.redemptions.map((x: Row) =>
+                              x.id === r.id ? { ...x, status: "已取消" } : x,
+                            ),
+                          },
+                        )
+                      }
+                    >
+                      取消并退豆
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
+          <section className="panel ops-panel" style={{ marginTop: 22 }}>
+            <div className="ops-panel-title">
+              <div>
+                <h2>健康广场活动</h2>
+                <p>先报名后签到；报名人数跨合成客户实时统计，取消释放名额。</p>
+              </div>
+            </div>
+            {activities.map((a) => {
+              const enrollment = account.enrollments.find(
+                (e: Row) => e.activityId === a.id && e.status !== "已取消",
+              );
+              const count = resourceUsed("activity", a.id);
+              return (
+                <div className="health-attention-row" key={a.id}>
+                  <div>
+                    <b>
+                      {a.name} · <Tag value={a.status} />
+                    </b>
+                    <small>
+                      {a.date} · {a.team} · 名额 {count}/{a.capacity} · 签到奖励{" "}
+                      {a.points} 豆
+                    </small>
+                  </div>
+                  <div className="ops-action-wrap">
+                    {!enrollment ? (
+                      <button
+                        className="btn"
+                        disabled={
+                          a.status !== "已启用" ||
+                          count >= a.capacity ||
+                          a.date < today()
+                        }
+                        onClick={() =>
+                          save(
+                            {
+                              ...account,
+                              enrollments: [
+                                ...account.enrollments,
+                                {
+                                  id: uid("EN"),
+                                  activityId: a.id,
+                                  name: a.name,
+                                  status: "已报名",
+                                  date: today(),
+                                },
+                              ],
+                            },
+                            "报名成功，已占用 1 个活动名额。",
+                          )
+                        }
+                      >
+                        {count >= a.capacity ? "名额已满" : "报名活动"}
+                      </button>
+                    ) : enrollment.status === "已签到" ? (
+                      <Tag value="已签到并发放" />
+                    ) : (
+                      <>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() =>
+                            change(
+                              Number(a.points),
+                              `活动签到奖励：${a.name}`,
+                              `activity:${a.id}`,
+                              {
+                                enrollments: account.enrollments.map(
+                                  (e: Row) =>
+                                    e.id === enrollment.id
+                                      ? { ...e, status: "已签到" }
+                                      : e,
+                                ),
+                              },
+                            )
+                          }
+                        >
+                          签到并发放
+                        </button>
+                        <button
+                          className="btn"
+                          onClick={() =>
+                            save(
+                              {
+                                ...account,
+                                enrollments: account.enrollments.map(
+                                  (e: Row) =>
+                                    e.id === enrollment.id
+                                      ? { ...e, status: "已取消" }
+                                      : e,
+                                ),
+                              },
+                              "报名已取消，活动名额已释放。",
+                            )
+                          }
+                        >
+                          取消报名
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+          <section className="panel ops-panel" style={{ marginTop: 22 }}>
+            <div className="ops-panel-title">
+              <div>
+                <h2>健康豆账本</h2>
+                <p>逐笔记录来源与变动后余额，拒绝重复来源或负余额。</p>
+              </div>
+              <button
+                className="btn"
+                onClick={() =>
+                  downloadCsv("健康豆账本", account.ledger, [
+                    f("at", "时间"),
+                    f("reason", "原因"),
+                    f("delta", "变动"),
+                    f("balance", "余额"),
+                    f("sourceKey", "来源"),
+                  ])
+                }
+              >
+                导出账本
+              </button>
+            </div>
+            <div className="ops-toolbar">
+              <input
+                type="number"
+                aria-label="健康豆调整数量"
+                value={delta}
+                onChange={(e) => setDelta(Number(e.target.value))}
+                style={{ width: 100 }}
+              />
+              <input
+                aria-label="健康豆调整原因"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="调整原因，必填"
+              />
+              <button
+                className="btn"
+                onClick={() => {
+                  if (change(delta, reason, uid("ADJ"))) setReason("");
+                }}
+              >
+                登记合成调整
+              </button>
+            </div>
+            <table className="ops-table" aria-label="健康豆账本">
+              <thead>
+                <tr>
+                  <th>来源说明</th>
+                  <th>变动</th>
+                  <th>余额</th>
+                </tr>
+              </thead>
+              <tbody>
+                {account.ledger
+                  .slice()
+                  .reverse()
+                  .map((l: Row) => (
+                    <tr key={l.id}>
+                      <td>
+                        {l.reason}
+                        <small className="ops-block">{l.sourceKey}</small>
+                      </td>
+                      <td>
+                        {l.delta > 0 ? "+" : ""}
+                        {l.delta}
+                      </td>
+                      <td>{l.balance}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </section>
+        </>
+      )}
+      {redeem && (
+        <div className="ops-overlay">
+          <section
+            className="ops-modal"
+            role="dialog"
+            aria-label="确认梦想商品兑换"
+            aria-modal="true"
+          >
+            <div className="ops-modal-head">
+              <h2>确认合成兑换</h2>
+              <button className="btn" onClick={() => setRedeem(null)}>
+                取消
+              </button>
+            </div>
+            <div className="health-task-detail">
+              <p>
+                {redeem.name} · 需要 {redeem.pointsCost} 豆
+              </p>
+              <p>
+                当前余额 {account.balance} 豆，兑换后{" "}
+                {account.balance - redeem.pointsCost}{" "}
+                豆。仅生成演示领取码，不配送。
+              </p>
+              <p>未领取可取消并退回原额健康豆，核销后不可取消。</p>
+            </div>
+            <div className="ops-modal-actions">
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  const used = resourceUsed("reward", redeem.id);
+                  if (used >= redeem.stock) {
+                    setNotice("库存不足，未扣健康豆。");
+                    setRedeem(null);
+                    return;
+                  }
+                  const next = {
+                    id: redeem.redemptionId,
+                    productId: redeem.id,
+                    name: redeem.name,
+                    points: redeem.pointsCost,
+                    date: today(),
+                    status: "待领取",
+                    code: `DEMO-${redeem.redemptionId}`,
+                  };
+                  if (
+                    change(
+                      -Number(redeem.pointsCost),
+                      `兑换：${redeem.name}`,
+                      `redeem:${redeem.redemptionId}`,
+                      { redemptions: [...account.redemptions, next] },
+                    )
+                  )
+                    setRedeem(null);
+                }}
+              >
+                确认兑换（模拟）
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function quoteCommerceOrder(
+  product: Row,
+  quantity: number,
+  shipping: Row | null,
+  groupRule: Row | null,
+  fulfillment: string,
+  region: string,
+) {
+  const errors: string[] = [];
+  if (!Number.isInteger(quantity) || quantity < 1)
+    errors.push("数量必须为正整数");
+  if (!Number.isFinite(Number(product.price)) || Number(product.price) < 0)
+    errors.push("商品价格无效");
+  if (
+    groupRule &&
+    (Number(groupRule.discount) <= 0 ||
+      Number(groupRule.discount) > 10 ||
+      Number(groupRule.minPeople) < 2)
+  )
+    errors.push("团购折扣须为 0–10 折且成团人数至少为 2");
+  if (fulfillment === "配送" && !shipping) errors.push("请选择运费模板");
+  if (
+    shipping &&
+    (["baseFee", "additionalFee", "freeAbove"].some(
+      (k) => Number(shipping[k] || 0) < 0,
+    ) ||
+      Number(shipping.firstWeight ?? 1) <= 0 ||
+      Number(shipping.additionalWeight ?? 1) <= 0)
+  )
+    errors.push("运费费用不能为负且首重/续重单位必须大于零");
+  if (
+    shipping &&
+    fulfillment === "配送" &&
+    !["全国", "全部地区", region].some((v) =>
+      String(shipping.region || "")
+        .split(/[，,]/)
+        .map((x: string) => x.trim())
+        .includes(v),
+    )
+  )
+    errors.push("所选地区不在运费模板服务范围");
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const subtotal = round(Number(product.price) * quantity);
+  const discounted = round(
+    subtotal * (groupRule ? Number(groupRule.discount) / 10 : 1),
+  );
+  const weight = Number(product.weight || 0.5) * quantity;
+  let fee = 0;
+  if (fulfillment === "配送" && shipping) {
+    if (!(
+      Number(shipping.freeAbove) > 0 && discounted >= Number(shipping.freeAbove)
+    ))
+      fee =
+        Number(shipping.baseFee || 0) +
+        Math.ceil(
+          Math.max(0, weight - Number(shipping.firstWeight || 1)) /
+            Number(shipping.additionalWeight || 1),
+        ) *
+          Number(shipping.additionalFee || 0);
+  }
+  return {
+    subtotal,
+    discount: round(subtotal - discounted),
+    discounted,
+    shipping: round(fee),
+    total: round(discounted + fee),
+    weight,
+    errors,
+  };
+}
+const domainSpec = (key: string, specs: WorkspaceSpec[]) =>
+  specs.find((s) => s.key === key)!;
+function CommerceSimulator() {
+  const { state, act } = useDemo() as any;
+  const products = useCollection(domainSpec("products", commerceSpecs)).rows;
+  const shippingRows = useCollection(
+    domainSpec("shipping", commerceSpecs),
+  ).rows;
+  const rules = useCollection(domainSpec("groupBuy", commerceSpecs)).rows;
+  const stores = useCollection(domainSpec("stores", commerceSpecs)).rows;
+  useCollection(domainSpec("shopOrders", commerceSpecs));
+  const [productId, setProductId] = useState("P-1001");
+  const [patientId, setPatientId] = useState(state.patients[0]?.id);
+  const [quantity, setQuantity] = useState(1);
+  const [mode, setMode] = useState("直接购买");
+  const [fulfillment, setFulfillment] = useState("配送");
+  const [region, setRegion] = useState("青岛市");
+  const [shipId, setShipId] = useState(shippingRows[0]?.id || "");
+  const [ruleId, setRuleId] = useState(rules[0]?.id || "");
+  const [storeId, setStoreId] = useState(stores[0]?.id || "");
+  const [reserveDate, setReserveDate] = useState(today());
+  const [notice, setNotice] = useState("");
+  const [confirm, setConfirm] = useState(false);
+  // Each preview grants exactly one synchronous submission, even in a batched double click.
+  const confirmationConsumed = useRef(true);
+  const [code, setCode] = useState("");
+  const product = products.find((p) => p.id === productId) || products[0];
+  const shipping = shippingRows.find((s) => s.id === shipId) || null;
+  const rule =
+    mode === "参与团购" ? rules.find((r) => r.id === ruleId) || null : null;
+  const orders = state.records.shopOrders || [],
+    reservations = state.records.commerceReservations || [],
+    rounds = state.records.groupBuyRounds || [];
+  const store = stores.find((s) => s.id === storeId);
+  const quote = quoteCommerceOrder(
+    product,
+    quantity,
+    shipping,
+    rule,
+    fulfillment,
+    region,
+  );
+  const reserved = Number(
+    (state.records.resourceUsage || []).find(
+      (r: Row) => r.kind === "commerce" && r.resourceId === product.id,
+    )?.used || 0,
+  );
+  const available = Number(product.stock) - reserved;
+  const currentOrders = orders.filter(
+    (o: Row) => o.customerId === patientId && o.pricingSnapshot,
+  );
+  const currentReservations = reservations.filter(
+    (o: Row) => o.customerId === patientId,
+  );
+  const persist = (collection: string, record: Row) =>
+    act({ type: "UPSERT_RECORD", payload: { collection, record } });
+  const submit = () => {
+    if (confirmationConsumed.current) return;
+    confirmationConsumed.current = true;
+    const errors = [...quote.errors];
+    if (!["在售", "预约中"].includes(product.status))
+      errors.push("商品当前不可购买");
+    if (quantity > available) errors.push("可用库存不足");
+    if (mode === "商品预约" && reserveDate < today())
+      errors.push("预约日期不能早于今天");
+    if (
+      mode === "参与团购" &&
+      (!rule || rule.status !== "已启用" || rule.date < today())
+    )
+      errors.push("团购规则未启用或已过有效期");
+    if (
+      rule &&
+      rule.product &&
+      rule.product !== product.name &&
+      rule.product !== "全部商品"
+    )
+      errors.push("团购规则不适用于当前商品");
+    if (fulfillment === "到店自取" && (!store || store.status !== "已启用"))
+      errors.push("请选择启用的服务店铺");
+    if (errors.length) {
+      setNotice(errors.join("；"));
+      setConfirm(false);
+      return;
+    }
+    const id = uid(mode === "商品预约" ? "RSV" : "SIM");
+    const open = rule
+      ? rounds.find(
+          (g: Row) =>
+            g.ruleId === rule.id &&
+            g.productId === product.id &&
+            g.status === "待成团" &&
+            g.deadline >= today(),
+        )
+      : null;
+    if (open?.members.some((m: Row) => m.customerId === patientId)) {
+      setNotice("该客户已参加当前团，不重复占用名额。");
+      setConfirm(false);
+      return;
+    }
+    const row = {
+      id,
+      name: product.name,
+      productId: product.id,
+      customerId: patientId,
+      customer: state.patients.find((p: Row) => p.id === patientId)?.name,
+      quantity,
+      amount: quote.total,
+      date: today(),
+      reservationDate: mode === "商品预约" ? reserveDate : undefined,
+      status: mode === "商品预约" ? "已预约" : rule ? "待成团" : "待付款",
+      mode,
+      fulfillment,
+      region,
+      storeId,
+      pricingSnapshot: {
+        ...quote,
+        product: {
+          id: product.id,
+          price: product.price,
+          weight: product.weight,
+        },
+        shipping: shipping ? { ...shipping } : null,
+        groupRule: rule ? { ...rule } : null,
+      },
+      consumptionCode: "",
+      history: [
+        {
+          at: cleanDate(),
+          text: "根据当前商品、运费、团购规则计算生成合成交易",
+        },
+      ],
+    };
+    if (rule) {
+      const group = open || {
+        id: uid("GB"),
+        ruleId: rule.id,
+        productId: product.id,
+        required: Number(rule.minPeople),
+        deadline: rule.date,
+        status: "待成团",
+        members: [],
+      };
+      const next = {
+        ...group,
+        members: [...group.members, { orderId: id, customerId: patientId }],
+      };
+      if (next.members.length >= next.required) {
+        next.status = "已成团";
+        row.status = "待付款";
+        group.members.forEach((m: Row) => {
+          const old = orders.find((o: Row) => o.id === m.orderId);
+          if (old)
+            persist("shopOrders", {
+              ...old,
+              status: "待付款",
+              groupId: group.id,
+            });
+        });
+      }
+      Object.assign(row, { groupId: group.id });
+      persist("groupBuyRounds", next);
+    }
+    persist(mode === "商品预约" ? "commerceReservations" : "shopOrders", row);
+    setConfirm(false);
+    setNotice(
+      `${mode === "商品预约" ? "已保存预约并占用库存" : "已创建本地订单"}，应付 ¥${quote.total.toFixed(2)}。`,
+    );
+  };
+  return (
+    <>
+      <Metrics
+        items={[
+          {
+            label: "当前可用库存",
+            value: available,
+            note: "减去有效预订和订单占用",
+          },
+          { label: "当前商品单价", value: `¥${product.price}` },
+          { label: "预计物流费用", value: `¥${quote.shipping.toFixed(2)}` },
+          {
+            label: "计算后应付",
+            value: `¥${quote.total.toFixed(2)}`,
+            note: "仅模拟，价格快照随订单保存",
+          },
+        ]}
+      />
+      <section className="panel ops-panel">
+        <div className="ops-panel-title">
+          <div>
+            <h2>商品预约与交易计算</h2>
+            <p>
+              商品、团购、运费、店铺规则均读取实时配置；下单后保存独立价格快照。
+            </p>
+          </div>
+        </div>
+        <div className="ops-form-grid">
+          <label className="ops-field">
+            <span>交易客户</span>
+            <select
+              aria-label="交易客户"
+              value={patientId}
+              onChange={(e) => setPatientId(e.target.value)}
+            >
+              {state.patients.map((p: Row) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>交易商品</span>
+            <select
+              aria-label="交易商品"
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+            >
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>交易方式</span>
+            <select
+              aria-label="交易方式"
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+            >
+              {["直接购买", "商品预约", "参与团购"].map((v) => (
+                <option key={v}>{v}</option>
+              ))}
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>购买数量</span>
+            <input
+              type="number"
+              aria-label="购买数量"
+              value={quantity}
+              min={1}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+            />
+          </label>
+          <label className="ops-field">
+            <span>履约方式</span>
+            <select
+              aria-label="履约方式"
+              value={fulfillment}
+              onChange={(e) => setFulfillment(e.target.value)}
+            >
+              <option>配送</option>
+              <option>到店自取</option>
+              <option>数字服务</option>
+            </select>
+          </label>
+          {fulfillment === "配送" ? (
+            <>
+              <label className="ops-field">
+                <span>收货地区（合成）</span>
+                <input
+                  aria-label="收货地区"
+                  value={region}
+                  onChange={(e) => setRegion(e.target.value)}
+                />
+              </label>
+              <label className="ops-field">
+                <span>运费模板</span>
+                <select
+                  aria-label="交易运费模板"
+                  value={shipId}
+                  onChange={(e) => setShipId(e.target.value)}
+                >
+                  {shippingRows
+                    .filter((s) => s.status === "已启用")
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </>
+          ) : (
+            <label className="ops-field">
+              <span>核销店铺</span>
+              <select
+                aria-label="核销店铺"
+                value={storeId}
+                onChange={(e) => setStoreId(e.target.value)}
+              >
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {mode === "参与团购" && (
+            <label className="ops-field">
+              <span>团购规则</span>
+              <select
+                aria-label="交易团购规则"
+                value={ruleId}
+                onChange={(e) => setRuleId(e.target.value)}
+              >
+                {rules.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} · {r.minPeople} 人 · {r.discount} 折
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {mode === "商品预约" && (
+            <label className="ops-field">
+              <span>商品预约日期</span>
+              <input
+                aria-label="商品预约日期"
+                type="date"
+                min={today()}
+                value={reserveDate}
+                onChange={(e) => setReserveDate(e.target.value)}
+              />
+            </label>
+          )}
+        </div>
+        <div className="ops-inline-box" style={{ margin: "0 24px 20px" }}>
+          <p>
+            商品 ¥{quote.subtotal.toFixed(2)} − 团购优惠 ¥
+            {quote.discount.toFixed(2)} + 运费 ¥{quote.shipping.toFixed(2)} =
+            应付 ¥{quote.total.toFixed(2)}
+          </p>
+          <p>
+            包裹重量 {quote.weight} kg。
+            {rule
+              ? `团购需 ${rule.minPeople} 位不同客户在 ${rule.date} 前加入，未成团不可模拟付款。`
+              : ""}
+          </p>
+          {quote.errors.map((e) => (
+            <p className="ops-error" key={e}>
+              {e}
+            </p>
+          ))}
+        </div>
+        <div className="ops-modal-actions">
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              if (confirm) return;
+              confirmationConsumed.current = false;
+              setConfirm(true);
+            }}
+          >
+            预览并确认交易
+          </button>
+        </div>
+        {notice && (
+          <div className="ops-feedback" role="status">
+            {notice}
+          </div>
+        )}
+      </section>
+      <section className="panel ops-panel" style={{ marginTop: 22 }}>
+        <div className="ops-panel-title">
+          <h2>商品预约与订单履约</h2>
+        </div>
+        {currentReservations.map((r: Row) => (
+          <div className="health-attention-row" key={r.id}>
+            <div>
+              <b>
+                {r.name} · {r.quantity} 件
+              </b>
+              <small>
+                预约 {r.reservationDate} · <Tag value={r.status} />
+              </small>
+            </div>
+            {r.status === "已预约" && (
+              <div className="ops-action-wrap">
+                <button
+                  className="btn"
+                  onClick={() => {
+                    persist("shopOrders", {
+                      ...r,
+                      id: `ORD-${r.id}`,
+                      status: "待付款",
+                      sourceReservationId: r.id,
+                    });
+                    persist("commerceReservations", {
+                      ...r,
+                      status: "已转订单",
+                    });
+                    setNotice("预约已转为待付款订单，库存占用不重复。");
+                  }}
+                >
+                  预约转订单
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => {
+                    persist("commerceReservations", { ...r, status: "已取消" });
+                    setNotice("预约已取消，库存占用已释放。");
+                  }}
+                >
+                  取消商品预约
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        {currentOrders.map((o: Row) => (
+          <div className="health-attention-row" key={o.id}>
+            <div>
+              <b>
+                {o.name} · ¥{o.amount.toFixed(2)} <Tag value={o.status} />
+              </b>
+              <small>
+                {o.id} · {o.fulfillment}
+                {o.consumptionCode ? ` · 消费码 ${o.consumptionCode}` : ""}
+              </small>
+            </div>
+            <div className="ops-action-wrap">
+              {o.status === "待付款" && (
+                <button
+                  className="btn"
+                  onClick={() => {
+                    persist("shopOrders", {
+                      ...o,
+                      status: o.fulfillment === "配送" ? "待发货" : "待核销",
+                      consumptionCode:
+                        o.fulfillment === "配送" ? "" : `DEMO-${o.id}`,
+                      paidAt: cleanDate(),
+                    });
+                    setNotice("已记录模拟付款，未发生真实资金流转。");
+                  }}
+                >
+                  模拟付款
+                </button>
+              )}
+              {["待付款", "待成团"].includes(o.status) && (
+                <button
+                  className="btn"
+                  onClick={() => {
+                    persist("shopOrders", { ...o, status: "已取消" });
+                    const group = rounds.find((g: Row) => g.id === o.groupId);
+                    if (group?.status === "待成团")
+                      persist("groupBuyRounds", {
+                        ...group,
+                        members: group.members.filter(
+                          (m: Row) => m.orderId !== o.id,
+                        ),
+                      });
+                    setNotice("本地订单已取消，库存占用已释放。");
+                  }}
+                >
+                  取消订单
+                </button>
+              )}
+              {o.status === "待核销" && (
+                <>
+                  <input
+                    aria-label={`订单消费码 ${o.id}`}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="输入完整演示消费码"
+                    style={{ width: 180, fontSize: 10 }}
+                  />
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      if (code !== o.consumptionCode) {
+                        setNotice("消费码不匹配，未核销。");
+                        return;
+                      }
+                      persist("shopOrders", {
+                        ...o,
+                        status: "已签收",
+                        redeemedAt: cleanDate(),
+                        redeemedBy: "当前管理员",
+                      });
+                      setNotice("消费码已核销，此订单不能二次核销。");
+                      setCode("");
+                    }}
+                  >
+                    确认消费码核销
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </section>
+      <section className="panel ops-panel" style={{ marginTop: 22 }}>
+        <div className="ops-panel-title">
+          <h2>团购进度</h2>
+          <button
+            className="btn"
+            onClick={() => {
+              rounds
+                .filter(
+                  (g: Row) => g.status === "待成团" && g.deadline < today(),
+                )
+                .forEach((g: Row) => {
+                  persist("groupBuyRounds", { ...g, status: "已过期" });
+                  g.members.forEach((m: Row) => {
+                    const o = orders.find((o: Row) => o.id === m.orderId);
+                    if (o)
+                      persist("shopOrders", {
+                        ...o,
+                        status: "已取消",
+                        cancelReason: "团购超时未成团",
+                      });
+                  });
+                });
+              setNotice("已核对团购有效期；过期待成团订单取消并释放库存。");
+            }}
+          >
+            检查过期团购
+          </button>
+        </div>
+        {rounds.map((g: Row) => (
+          <div className="health-attention-row" key={g.id}>
+            <div>
+              <b>
+                {products.find((p) => p.id === g.productId)?.name} ·{" "}
+                {g.members.length}/{g.required} 人
+              </b>
+              <small>
+                {g.id} · 截止 {g.deadline}
+              </small>
+            </div>
+            <Tag value={g.status} />
+          </div>
+        ))}
+      </section>
+      {confirm && (
+        <div className="ops-overlay">
+          <section
+            className="ops-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="确认本地商品交易"
+          >
+            <div className="ops-modal-head">
+              <h2>确认本地交易</h2>
+              <button
+                className="btn"
+                onClick={() => {
+                  confirmationConsumed.current = true;
+                  setConfirm(false);
+                }}
+              >
+                返回修改
+              </button>
+            </div>
+            <div className="health-task-detail">
+              <p>
+                {state.patients.find((p: Row) => p.id === patientId)?.name} ·{" "}
+                {product.name} × {quantity}
+              </p>
+              <p>
+                {mode} / {fulfillment} / 应付 ¥{quote.total.toFixed(2)}
+              </p>
+              <p>将保存当前规则快照；不发起付款、真实物流或外部沟通。</p>
+            </div>
+            <div className="ops-modal-actions">
+              <button className="btn btn-primary" onClick={submit}>
+                确认创建本地交易
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
+  );
+}
+const configurableMenus = [
+  ["/dashboard", "运营概览"],
+  ["/appointments", "预约登记"],
+  ["/queue", "智能导检"],
+  ["/exam", "分检工作站"],
+  ["/review", "总检审核"],
+  ["/reports", "报告中心"],
+  ["/health", "健康管理"],
+  ["/enterprise", "企业健康"],
+  ["/services", "医生与服务"],
+  ["/commerce", "健康商城"],
+  ["/content", "内容消息"],
+  ["/finance", "财务结算"],
+  ["/analytics", "工作量统计"],
+  ["/support", "客户服务"],
+  ["/quality", "质控追踪"],
+  ["/settings", "系统配置"],
+  ["/controls", "通知与专项质控"],
+  ["/coverage", "需求覆盖"],
+];
+function StaffPolicyWorkspace() {
+  const { state, act } = useDemo() as any;
+  const staff = useCollection(domainSpec("staff", settingsSpecs)).rows,
+    roles = useCollection(domainSpec("roles", settingsSpecs)).rows;
+  const [staffId, setStaffId] = useState("U-1001");
+  const [action, setAction] = useState("审核报告");
+  const [examType, setExamType] = useState("个检");
+  const [discount, setDiscount] = useState(1);
+  const [notice, setNotice] = useState("");
+  const [patientId, setPatientId] = useState(state.patients[0]?.id);
+  const [reason, setReason] = useState("");
+  const [end, setEnd] = useState("");
+  const [start, setStart] = useState(today());
+  const person = staff.find((s) => s.id === staffId) || staff[0];
+  const role =
+    roles.find((r) => r.id === person?.roleId || r.name === person?.role) ||
+    roles[0];
+  const entries = state.records.bookingBlacklist || [];
+  const permissions = role?.permissions || [];
+  const blocked =
+    person?.status !== "已通过"
+      ? "人员资质未通过"
+      : !permissions.includes(action)
+        ? "当前角色没有此操作权限"
+        : !(role.examTypes || ["个检", "团检"]).includes(examType)
+          ? "角色无此体检类型权限"
+          : Number(discount) < Number(role.minDiscount ?? 0.8)
+            ? "折扣低于该角色允许下限"
+            : "";
+  const saveRole = (patch: Row) =>
+    act({
+      type: "UPSERT_RECORD",
+      payload: { collection: "roles", record: { ...role, ...patch } },
+    });
+  return (
+    <>
+      <section className="panel ops-panel" style={{ marginBottom: 22 }}>
+        <div className="ops-panel-title">
+          <div>
+            <h2>医生角色分配与权限验证</h2>
+            <p>角色直接约束下方操作模拟器。服务端鉴权仍需真实系统实现。</p>
+          </div>
+        </div>
+        <div className="ops-form-grid">
+          <label className="ops-field">
+            <span>医护账号</span>
+            <select
+              aria-label="配置医护账号"
+              value={staffId}
+              onChange={(e) => setStaffId(e.target.value)}
+            >
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} · {s.status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>绑定业务角色</span>
+            <select
+              aria-label="绑定业务角色"
+              value={role?.id || ""}
+              onChange={(e) => {
+                const r = roles.find((r) => r.id === e.target.value);
+                if (!r) return;
+                act({
+                  type: "UPSERT_RECORD",
+                  payload: {
+                    collection: "staff",
+                    record: { ...person, roleId: r.id, role: r.name },
+                  },
+                });
+                setNotice(`${person.name} 已分配角色 ${r.name}`);
+              }}
+            >
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>角色折扣下限（0–1）</span>
+            <input
+              aria-label="角色折扣下限"
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={role?.minDiscount ?? 0.8}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (value >= 0 && value <= 1) saveRole({ minDiscount: value });
+              }}
+            />
+          </label>
+          <label className="ops-field">
+            <span>客户数据范围</span>
+            <select
+              aria-label="角色客户数据范围"
+              value={role?.scope || "本人客户"}
+              onChange={(e) => saveRole({ scope: e.target.value })}
+            >
+              {["本人客户", "所在科室", "所在机构", "演示全局"].map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+          <div className="ops-span2">
+            <div className="ops-permissions">
+              {[
+                "查看客户",
+                "维护档案",
+                "维护预约",
+                "录入结果",
+                "审核报告",
+                "订单处理",
+                "财务查询",
+                "系统配置",
+                "导出数据",
+              ].map((p) => (
+                <label key={p}>
+                  <input
+                    type="checkbox"
+                    checked={permissions.includes(p)}
+                    onChange={(e) =>
+                      saveRole({
+                        permissions: e.target.checked
+                          ? [...permissions, p]
+                          : permissions.filter((v: string) => v !== p),
+                      })
+                    }
+                  />
+                  {p}
+                </label>
+              ))}
+            </div>
+            <div className="ops-action-wrap" style={{ marginTop: 16 }}>
+              {["个检", "团检", "职业体检"].map((t) => (
+                <label key={t} style={{ fontSize: 11 }}>
+                  <input
+                    type="checkbox"
+                    checked={(role?.examTypes || ["个检", "团检"]).includes(t)}
+                    onChange={(e) =>
+                      saveRole({
+                        examTypes: e.target.checked
+                          ? [...(role?.examTypes || ["个检", "团检"]), t]
+                          : (role?.examTypes || ["个检", "团检"]).filter(
+                              (v: string) => v !== t,
+                            ),
+                      })
+                    }
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "0 24px 24px" }}>
+          <h3 style={{ fontSize: 13 }}>当前角色可见菜单</h3>
+          <div className="ops-permissions">
+            {configurableMenus.map(([path, label]) => (
+              <label key={path}>
+                <input
+                  type="checkbox"
+                  checked={(
+                    role?.menuPaths || configurableMenus.map(([p]) => p)
+                  ).includes(path)}
+                  onChange={(e) => {
+                    const paths =
+                      role?.menuPaths || configurableMenus.map(([p]) => p);
+                    saveRole({
+                      menuPaths: e.target.checked
+                        ? [...paths, path]
+                        : paths.filter((p: string) => p !== path),
+                    });
+                  }}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          <h3 style={{ fontSize: 13, marginTop: 22 }}>
+            明确客户与院区可见范围
+          </h3>
+          <p style={{ fontSize: 11, color: "#809681" }}>
+            客户不勾选表示全体；具体客户列表优先于描述性
+            scope，不自动推断“本人客户”。
+          </p>
+          <div className="ops-permissions">
+            {state.patients.map((p: Row) => (
+              <label key={p.id}>
+                <input
+                  type="checkbox"
+                  checked={(role?.allowedPatientIds || []).includes(p.id)}
+                  onChange={(e) =>
+                    saveRole({
+                      allowedPatientIds: e.target.checked
+                        ? [...(role?.allowedPatientIds || []), p.id]
+                        : (role?.allowedPatientIds || []).filter(
+                            (id: string) => id !== p.id,
+                          ),
+                    })
+                  }
+                />
+                {p.name}
+              </label>
+            ))}
+          </div>
+          <label className="ops-field" style={{ marginTop: 18 }}>
+            <span>限定可见院区</span>
+            <select
+              aria-label="角色限定院区"
+              value={role?.allowedCampus || ""}
+              onChange={(e) => saveRole({ allowedCampus: e.target.value })}
+            >
+              <option value="">全部院区</option>
+              <option>中心院区</option>
+              <option>东院区</option>
+            </select>
+          </label>
+          <div className="ops-action-wrap" style={{ marginTop: 18 }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                const paths =
+                  role?.menuPaths || configurableMenus.map(([p]) => p);
+                if (!paths.length) {
+                  setNotice("请至少选择一个可见菜单，再激活角色。");
+                  return;
+                }
+                saveRole({
+                  menuPaths: paths,
+                  allowedPatientIds: role.allowedPatientIds || [],
+                  allowedCampus: role.allowedCampus || "",
+                  examTypes: role.examTypes || ["个检", "团检"],
+                });
+                act({
+                  type: "UPDATE_CONFIG",
+                  payload: {
+                    customRoleId: role.id,
+                    discountMin: Number(role.minDiscount ?? 0.8),
+                  },
+                });
+                setNotice(
+                  `已激活自定义角色 ${role.name}；退出入口始终保留在顶栏。`,
+                );
+              }}
+            >
+              激活此自定义角色
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                act({
+                  type: "UPDATE_CONFIG",
+                  payload: { customRoleId: "", discountMin: 0.8 },
+                });
+                setNotice("已退出自定义角色限制。");
+              }}
+            >
+              退出自定义角色
+            </button>
+          </div>
+        </div>
+        <div className="ops-inline-box" style={{ margin: "0 24px 22px" }}>
+          <h3>配置生效验证</h3>
+          <div className="ops-inline-controls" style={{ flexWrap: "wrap" }}>
+            <select
+              aria-label="模拟权限操作"
+              value={action}
+              onChange={(e) => setAction(e.target.value)}
+            >
+              {["查看客户", "录入结果", "审核报告", "财务查询", "系统配置"].map(
+                (a) => (
+                  <option key={a}>{a}</option>
+                ),
+              )}
+            </select>
+            <select
+              aria-label="模拟体检类型"
+              value={examType}
+              onChange={(e) => setExamType(e.target.value)}
+            >
+              {["个检", "团检", "职业体检"].map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
+            <input
+              aria-label="模拟请求折扣"
+              type="number"
+              step={0.05}
+              value={discount}
+              onChange={(e) => setDiscount(Number(e.target.value))}
+            />
+            <button
+              className="btn"
+              onClick={() => {
+                if (blocked) {
+                  setNotice(`已拦截：${blocked}`);
+                  return;
+                }
+                act({
+                  type: "ADD_AUDIT",
+                  payload: {
+                    message: `角色权限模拟通过：${person.name} / ${role.name} / ${action} / ${examType} / 折扣${discount}`,
+                  },
+                });
+                setNotice(`允许模拟执行：${action}；数据范围 ${role.scope}。`);
+              }}
+            >
+              按配置校验并模拟执行
+            </button>
+          </div>
+          <p>
+            {blocked
+              ? `当前阻断：${blocked}`
+              : `当前允许，人员 ${person?.name}，角色 ${role?.name}`}
+          </p>
+        </div>
+      </section>
+      <section className="panel ops-panel" style={{ marginBottom: 22 }}>
+        <div className="ops-panel-title">
+          <div>
+            <h2>客户预约黑名单</h2>
+            <p>
+              与患者小程序、自助机共用
+              bookingBlacklist；有期限的记录只在有效期内生效。
+            </p>
+          </div>
+        </div>
+        <div className="ops-form-grid">
+          <label className="ops-field">
+            <span>限制客户</span>
+            <select
+              aria-label="黑名单客户"
+              value={patientId}
+              onChange={(e) => setPatientId(e.target.value)}
+            >
+              {state.patients.map((p: Row) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>限制原因 *</span>
+            <input
+              aria-label="黑名单原因"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </label>
+          <label className="ops-field">
+            <span>开始日期</span>
+            <input
+              type="date"
+              aria-label="黑名单开始日期"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+            />
+          </label>
+          <label className="ops-field">
+            <span>结束日期（可空）</span>
+            <input
+              type="date"
+              aria-label="黑名单结束日期"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="ops-modal-actions">
+          <button
+            className="btn"
+            onClick={() => {
+              if (!reason.trim() || !start || (end && end < start)) {
+                setNotice("请填写原因及有效日期范围。");
+                return;
+              }
+              act({
+                type: "UPSERT_RECORD",
+                payload: {
+                  collection: "bookingBlacklist",
+                  record: {
+                    id: `BL-${patientId}`,
+                    patientId,
+                    status: "已启用",
+                    reason: reason.trim(),
+                    startDate: start,
+                    endDate: end,
+                    createdBy: "当前管理员",
+                    updatedAt: cleanDate(),
+                  },
+                },
+              });
+              setNotice("客户预约限制已保存，患者端将读取同一记录。");
+              setReason("");
+            }}
+          >
+            保存客户限制
+          </button>
+        </div>
+        {entries.map((r: Row) => (
+          <div className="health-attention-row" key={r.id}>
+            <div>
+              <b>
+                {state.patients.find((p: Row) => p.id === r.patientId)?.name ||
+                  r.patientId}{" "}
+                · <Tag value={r.status} />
+              </b>
+              <small>
+                {r.reason} · {r.startDate || "立即"} 至 {r.endDate || "不限期"}
+              </small>
+            </div>
+            <button
+              className="btn"
+              disabled={r.status === "已解除"}
+              onClick={() => {
+                act({
+                  type: "UPSERT_RECORD",
+                  payload: {
+                    collection: "bookingBlacklist",
+                    record: { ...r, status: "已解除", resolvedAt: cleanDate() },
+                  },
+                });
+                setNotice("客户限制已解除，保留原始原因与解除时间。");
+              }}
+            >
+              解除客户限制
+            </button>
+          </div>
+        ))}
+      </section>
+      {notice && (
+        <div className="ops-feedback" role="status">
+          {notice}
+        </div>
+      )}
+    </>
+  );
+}
+function OrderSettlement() {
+  const { state, act } = useDemo() as any;
+  const [period, setPeriod] = useState(today().slice(0, 7));
+  const [notice, setNotice] = useState("");
+  const orders = (state.records.shopOrders || []).filter((o: Row) =>
+    String(o.date || "").startsWith(period),
+  );
+  const services = (state.records.serviceOrders || []).filter((o: Row) =>
+    String(o.date || "").startsWith(period),
+  );
+  const paid = orders.filter((o: Row) =>
+    ["待发货", "已发货", "待核销", "已签收", "退款申请", "已退款"].includes(
+      o.status,
+    ),
+  );
+  const refunds = orders.filter((o: Row) => o.status === "已退款");
+  const gross = paid.reduce(
+      (n: number, o: Row) => n + Number(o.amount || 0),
+      0,
+    ),
+    refund = refunds.reduce(
+      (n: number, o: Row) => n + Number(o.amount || 0),
+      0,
+    );
+  const due = orders
+    .filter((o: Row) => o.status === "待付款")
+    .reduce((n: number, o: Row) => n + Number(o.amount || 0), 0);
+  return (
+    <section className="panel ops-panel" style={{ marginBottom: 22 }}>
+      <div className="ops-panel-title">
+        <div>
+          <h2>订单来源结算核对</h2>
+          <p>
+            按月份汇总实际本地订单，退款冲减已收金额；生成不可随规则修改的账单快照。
+          </p>
+        </div>
+        <input
+          type="month"
+          aria-label="结算月份"
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+        />
+      </div>
+      <Metrics
+        items={[
+          { label: "商城已收（模拟）", value: `¥${gross.toFixed(2)}` },
+          { label: "退款冲减", value: `¥${refund.toFixed(2)}` },
+          { label: "商城净额", value: `¥${(gross - refund).toFixed(2)}` },
+          { label: "待付款订单", value: `¥${due.toFixed(2)}` },
+        ]}
+      />
+      <div className="ops-modal-actions">
+        <button
+          className="btn"
+          onClick={() =>
+            downloadCsv("订单结算明细", orders, [
+              f("id", "订单编号"),
+              f("customer", "客户"),
+              f("date", "日期"),
+              f("amount", "金额"),
+              f("status", "状态"),
+            ])
+          }
+        >
+          导出来源明细
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            act({
+              type: "UPSERT_RECORD",
+              payload: {
+                collection: "settlements",
+                record: {
+                  id: `SETTLE-${period}`,
+                  name: `${period} 月商城订单结算`,
+                  category: "商城",
+                  amount: gross - refund,
+                  gross,
+                  refund,
+                  unpaid: due,
+                  orderIds: orders.map((o: Row) => o.id),
+                  sourceSnapshot: JSON.parse(JSON.stringify(orders)),
+                  serviceCompletedAmount: services
+                    .filter((s: Row) => s.status === "已完成")
+                    .reduce(
+                      (n: number, s: Row) => n + Number(s.amount || 0),
+                      0,
+                    ),
+                  date: today(),
+                  owner: "当前管理员",
+                  description: `来源 ${orders.length} 笔商城订单；已收 ${gross}，退款 ${refund}，净额 ${gross - refund}`,
+                  status: "待核对",
+                },
+              },
+            });
+            setNotice("已从订单生成本月结算快照，可在下方查看并核对。");
+          }}
+        >
+          生成本月结算账单
+        </button>
+      </div>
+      {notice && (
+        <div className="ops-feedback" role="status">
+          {notice}
+        </div>
+      )}
+    </section>
+  );
+}
+
+commerceSpecs.push({
+  key: "commerceSimulator",
+  label: "交易与预约模拟",
+  description: "规则驱动交易",
+  fields: [],
+  seeds: [],
+});
+const shipment = domainSpec("shipping", commerceSpecs);
+shipment.fields.splice(
+  4,
+  0,
+  f("firstWeight", "首重 / kg", "number"),
+  f("additionalWeight", "续重单位 / kg", "number"),
+  f("additionalFee", "续重费用 / 元", "number"),
+);
+shipment.seeds.forEach((s, i) =>
+  Object.assign(s, {
+    region: i ? "全国" : "青岛市",
+    firstWeight: 1,
+    additionalWeight: 1,
+    additionalFee: 3,
+    baseFee: i ? 12 : 8,
+    freeAbove: 99,
+  }),
+);
+const groupRules = domainSpec("groupBuy", commerceSpecs);
+groupRules.seeds.forEach((r, i) =>
+  Object.assign(r, {
+    product: i ? "全部商品" : "轻量运动水杯",
+    minPeople: 2,
+    discount: 9,
+    date: "2027-12-31",
+  }),
+);
+const productRules = domainSpec("products", commerceSpecs);
+productRules.fields.splice(4, 0, f("weight", "单件重量 / kg", "number"));
+productRules.seeds.forEach((p) =>
+  Object.assign(p, {
+    weight: p.category === "健康课程" ? 0 : 0.5,
+    attributes: { color: "默认色", size: "标准规格" },
+    skuVariants: [],
+  }),
+);
+const roleDefs = domainSpec("roles", settingsSpecs);
+roleDefs.seeds.forEach((r) =>
+  Object.assign(r, {
+    minDiscount: r.name === "机构管理员" ? 0.5 : 0.8,
+    examTypes: ["个检", "团检"],
+    permissions:
+      r.name === "主检医生"
+        ? ["查看客户", "录入结果", "审核报告"]
+        : r.name === "机构管理员"
+          ? [
+              "查看客户",
+              "维护档案",
+              "维护预约",
+              "录入结果",
+              "审核报告",
+              "订单处理",
+              "财务查询",
+              "系统配置",
+              "导出数据",
+            ]
+          : r.name === "健康管理师"
+            ? ["查看客户", "维护档案"]
+            : ["查看客户", "订单处理"],
+  }),
+);
 const sectionMeta: Record<
   string,
   {
@@ -2538,9 +5035,15 @@ export default function Operations({
         </section>
       ) : spec.key === "bookingRules" ? (
         <BookingConfig />
+      ) : spec.key === "community" ? (
+        <LoyaltyCenter />
+      ) : spec.key === "commerceSimulator" ? (
+        <CommerceSimulator />
       ) : (
         <>
           {spec.key.startsWith("crm") && <CrmSummary />}
+          {["staff", "roles"].includes(spec.key) && <StaffPolicyWorkspace />}
+          {spec.key === "settlements" && <OrderSettlement />}
           <RecordWorkspace key={spec.key} spec={spec} />
         </>
       )}

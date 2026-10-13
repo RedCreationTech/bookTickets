@@ -1,3 +1,4 @@
+import { ReportOperations } from "./ReviewTools";
 import { useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
@@ -393,6 +394,10 @@ export function Analytics() {
           </section>
         </div>
       )}
+      <details>
+        <summary>解读、标本与指引单回收工作量</summary>
+        <ReportOperations statisticsOnly />
+      </details>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import {
 import App, { roles } from "../src/App";
 import { DemoProvider } from "../src/store";
 import { createInitialState, reducer, type DemoState } from "../src/model";
-const KEY = "qinghe.health.demo.v1";
+const KEY = "hongchuang.health.demo.v1";
 const snapshot = (): DemoState => JSON.parse(localStorage.getItem(KEY)!);
 function seed(update?: (state: DemoState) => void) {
   const state = createInitialState();

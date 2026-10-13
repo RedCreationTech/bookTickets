@@ -24,7 +24,7 @@ describe("storage and explanation reliability", () => {
   });
   it("R02 malformed persisted schema recovers initial synthetic data", () => {
     localStorage.setItem(
-      "qinghe.health.demo.v1",
+      "hongchuang.health.demo.v1",
       JSON.stringify({
         version: 1,
         patients: [],
@@ -41,7 +41,7 @@ describe("storage and explanation reliability", () => {
       screen.getByRole("heading", { name: "每一份健康，都值得悉心守护" }),
     ).toBeInTheDocument();
     expect(
-      JSON.parse(localStorage.getItem("qinghe.health.demo.v1")!).patients,
+      JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!).patients,
     ).toHaveLength(8);
   });
   it("R03 tutorial provides actual video, captions and chapter seeking without claiming a recording", () => {

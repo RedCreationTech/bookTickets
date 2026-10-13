@@ -24,13 +24,13 @@ describe("core frontend interactions", () => {
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "确认预约" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    const saved = JSON.parse(localStorage.getItem("qinghe.health.demo.v1")!);
+    const saved = JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!);
     expect(saved.appointments).toHaveLength(9);
     expect(saved.appointments[0].status).toBe("booked");
     const payments = screen.getAllByRole("button", { name: "模拟收款" });
     fireEvent.click(payments[0]);
     expect(
-      JSON.parse(localStorage.getItem("qinghe.health.demo.v1")!).appointments[0]
+      JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!).appointments[0]
         .status,
     ).toBe("paid");
   });
@@ -41,7 +41,7 @@ describe("core frontend interactions", () => {
       within(screen.getByRole("dialog")).getByRole("button", { name: "取消" }),
     );
     expect(
-      JSON.parse(localStorage.getItem("qinghe.health.demo.v1")!).appointments,
+      JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!).appointments,
     ).toHaveLength(8);
   });
   it("U03 blocks nonnumeric clinical results and incomplete submissions", () => {
@@ -58,7 +58,7 @@ describe("core frontend interactions", () => {
       target: { value: "5.8" },
     });
     fireEvent.click(screen.getByRole("button", { name: "提交分检结果" }));
-    const data = JSON.parse(localStorage.getItem("qinghe.health.demo.v1")!);
+    const data = JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!);
     expect(data.appointments[0].status).toBe("review");
   });
   it("U04 generates actual associated demo conclusion and advances three review stages", () => {
@@ -67,12 +67,13 @@ describe("core frontend interactions", () => {
       screen.getByRole("button", { name: "生成关联异常综合建议" }),
     );
     expect(
-      (screen.getByRole("textbox") as HTMLTextAreaElement).value,
+      (screen.getByLabelText("综合结论与指导意见") as HTMLTextAreaElement)
+        .value,
     ).toContain("关联指标");
     fireEvent.click(screen.getByRole("button", { name: "通过初审" }));
     fireEvent.click(screen.getByRole("button", { name: "通过主检" }));
     fireEvent.click(screen.getByRole("button", { name: "通过总检" }));
-    const data = JSON.parse(localStorage.getItem("qinghe.health.demo.v1")!);
+    const data = JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!);
     expect(
       data.appointments.find((x: any) => x.patientId === "P003").status,
     ).toBe("approved");
@@ -125,7 +126,7 @@ describe("core frontend interactions", () => {
       within(dialog).getByRole("button", { name: "登记模拟回款" }),
     );
     expect(
-      JSON.parse(localStorage.getItem("qinghe.health.demo.v1")!).records
+      JSON.parse(localStorage.getItem("hongchuang.health.demo.v1")!).records
         .bills[0].paid,
     ).toBe(81000);
   });

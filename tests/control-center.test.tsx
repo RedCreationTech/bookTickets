@@ -155,7 +155,7 @@ describe("Dedicated local service and quality controls", () => {
       type: "REJECT",
       payload: { id: initial.appointments[2].id, reason: "缺少复核说明" },
     });
-    localStorage.setItem("qinghe.health.demo.v1", JSON.stringify(after));
+    localStorage.setItem("hongchuang.health.demo.v1", JSON.stringify(after));
     mount("rejections");
     expect(screen.getByRole("table")).toHaveTextContent("余医生");
     expect(screen.getByRole("table")).toHaveTextContent("缺少复核说明");
@@ -207,7 +207,7 @@ describe("Dedicated local service and quality controls", () => {
     expect(state().config.passwordDemoStrength).toBe("强（演示规则）");
     for (const label of ["当前模拟口令", "新模拟口令", "再次输入新模拟口令"])
       expect(screen.getByLabelText(label)).toHaveValue("");
-    const stored = localStorage.getItem("qinghe.health.demo.v1") || "";
+    const stored = localStorage.getItem("hongchuang.health.demo.v1") || "";
     expect(stored).not.toContain("DEMO-OLD");
     expect(stored).not.toContain("DEMO-Next123!");
     expect(stored).not.toContain("DEMO-Different123!");
@@ -216,5 +216,124 @@ describe("Dedicated local service and quality controls", () => {
         r.message.includes("未保存或修改任何真实凭据"),
       ),
     ).toBe(true);
+  });
+});
+
+describe("Additional persisted control workflows", () => {
+  it("persists an edited notification template and reapplies it after switching and remounting", () => {
+    const view = mount("notifications");
+    change("通知正文", "【预约演示】{姓名}，请在 {日期} 查看体检安排。");
+    fireEvent.click(screen.getByRole("button", { name: "保存为当前通知模板" }));
+    expect(state().records.notificationTemplates[0]).toMatchObject({
+      id: "appointment",
+      version: 1,
+    });
+    change("通知模板", "report");
+    change("通知模板", "appointment");
+    expect(screen.getByLabelText("通知正文")).toHaveValue(
+      "【预约演示】{姓名}，请在 {日期} 查看体检安排。",
+    );
+    view.unmount();
+    mount("notifications");
+    expect(screen.getByLabelText("通知正文")).toHaveValue(
+      "【预约演示】{姓名}，请在 {日期} 查看体检安排。",
+    );
+    change("通知正文", "未保存草稿");
+    fireEvent.click(screen.getByRole("button", { name: "重新套用已存模板" }));
+    expect(screen.getByLabelText("通知正文")).toHaveValue(
+      "【预约演示】{姓名}，请在 {日期} 查看体检安排。",
+    );
+  });
+  it("queries pending identity rechecks then closes their prior records on a confirmed match", () => {
+    mount("identity");
+    change("核验 / 复核说明", "抽象示意需人工复核");
+    fireEvent.click(screen.getByRole("checkbox", { name: /我已人工核对/ }));
+    fireEvent.click(screen.getByRole("button", { name: "标记不一致" }));
+    const priorId = state().records.controlIdentity[0].id;
+    change("核验状态", "不一致，待复核");
+    change("核验查询", "林知远");
+    expect(
+      screen.getAllByRole("button", { name: "打开核验记录" }),
+    ).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "打开核验记录" }));
+    change("核验 / 复核说明", "合成演示复核后确认一致");
+    fireEvent.click(screen.getByRole("checkbox", { name: /我已人工核对/ }));
+    fireEvent.click(screen.getByRole("button", { name: "确认一致" }));
+    expect(
+      state().records.controlIdentity.find((r: any) => r.id === priorId),
+    ).toMatchObject({ status: "复核已关闭" });
+    expect(screen.queryByRole("button", { name: "打开核验记录" })).toBeNull();
+    expect(state().appointments[0].identityVerification.outcome).toBe("一致");
+  });
+  it("executes an explicitly selected local waiver with an archive reference and protects completed/locked projects", () => {
+    mount("signatures");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /同时执行所选本地订单动作/ }),
+    );
+    expect(
+      within(screen.getByLabelText("签名确认弃检项目")).queryByRole("option", {
+        name: "一般检查",
+      }),
+    ).toBeNull();
+    change("签名确认弃检项目", "肾功能");
+    change("本次操作说明", "模拟弃检肾功能并归档演示确认");
+    change("演示签名文字", "演示签名");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /确认本次“弃检确认”/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "归档演示签名" }));
+    const a = state().appointments[0];
+    const signature = state().records.controlSignatures[0];
+    expect(a.items).not.toContain("肾功能");
+    expect(a.waived).toContain("肾功能");
+    expect(a.signatureArchiveIds).toContain(signature.id);
+    expect(signature.executed).toBe(true);
+    expect(
+      state().audit.some(
+        (r: any) =>
+          r.action === "UPDATE_APPOINTMENT" &&
+          r.before.items.includes("肾功能") &&
+          !r.after.items.includes("肾功能"),
+      ),
+    ).toBe(true);
+  });
+  it("rejects report collection without an audited report and executes guide recovery independently", () => {
+    mount("signatures");
+    change("确认操作", "特殊报告领取");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /同时执行所选本地订单动作/ }),
+    );
+    change("本次操作说明", "演示报告领取");
+    change("演示签名文字", "演示签名");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /确认本次“特殊报告领取”/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "归档演示签名" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("已审核或已打印");
+    expect(state().records.controlSignatures).toBeUndefined();
+    change("确认操作", "导检单回收");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /确认本次“导检单回收”/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "归档演示签名" }));
+    expect(state().appointments[0].guideRecovered).toBe(true);
+    expect(state().appointments[0].results).toEqual({
+      一般检查: "128/82",
+      血常规: "正常",
+      肝功能: "24",
+    });
+  });
+  it("updates abnormal level labels and colours without changing the patient risk classification", () => {
+    mount("abnormal-levels");
+    change("A类显示名称", "需及时复核（演示）");
+    change("A类展示颜色", "#123abc");
+    fireEvent.click(screen.getByRole("button", { name: "保存异常等级展示" }));
+    expect(
+      state().config.abnormalLevels.find((l: any) => l.id === "A类"),
+    ).toMatchObject({ name: "需及时复核（演示）", color: "#123abc" });
+    expect(state().patients.find((p: any) => p.id === "P003").risk).toBe("A类");
+    expect(screen.getByText("需及时复核（演示）")).toHaveStyle({
+      borderLeft: "5px solid #123abc",
+    });
   });
 });

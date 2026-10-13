@@ -7,12 +7,17 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import Patient from "../src/modules/Patient";
+import Patient, { UnitBookingCalendar } from "../src/modules/Patient";
 import Kiosk from "../src/modules/Kiosk";
 import { createInitialState, DemoProvider, useDemo } from "../src/store";
-import { getBookingAvailability } from "../src/bookingRules";
+import {
+  getBookingAvailability,
+  getOnlineExtraCatalog,
+  getBookingDates,
+  getGroupBookingSchedules,
+} from "../src/bookingRules";
 
-const STORAGE = "qinghe.health.demo.v1";
+const STORAGE = "hongchuang.health.demo.v1";
 function Probe() {
   const { state } = useDemo();
   return (
@@ -267,7 +272,7 @@ describe("预约规则与防重复提交", () => {
   it("H5 开放增删时实际保留选择项目，重复确认只创建一单且新流程可再次预约", () => {
     renderPortal("patient", "#/patient");
     click("开启健康计划");
-    fireEvent.click(screen.getByLabelText("套餐项目：一般检查"));
+    fireEvent.click(screen.getByLabelText("套餐项目：肝功能"));
     fireEvent.click(screen.getByLabelText(/甲状腺彩超/));
     fireEvent.click(
       screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
@@ -279,7 +284,7 @@ describe("预约规则与防重复提交", () => {
       fireEvent.click(confirm);
     });
     expect(state().appointments).toHaveLength(count + 1);
-    expect(state().appointments[0].items).not.toContain("一般检查");
+    expect(state().appointments[0].items).not.toContain("肝功能");
     expect(state().appointments[0].items).toContain("甲状腺彩超");
     expect(state().appointments[0].amount).toBe(519);
     click("返回首页");
@@ -334,7 +339,7 @@ describe("预约规则与防重复提交", () => {
     fireEvent.change(screen.getByLabelText("预约日期"), {
       target: { value: futureDate() },
     });
-    fireEvent.click(screen.getByLabelText("套餐项目：一般检查"));
+    fireEvent.click(screen.getByLabelText("套餐项目：肝功能"));
     fireEvent.click(screen.getByLabelText("增加项目：甲状腺彩超"));
     const count = state().appointments.length;
     const confirm = screen.getByRole("button", { name: "创建模拟预约" });
@@ -343,7 +348,7 @@ describe("预约规则与防重复提交", () => {
       fireEvent.click(confirm);
     });
     expect(state().appointments).toHaveLength(count + 1);
-    expect(state().appointments[0].items).not.toContain("一般检查");
+    expect(state().appointments[0].items).not.toContain("肝功能");
     expect(state().appointments[0].items).toContain("甲状腺彩超");
     expect(state().appointments[0].amount).toBe(519);
   });
@@ -495,5 +500,642 @@ describe("自助终端业务与异常状态", () => {
     expect(screen.getByRole("status").textContent).toContain("会话已超时");
     expect(screen.getByRole("button", { name: /自助签到/ })).toBeTruthy();
     expect(screen.queryByLabelText("到检院区")).toBeNull();
+  });
+});
+
+describe("单位排期、时钟、问卷与门户配置闭环", () => {
+  const fixedState = () => {
+    const s = createInitialState();
+    s.config.bookingClock = "2026-10-13T15:00:00Z";
+    s.appointments = [];
+    return s;
+  };
+  const unit = {
+    id: "xingchen-2026",
+    company: "星辰科技",
+    enabled: true,
+    scheduled: true,
+    startDate: "2026-10-14",
+    endDate: "2026-10-16",
+    dailyCapacity: 1,
+    reservedCapacity: 0,
+    allowedTimes: "08:00-08:30",
+    allowRelatives: true,
+  };
+  it("单位真实日期、日限额、开关、排期与单位时段逐一实际阻止预约", () => {
+    const s = fixedState();
+    s.records.groupBookingSchedules = [{ ...unit }];
+    const c = {
+      kind: "group" as const,
+      company: "星辰科技",
+      patientId: "P001",
+      time: "08:00-08:30",
+    };
+    expect(
+      getBookingAvailability(s, "2026-10-13", undefined, c).error,
+    ).toContain("仅可预约");
+    expect(
+      getBookingAvailability(s, "2026-10-14", undefined, {
+        ...c,
+        time: "09:00-09:30",
+      }).error,
+    ).toContain("单位可预约时段");
+    expect(getBookingAvailability(s, "2026-10-14", undefined, c).allowed).toBe(
+      true,
+    );
+    s.appointments = [
+      {
+        ...createInitialState().appointments[0],
+        date: "2026-10-14",
+        source: "H5团检",
+        groupCompany: "星辰科技",
+      },
+    ];
+    expect(
+      getBookingAvailability(s, "2026-10-14", undefined, c).error,
+    ).toContain("单位当日预约已满");
+    s.records.groupBookingSchedules[0].enabled = false;
+    expect(
+      getBookingAvailability(s, "2026-10-15", undefined, c).error,
+    ).toContain("未开放预约");
+    s.records.groupBookingSchedules[0].enabled = true;
+    s.records.groupBookingSchedules[0].scheduled = false;
+    expect(getBookingAvailability(s, "2026-10-20", undefined, c).allowed).toBe(
+      true,
+    );
+  });
+  it("模拟时钟跨越次日放号及团转个时刻后号源确实改变", () => {
+    const s = fixedState();
+    s.config.releaseHour = "18:00";
+    expect(getBookingAvailability(s, "2026-10-14").error).toContain("18:00");
+    s.config.bookingClock = "2026-10-13T18:00:00Z";
+    expect(getBookingAvailability(s, "2026-10-14").allowed).toBe(true);
+    s.config.dailyCapacity = 2;
+    s.config.groupReleaseHour = "12:00";
+    s.config.bookingClock = "2026-10-15T11:59:00Z";
+    s.records.groupBookingSchedules = [
+      { ...unit, dailyCapacity: 2, reservedCapacity: 2 },
+    ];
+    expect(
+      getBookingAvailability(s, "2026-10-15", undefined, { kind: "individual" })
+        .remaining,
+    ).toBe(0);
+    expect(
+      getBookingAvailability(s, "2026-10-15", undefined, {
+        kind: "group",
+        company: "星辰科技",
+      }).allowed,
+    ).toBe(true);
+    s.config.bookingClock = "2026-10-15T12:00:00Z";
+    const rule = getBookingAvailability(s, "2026-10-15", undefined, {
+      kind: "individual",
+    });
+    expect(rule.allowed).toBe(true);
+    expect(rule.remaining).toBe(2);
+    expect(rule.released).toBe(true);
+  });
+  it("分时容量实际校验，非开放时段与周末日期被过滤", () => {
+    const s = fixedState();
+    s.config.timeSlots = "08:00–08:30: 1; 08:30–09:00: 2";
+    s.appointments = [
+      {
+        ...createInitialState().appointments[0],
+        date: "2026-10-15",
+        time: "08:00–08:30",
+      },
+    ];
+    expect(
+      getBookingAvailability(s, "2026-10-15", undefined, {
+        time: "08:00-08:30",
+      }).error,
+    ).toContain("时段预约已满");
+    expect(
+      getBookingAvailability(s, "2026-10-15", undefined, {
+        time: "10:00-10:30",
+      }).error,
+    ).toContain("未开放预约");
+    expect(
+      getBookingAvailability(s, "2026-10-15", undefined, {
+        time: "08:30-09:00",
+      }).allowed,
+    ).toBe(true);
+    expect(getBookingDates(s)).not.toContain("2026-10-17");
+    expect(getBookingDates(s)).not.toContain("2026-10-18");
+  });
+  it("黑名单根据生效和过期日期阻止共享预约校验及H5提交", () => {
+    const s = fixedState();
+    s.records.bookingBlacklist = [
+      {
+        id: "B1",
+        patientId: "P001",
+        status: "已启用",
+        startDate: "2026-10-12",
+        endDate: "2026-10-14",
+        reason: "演示限制",
+      },
+    ];
+    expect(
+      getBookingAvailability(s, "2026-10-15", undefined, { patientId: "P001" })
+        .error,
+    ).toContain("限制预约");
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    expect(screen.getByRole("button", { name: "确认预约" })).toBeDisabled();
+    expect(screen.getByRole("note").textContent).toContain("限制预约");
+    s.records.bookingBlacklist[0].endDate = "2026-10-12";
+    expect(
+      getBookingAvailability(s, "2026-10-15", undefined, { patientId: "P001" })
+        .allowed,
+    ).toBe(true);
+    s.records.bookingBlacklist[0].endDate = "2026-10-20";
+    s.records.bookingBlacklist[0].startDate = "2026-10-14";
+    expect(
+      getBookingAvailability(s, "2026-10-15", undefined, { patientId: "P001" })
+        .allowed,
+    ).toBe(true);
+  });
+  it("日历编辑实际持久化单位限额，查看具体日期可见所属单位订单", () => {
+    const s = fixedState();
+    s.appointments = [
+      {
+        ...createInitialState().appointments[0],
+        date: "2026-10-15",
+        source: "团检备单",
+        groupCompany: "星辰科技",
+      },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    render(
+      <DemoProvider>
+        <UnitBookingCalendar editable />
+        <Probe />
+      </DemoProvider>,
+    );
+    fireEvent.click(screen.getByLabelText("为单位设置日期排期"));
+    fireEvent.change(screen.getByLabelText("单位开始日期"), {
+      target: { value: "2026-10-15" },
+    });
+    fireEvent.change(screen.getByLabelText("单位结束日期"), {
+      target: { value: "2026-10-16" },
+    });
+    fireEvent.change(screen.getByLabelText("单位每日容量"), {
+      target: { value: "1" },
+    });
+    click("保存单位排期");
+    expect(state().records.groupBookingSchedules[0].dailyCapacity).toBe(1);
+    expect(getGroupBookingSchedules(state()).length).toBeGreaterThan(1);
+    click("查看 2026-10-15 星辰科技 排期");
+    expect(screen.getByText(/林知远 · 08:00/)).toBeTruthy();
+    expect(
+      getBookingAvailability(state(), "2026-10-15", undefined, {
+        kind: "group",
+        company: "星辰科技",
+      }).allowed,
+    ).toBe(false);
+  });
+  it("单位关闭亲属预约时H5不可选择亲属，关闭整个单位时不能提交", () => {
+    const s = fixedState();
+    s.records.groupBookingSchedules = [
+      { ...unit, allowRelatives: false, enabled: false },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient?group=xingchen-2026");
+    expect(screen.getByLabelText("亲属预约（专属价自费）")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "确认预约" })).toBeDisabled();
+  });
+  it("必填问卷阻止H5预约，完成后写入问卷答案且推荐关闭不加项目", () => {
+    const s = fixedState();
+    Object.assign(s.config, {
+      questionnaireEnabled: true,
+      questionnaireSkippable: false,
+      recommendationEnabled: false,
+    });
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    expect(screen.getByRole("button", { name: "确认预约" })).toBeDisabled();
+    fireEvent.click(screen.getAllByRole("button", { name: "填写检前问卷" })[0]);
+    expect(screen.queryByRole("button", { name: "跳过问卷" })).toBeNull();
+    fireEvent.click(screen.getByLabelText("关注甲状腺健康"));
+    click("提交问卷");
+    expect(state().records.bookingQuestionnaires[0].recommended).toEqual([]);
+    click("返回预约");
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments[0].questionnaireCompleted).toBe(true);
+    expect(state().appointments[0].questionnaireAnswers).toContain(
+      "关注甲状腺健康",
+    );
+    expect(state().appointments[0].items).not.toContain("甲状腺彩超");
+  });
+  it("问卷可跳过、关闭不拦截，开启推荐会选入对应参考项目", () => {
+    const s = fixedState();
+    Object.assign(s.config, {
+      questionnaireEnabled: true,
+      questionnaireSkippable: true,
+      recommendationEnabled: true,
+    });
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    fireEvent.click(screen.getAllByRole("button", { name: "填写检前问卷" })[0]);
+    expect(screen.getByRole("button", { name: "跳过问卷" })).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("关注甲状腺健康"));
+    click("完成问卷并生成参考方案");
+    click("使用方案继续预约");
+    expect(screen.getByLabelText(/甲状腺彩超/)).toBeChecked();
+    expect(state().records.bookingQuestionnaires[0].recommended).toContain(
+      "甲状腺彩超",
+    );
+    s.config.questionnaireEnabled = false;
+    s.config.questionnaireSkippable = false;
+    expect(
+      getBookingAvailability(s, "2026-10-14", undefined, { patientId: "P001" })
+        .allowed,
+    ).toBe(true);
+  });
+  it("套餐非默认选中仍保留必检，允许勾选其他项目且默认规则不能绕过", () => {
+    const s = fixedState();
+    s.config.defaultSelected = false;
+    s.config.allowRemove = false;
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    expect(screen.getByLabelText("套餐项目：一般检查")).toBeChecked();
+    expect(screen.getByLabelText("套餐项目：一般检查")).toBeDisabled();
+    expect(screen.getByLabelText("套餐项目：肝功能")).not.toBeChecked();
+    fireEvent.click(screen.getByLabelText("套餐项目：肝功能"));
+    expect(screen.getByLabelText("套餐项目：肝功能")).toBeChecked();
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments[0].items).toEqual(["一般检查", "肝功能"]);
+  });
+  it("自助机必填问卷、单位开关及黑名单都走共享规则", () => {
+    const s = fixedState();
+    s.config.questionnaireEnabled = true;
+    s.config.questionnaireSkippable = false;
+    s.config.recommendationEnabled = false;
+    s.records.groupBookingSchedules = [{ ...unit, enabled: false }];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("kiosk", "#/kiosk");
+    click(/体检预约/);
+    identify("P004");
+    expect(screen.getByRole("button", { name: "创建模拟预约" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "跳过自助机问卷" })).toBeNull();
+    fireEvent.click(screen.getByLabelText("以上均无"));
+    click("提交自助机问卷");
+    expect(screen.getByRole("button", { name: "创建模拟预约" })).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("预约类型"), {
+      target: { value: "group" },
+    });
+    fireEvent.change(screen.getByLabelText("团检单位"), {
+      target: { value: "星辰科技" },
+    });
+    expect(screen.getByRole("button", { name: "创建模拟预约" })).toBeDisabled();
+  });
+  it("患者端消费医院、海报新闻、菜单、FAQ、团队、服务、链接，停用和未来内容不展示", () => {
+    const s = fixedState();
+    s.config.portalHospital = {
+      name: "测试合成健康中心",
+      intro: "测试中心介绍",
+      address: "合成地址 DEMO",
+      hotline: "DEMO-8899",
+      hours: "演示开放时段",
+    };
+    s.records.portalMenus = [
+      {
+        id: "M",
+        name: "了解本中心",
+        target: "常见问题",
+        icon: "客服",
+        order: 1,
+        status: "已启用",
+      },
+    ];
+    s.records.portalBanners = [
+      {
+        id: "P",
+        name: "测试文字海报",
+        kind: "海报",
+        date: "2026-10-13",
+        summary: "预约活动内容",
+        target: "预约体检",
+        status: "已启用",
+      },
+      {
+        id: "N",
+        name: "测试医院新闻",
+        kind: "新闻",
+        date: "2026-10-12",
+        summary: "新闻详情内容",
+        status: "已启用",
+      },
+      { id: "F", name: "未来不展示", date: "2026-10-20", status: "已启用" },
+      { id: "D", name: "停用不展示", status: "已停用" },
+    ];
+    s.records.portalFaq = [
+      { id: "FAQ", name: "测试问题", answer: "测试答复", status: "已启用" },
+    ];
+    s.records.portalTeams = [
+      {
+        id: "T",
+        name: "测试演示设备",
+        kind: "检查设备",
+        summary: "测试设备说明",
+        status: "已启用",
+      },
+    ];
+    s.records.portalServices = [
+      {
+        id: "S",
+        name: "测试关怀服务",
+        scope: "测试服务范围",
+        hours: "每日",
+        location: "演示中心",
+        price: 0,
+        status: "已启用",
+      },
+    ];
+    s.records.portalLinks = [
+      {
+        id: "L",
+        name: "测试帮助链接",
+        url: "https://example.invalid/demo",
+        description: "只显示链接配置",
+        status: "已启用",
+      },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    expect(screen.getByText("测试文字海报")).toBeTruthy();
+    expect(screen.getByText("测试医院新闻")).toBeTruthy();
+    expect(screen.queryByText("未来不展示")).toBeNull();
+    expect(screen.queryByText("停用不展示")).toBeNull();
+    click(/了解本中心/);
+    for (const text of [
+      "测试中心介绍",
+      "合成地址 DEMO",
+      "测试问题",
+      "测试演示设备 · 检查设备",
+      "测试关怀服务",
+      "测试帮助链接",
+    ])
+      expect(screen.getByText(text)).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "测试帮助链接" })).toBeNull();
+  });
+});
+
+describe("合成身份、来源二维码与患者排队", () => {
+  it("合成注册拒绝真实号码格式，新增体检人及常用关联并可移除关联", () => {
+    renderPortal("patient", "#/patient");
+    click("管理我的健康档案");
+    const count = state().patients.length;
+    fireEvent.change(screen.getByLabelText("合成称呼"), {
+      target: { value: "演示小青" },
+    });
+    fireEvent.change(screen.getByLabelText("合成手机号标识"), {
+      target: { value: "13800138000" },
+    });
+    click("注册并保存合成体检人");
+    expect(state().patients).toHaveLength(count);
+    fireEvent.change(screen.getByLabelText("合成手机号标识"), {
+      target: { value: "DEMO-5678" },
+    });
+    click("注册并保存合成体检人");
+    expect(state().patients).toHaveLength(count + 1);
+    expect(state().patients[0].demoAccount).toBe(true);
+    expect(state().patients[0].phone).toBe("DEMO-5678");
+    expect(screen.getByLabelText("常用体检人：演示小青")).toBeChecked();
+    fireEvent.click(screen.getByLabelText("常用体检人：演示小青"));
+    expect(state().records.patientCommonPeople[0].status).toBe("removed");
+    expect(state().patients).toHaveLength(count + 1);
+  });
+  it("个人推广二维码编码来源且新订单实时计入来源统计", () => {
+    renderPortal("patient", "#/patient?distributor=D-P001");
+    click("开启健康计划");
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments[0].distributorId).toBe("D-P001");
+    click("管理我的健康档案");
+    expect(
+      screen
+        .getByRole("link", { name: "打开个人推广预约入口" })
+        .getAttribute("href"),
+    ).toContain("distributor=D-P001");
+    expect(screen.getByText(/通过此推广入口创建的订单：1 单/)).toBeTruthy();
+    expect(document.querySelector("svg title")?.textContent).toBeTruthy();
+  });
+  it("排队二维码进入正确订单，可主动结束对应工作台排队记录", () => {
+    const s = createInitialState();
+    const order = s.appointments[0];
+    s.records.queueTickets = [
+      {
+        id: "TICKET-1",
+        appointmentId: order.id,
+        department: "心电图区",
+        status: "waiting",
+        position: 0,
+        zone: "二层演示区",
+      },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", `#/patient?queue=${order.id}`);
+    expect(screen.getByText("我的排队二维码")).toBeTruthy();
+    expect(screen.getByText(/演示票号 TICKET-1/)).toBeTruthy();
+    click("结束此排队");
+    expect(state().records.queueTickets[0].status).toBe("cleared");
+    expect(state().records.queueTickets[0].endedBy).toBe("patient");
+    expect(screen.getByText("当前没有活动排队记录。")).toBeTruthy();
+  });
+  it("患者排队尊重已签到及队列开关，不会重复生成票号", () => {
+    const s = createInitialState();
+    s.records.queueTickets = [];
+    s.config.queueOpen = { 心电图区: false };
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", `#/patient?queue=${s.appointments[0].id}`);
+    fireEvent.change(screen.getByLabelText("选择排队科室"), {
+      target: { value: "心电图区" },
+    });
+    click("加入演示排队");
+    expect(state().records.queueTickets).toHaveLength(0);
+    expect(screen.getByRole("status").textContent).toContain("未开放");
+    fireEvent.change(screen.getByLabelText("选择排队科室"), {
+      target: { value: "超声区" },
+    });
+    click("加入演示排队");
+    click("加入演示排队");
+    expect(state().records.queueTickets).toHaveLength(1);
+    expect(state().records.queueTickets[0].status).toBe("waiting");
+  });
+});
+
+describe("共享单位订单与问卷上下游", () => {
+  it("共享单位订单限制套餐及自选数量，按共享规则计算单位与个人分摊", () => {
+    const s = createInitialState();
+    s.appointments = [];
+    s.records.groupOrders = [
+      {
+        id: "GO-1",
+        name: "共享单位体检订单",
+        company: "星辰科技",
+        mode: "限额自选",
+        budget: 800,
+        packages: ["PK02"],
+        optionalItems: ["甲状腺彩超", "骨密度"],
+        choose: 1,
+        personalItems: ["甲状腺彩超"],
+        startDate: "2026-01-01",
+        endDate: "2027-12-31",
+        status: "生效",
+      },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient?group=xingchen-2026");
+    expect(screen.queryByRole("button", { name: /基础安心体检/ })).toBeNull();
+    click(/都市精英体检/);
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments).toHaveLength(0);
+    expect(screen.getByRole("status").textContent).toContain("需选择 1 项");
+    fireEvent.click(screen.getByLabelText(/甲状腺彩超/));
+    click("确认预约");
+    const order = state().appointments[0];
+    expect(order.groupOrderId).toBe("GO-1");
+    expect(order.amount).toBe(979);
+    expect(order.groupSplit).toEqual({ unit: 800, personal: 179 });
+    expect(order.selfPay).toBe(179);
+    expect(order.pricing).toHaveLength(9);
+  });
+  it("共享单位订单名单不适用时禁止退回旧的通用团检方案", () => {
+    const s = createInitialState();
+    s.records.groupOrders = [
+      {
+        id: "GO-1",
+        company: "星辰科技",
+        mode: "固定套餐",
+        budget: 899,
+        packages: ["PK02"],
+        members: ["P003"],
+        optionalItems: [],
+        choose: 0,
+        startDate: "2026-01-01",
+        endDate: "2027-12-31",
+        status: "生效",
+      },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient?group=xingchen-2026");
+    expect(screen.getByRole("button", { name: "确认预约" })).toBeDisabled();
+    expect(
+      screen.getAllByText("当前体检人不在单位订单有效名单或预约日期内").length,
+    ).toBeGreaterThan(0);
+  });
+  it("问卷保存明确的合成既往史用药家族史，未填写保留空白", () => {
+    renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    fireEvent.click(screen.getAllByRole("button", { name: "填写检前问卷" })[0]);
+    fireEvent.change(screen.getByLabelText("合成既往史（可选）"), {
+      target: { value: "合成既往史样例A（非真实信息）" },
+    });
+    fireEvent.change(screen.getByLabelText("合成用药记录（可选）"), {
+      target: { value: "明确无相关演示记录" },
+    });
+    fireEvent.click(screen.getByLabelText("以上均无"));
+    click("完成问卷并生成参考方案");
+    expect(state().records.bookingQuestionnaires[0].history).toBe(
+      "合成既往史样例A（非真实信息）",
+    );
+    expect(state().records.bookingQuestionnaires[0].medication).toBe(
+      "明确无相关演示记录",
+    );
+    expect(state().records.bookingQuestionnaires[0].family).toBe("");
+  });
+  it("线上停用套餐与年龄不适用套餐从患者及自助机中移除", () => {
+    const s = createInitialState();
+    s.records.packageRules = [
+      { packageId: "PK01", onlineEnabled: false },
+      { packageId: "PK03", minAge: 60 },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    const first = renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    expect(screen.queryByRole("button", { name: /基础安心体检/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /全维深度体检/ })).toBeNull();
+    first.unmount();
+    renderPortal("kiosk", "#/kiosk");
+    click(/体检预约/);
+    identify("P004");
+    expect(screen.queryByRole("button", { name: /基础安心体检/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /全维深度体检/ })).toBeNull();
+  });
+});
+
+describe("共享医院项目字典的患者端消费", () => {
+  function catalogState() {
+    const s = createInitialState();
+    s.appointments = [];
+    s.records.orderingRules = [
+      { id: "basic", item: "一般检查", price: 99, required: true },
+      {
+        id: "local",
+        item: "演示新增检查",
+        price: 129,
+        meaning: "医院维护的合成项目说明",
+      },
+      { id: "off", item: "甲状腺彩超", price: 120, enabled: false },
+      { id: "female", item: "演示女性限定检查", price: 99, sex: "女" },
+      {
+        id: "ignored",
+        item: "演示已停用限制规则",
+        price: 88,
+        sex: "女",
+        ruleEnabled: false,
+      },
+      { id: "duplicate", item: "血常规", price: 60 },
+    ];
+    return s;
+  }
+  it("项目停用与规则停用区分，限制条件实际过滤线上项目", () => {
+    const s = catalogState();
+    const catalog = getOnlineExtraCatalog(s, "P001");
+    expect(catalog.some((row) => row.name === "甲状腺彩超")).toBe(false);
+    expect(catalog.some((row) => row.name === "演示女性限定检查")).toBe(false);
+    expect(catalog.some((row) => row.name === "演示已停用限制规则")).toBe(true);
+    expect(catalog.find((row) => row.name === "演示新增检查")?.price).toBe(129);
+  });
+  it("医院维护项目可在 H5 加选并按维护价格计费，套餐既有项目不重复加购", () => {
+    localStorage.setItem(STORAGE, JSON.stringify(catalogState()));
+    renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    expect(screen.queryByLabelText(/演示女性限定检查/)).toBeNull();
+    expect(screen.getAllByLabelText(/血常规/)).toHaveLength(1);
+    fireEvent.click(screen.getByLabelText(/演示新增检查/));
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments[0].items).toContain("演示新增检查");
+    expect(state().appointments[0].amount).toBe(528);
+  });
+  it("自助机读取相同项目及价格，项目停用不再可选", () => {
+    localStorage.setItem(STORAGE, JSON.stringify(catalogState()));
+    renderPortal("kiosk", "#/kiosk");
+    click(/体检预约/);
+    identify("P001");
+    expect(screen.queryByLabelText("增加项目：甲状腺彩超")).toBeNull();
+    expect(screen.queryByLabelText("增加项目：血常规")).toBeNull();
+    fireEvent.click(screen.getByLabelText("增加项目：演示新增检查"));
+    click("创建模拟预约");
+    expect(state().appointments[0].items).toContain("演示新增检查");
+    expect(state().appointments[0].amount).toBe(528);
   });
 });

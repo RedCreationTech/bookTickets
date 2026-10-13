@@ -3,7 +3,32 @@ const GroupImport = lazy(() =>
   import("./Advanced").then((m) => ({ default: m.GroupImport })),
 );
 import { analyzeDemoResults } from "../rules";
-import { useState, lazy, Suspense } from "react";
+import {
+  getOrderRules,
+  packageIsApplicable,
+  getOrderingIssues,
+  quoteOrder,
+  percentFromAmount,
+  resolveDependencies,
+} from "../orderingRules";
+import { PrintDesk, ExpiryDesk, GynecologySpecimens } from "./ExecutionDesk";
+import { RegistrationProfile, defaultCustomerTypes } from "./Registration";
+import {
+  ReviewTools,
+  ReportOperations,
+  sortReviewAppointments,
+  isReportOverdue,
+  isCriticalReviewAppointment,
+} from "./ReviewTools";
+import {
+  GroupContractWorkbench,
+  InvoiceLedger,
+  applicableGroup,
+  splitGroupAmount,
+} from "./Groups";
+import { ExamExtras, UndoExam } from "./ClinicalExtras";
+import { OrderingRuleEditor } from "./Ordering";
+import { useState, useRef, lazy, Suspense } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -83,7 +108,7 @@ export function Dashboard() {
             ).length
           }
           unit="人"
-          note="已开放 80 个预约名额"
+          note={`已开放 ${state.config.dailyCapacity} 个预约名额`}
         >
           <CalendarDays size={20} />
         </Metric>
@@ -308,13 +333,31 @@ export function Appointments() {
   const [filterCampus, setFilterCampus] = useState("all");
   const [open, setOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [ruleEditor, setRuleEditor] = useState(false);
+  const [groupEditor, setGroupEditor] = useState(false);
+  const [profile, setProfile] = useState<string | null>(null);
+  const [printDesk, setPrintDesk] = useState(false);
+  const [expiryDesk, setExpiryDesk] = useState(false);
+  const [otherPackages, setOtherPackages] = useState<string[]>([]);
+  const [lineDiscounts, setLineDiscounts] = useState<Record<string, number>>(
+    {},
+  );
+  const [extraItems, setExtraItems] = useState<string[]>([]);
+  const [overrideReason, setOverrideReason] = useState("");
+  const [replacement, setReplacement] = useState("");
+  const [replacementReason, setReplacementReason] = useState("");
+  const submitting = useRef(false);
   const [detail, setDetail] = useState(
     new URLSearchParams(window.location.hash.split("?")[1] || "").get(
       "selected",
     ) || "",
   );
-  const [patient, setPatient] = useState("P001");
-  const [pkg, setPkg] = useState("PK02");
+  const [patient, setPatient] = useState(state.patients[0]?.id || "");
+  const [pkg, setPkg] = useState(
+    () =>
+      applicableGroup(state, state.patients[0]?.id || "", today())
+        ?.packages?.[0] || "PK02",
+  );
   const [date, setDate] = useState(today());
   const [time, setTime] = useState("08:00–08:30");
   const [campus, setCampus] = useState(state.config.campus);
@@ -326,15 +369,30 @@ export function Appointments() {
   const list = state.appointments.filter((a) => {
     const p = state.patients.find((p) => p.id === a.patientId);
     return (
-      (!q || [a.id, p?.name, p?.company].join("").includes(q)) &&
+      (!q ||
+        [
+          a.id,
+          p?.name,
+          p?.company,
+          ...(a.replacements || []).flatMap((r: any) => [
+            state.patients.find((p) => p.id === r.originalPatientId)?.name,
+            state.patients.find((p) => p.id === r.replacementPatientId)?.name,
+          ]),
+        ]
+          .join("")
+          .includes(q)) &&
       (filter === "all" || a.status === filter) &&
       (!filterDate || a.date === filterDate) &&
       (filterCampus === "all" || a.campus === filterCampus)
     );
   });
   const a = state.appointments.find((a) => a.id === detail);
-  const pack = state.packages.find((x) => x.id === pkg)!;
-  const historyPatient = state.patients.find((p) => p.id === patient)!;
+  const historyPatient =
+    state.patients.find((p) => p.id === patient) || state.patients[0];
+  if (!historyPatient)
+    return (
+      <Empty text="当前演示数据范围内没有客户，请退出自定义权限或调整授权范围。" />
+    );
   const historyOrder = state.appointments.find(
     (a) => a.patientId === patient && a.history,
   );
@@ -344,11 +402,64 @@ export function Appointments() {
       : historyPatient.risk === "B类"
         ? "血脂复查"
         : "健康教育咨询";
+  const group = applicableGroup(state, patient, date);
+  const packageIds = [...new Set([pkg, ...otherPackages])];
+  const initialQuote = quoteOrder(state, packageIds, discount, lineDiscounts, [
+    ...extraItems,
+    ...(extra ? [recommendation] : []),
+  ]);
+  const resolved = resolveDependencies(state, initialQuote.items);
+  const quote = quoteOrder(state, packageIds, discount, lineDiscounts, [
+    ...extraItems,
+    ...resolved.added,
+    ...(extra ? [recommendation] : []),
+  ]);
+  const orderingErrors = getOrderingIssues(
+    state,
+    patient,
+    quote.items,
+    packageIds,
+  );
   const submit = () => {
-    const availability = getBookingAvailability(state, date);
+    if (submitting.current) return;
+    if (group && packageIds.some((id) => !group.packages.includes(id)))
+      return setError("所选套餐不在该单位订单允许范围");
+    if (group && group.mode === "固定套餐" && packageIds.length !== 1)
+      return setError("固定套餐单位订单只允许一个套餐");
+    if (
+      group &&
+      group.choose > 0 &&
+      extraItems.filter((i) => group.optionalItems.includes(i)).length !==
+        group.choose
+    )
+      return setError("单位自选包必须选" + group.choose + "项");
+    if (resolved.errors.length) return setError(resolved.errors.join("；"));
+    const hardErrors = orderingErrors.filter((e) => !e.includes("婚姻"));
+    if (hardErrors.length || (orderingErrors.length && !overrideReason.trim()))
+      return setError(
+        [
+          ...hardErrors,
+          ...(orderingErrors.some((e) => e.includes("婚姻"))
+            ? ["婚姻适用警示需填写强制添加理由"]
+            : []),
+        ].join("；"),
+      );
+    if (
+      quote.rows.some(
+        (r) => !r.nonDiscount && r.percent < state.config.discountMin * 100,
+      )
+    )
+      return setError("单项折扣低于角色授权下限");
+    const availability = getBookingAvailability(state, date, undefined, {
+      patientId: patient,
+      company: historyPatient.company,
+      kind: historyPatient.company === "个检" ? "individual" : "group",
+      time,
+    });
     if (!availability.allowed) return setError(availability.error);
     if (discount < state.config.discountMin * 100)
       return setError("折扣超出当前权限，请在审批中心申请授权（演示）");
+    submitting.current = true;
     act({
       type: "CREATE_APPOINTMENT",
       payload: {
@@ -357,9 +468,24 @@ export function Appointments() {
         date,
         time,
         campus,
-        amount: Math.round((pack.price * discount) / 100) + (extra ? 80 : 0),
-        items: [...pack.items, ...(extra ? [recommendation] : [])],
+        amount: quote.amount,
+        items: quote.items,
+        packageIds,
+        pricing: quote.rows,
+        orderingOverride: overrideReason,
         source: "前台登记",
+        orderType:
+          (state.records.customerTypes || defaultCustomerTypes).find(
+            (t) => t.id === historyPatient.customerType,
+          )?.orderType || (historyPatient.company === "个检" ? "个检" : "团检"),
+        preferredQueueArea: (
+          state.records.customerTypes || defaultCustomerTypes
+        ).find((t) => t.id === historyPatient.customerType)?.queueArea,
+        preExamHistory: historyPatient.preExamHistory,
+        groupOrderId: group?.id,
+        groupPersonnelId: group?.personnelGroupId,
+        groupPersonnelName: group?.personnelGroupName,
+        groupSplit: splitGroupAmount(group, quote.rows),
         note,
       },
     });
@@ -395,6 +521,13 @@ export function Appointments() {
             <button
               className="btn btn-primary"
               onClick={() => {
+                submitting.current = false;
+                const g = applicableGroup(state, patient, date);
+                if (g?.packages?.[0]) setPkg(g.packages[0]);
+                setOtherPackages([]);
+                setExtraItems([]);
+                setLineDiscounts({});
+                setOverrideReason("");
                 setOpen(true);
                 setError("");
               }}
@@ -482,6 +615,44 @@ export function Appointments() {
           </button>
           <button className="btn" onClick={() => setImporting(true)}>
             团检 CSV 导入
+          </button>
+          <button className="btn" onClick={() => setRuleEditor(true)}>
+            项目与套餐规则
+          </button>
+          <button className="btn" onClick={() => setGroupEditor(true)}>
+            团检订单与预算
+          </button>
+          <button className="btn" onClick={() => setProfile("")}>
+            手工客户登记
+          </button>
+          <button className="btn" onClick={() => setPrintDesk(true)}>
+            打印任务与版式
+          </button>
+          <button className="btn" onClick={() => setExpiryDesk(true)}>
+            改日检到期管理
+          </button>
+          <button
+            className="btn"
+            onClick={() =>
+              exportCsv(
+                "团检替检对应名单.csv",
+                state.appointments.flatMap((a) =>
+                  (a.replacements || []).map((r: any) => ({
+                    体检号: a.id,
+                    原名单: state.patients.find(
+                      (p) => p.id === r.originalPatientId,
+                    )?.name,
+                    替检名单: state.patients.find(
+                      (p) => p.id === r.replacementPatientId,
+                    )?.name,
+                    原因: r.reason,
+                    日期: r.at,
+                  })),
+                ),
+              )
+            }
+          >
+            导出原名单与替检名单
           </button>
         </div>
         <div className="table-scroll">
@@ -600,6 +771,51 @@ export function Appointments() {
           <span>仅保存于当前浏览器</span>
         </div>
       </section>
+      {printDesk && (
+        <Modal
+          title="打印任务与版式管理"
+          wide
+          onClose={() => setPrintDesk(false)}
+        >
+          <PrintDesk />
+        </Modal>
+      )}
+      {expiryDesk && (
+        <Modal
+          title="改日检临期与到期处理"
+          wide
+          onClose={() => setExpiryDesk(false)}
+        >
+          <ExpiryDesk />
+        </Modal>
+      )}
+      {profile !== null && (
+        <Modal
+          title="合成客户登记与基础资料"
+          wide
+          onClose={() => setProfile(null)}
+        >
+          <RegistrationProfile key={profile} patientId={profile || undefined} />
+        </Modal>
+      )}
+      {groupEditor && (
+        <Modal
+          title="团检单位订单、预算与结算"
+          wide
+          onClose={() => setGroupEditor(false)}
+        >
+          <GroupContractWorkbench />
+        </Modal>
+      )}
+      {ruleEditor && (
+        <Modal
+          title="项目、套餐与计费规则"
+          wide
+          onClose={() => setRuleEditor(false)}
+        >
+          <OrderingRuleEditor />
+        </Modal>
+      )}
       {importing && (
         <Modal
           title="团检名单导入与校验"
@@ -621,6 +837,12 @@ export function Appointments() {
                 onChange={(e) => {
                   setPatient(e.target.value);
                   setExtra(false);
+                  setOtherPackages([]);
+                  setLineDiscounts({});
+                  setOverrideReason("");
+                  setExtraItems([]);
+                  const g = applicableGroup(state, e.target.value, date);
+                  if (g?.packages?.[0]) setPkg(g.packages[0]);
                 }}
               >
                 {state.patients.map((p) => (
@@ -646,7 +868,14 @@ export function Appointments() {
                 type="date"
                 min={today()}
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  const g = applicableGroup(state, patient, e.target.value);
+                  if (g?.packages?.[0]) setPkg(g.packages[0]);
+                  setOtherPackages([]);
+                  setExtraItems([]);
+                  setLineDiscounts({});
+                }}
               />
             </label>
             <label>
@@ -659,12 +888,22 @@ export function Appointments() {
             </label>
             <label>
               体检套餐
-              <select value={pkg} onChange={(e) => setPkg(e.target.value)}>
-                {state.packages.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ¥{p.price}
-                  </option>
-                ))}
+              <select
+                value={pkg}
+                onChange={(e) => {
+                  setPkg(e.target.value);
+                  setLineDiscounts({});
+                }}
+              >
+                {state.packages
+                  .filter((p) =>
+                    packageIsApplicable(state, historyPatient, p.id),
+                  )
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ¥{p.price}
+                    </option>
+                  ))}
               </select>
             </label>
             <label>
@@ -682,6 +921,198 @@ export function Appointments() {
               />
             </label>
           </div>
+          {group && (
+            <div className="callout">
+              <div>
+                <strong>
+                  单位订单：{group.name} · {group.mode}
+                </strong>
+                <p>
+                  单位承担 ¥
+                  {splitGroupAmount(group, quote.rows).unit.toFixed(2)} /
+                  个人承担 ¥
+                  {splitGroupAmount(group, quote.rows).personal.toFixed(2)}
+                  ；超预算差额自动转个人
+                </p>
+                <p>
+                  单位自选包：{group.optionalItems.length}选{group.choose}
+                </p>
+                {group.optionalItems.map((item: string) => (
+                  <label className="check-line" key={item}>
+                    <input
+                      type="checkbox"
+                      checked={extraItems.includes(item)}
+                      onChange={(e) =>
+                        setExtraItems(
+                          e.target.checked
+                            ? [...extraItems, item]
+                            : extraItems.filter((i) => i !== item),
+                        )
+                      }
+                    />
+                    {item}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          <details>
+            <summary>多套餐、单项折扣与适用规则</summary>
+            <div className="form-grid">
+              <label>
+                婚姻状态（用于演示规则）
+                <select
+                  value={historyPatient.marriage || "未设置"}
+                  onChange={(e) =>
+                    act({
+                      type: "UPSERT_PATIENT",
+                      payload: { ...historyPatient, marriage: e.target.value },
+                    })
+                  }
+                >
+                  <option>未设置</option>
+                  <option>未婚</option>
+                  <option>已婚</option>
+                </select>
+              </label>
+              <label>
+                目标总金额（反算折扣）
+                <input
+                  aria-label="目标总金额"
+                  type="number"
+                  min="0"
+                  max={quote.original}
+                  value={quote.amount}
+                  onChange={(e) => {
+                    setDiscount(
+                      percentFromAmount(
+                        state,
+                        packageIds,
+                        Number(e.target.value),
+                        [...extraItems, ...(extra ? [recommendation] : [])],
+                      ),
+                    );
+                    setLineDiscounts({});
+                  }}
+                />
+              </label>
+            </div>
+            <p>
+              多套餐重复项目只计费一次；单项基价按套餐金额均分，叠加时取较高者，纯演示计价规则。
+            </p>
+            {state.packages
+              .filter((p) => p.id !== pkg)
+              .map((p) => (
+                <label className="check-line" key={p.id}>
+                  <input
+                    type="checkbox"
+                    checked={otherPackages.includes(p.id)}
+                    onChange={(e) =>
+                      setOtherPackages(
+                        e.target.checked
+                          ? [...otherPackages, p.id]
+                          : otherPackages.filter((x) => x !== p.id),
+                      )
+                    }
+                  />
+                  {p.name}
+                </label>
+              ))}
+            <label>
+              附加项目
+              <select
+                aria-label="规则附加项目"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value)
+                    setExtraItems([
+                      ...new Set([...extraItems, e.target.value]),
+                    ]);
+                }}
+              >
+                <option value="">选择项目</option>
+                {getOrderRules(state)
+                  .filter(
+                    (r) =>
+                      r.enabled !== false &&
+                      (!r.sex ||
+                        r.sex === "不限" ||
+                        r.sex === historyPatient.sex),
+                  )
+                  .map((r) => (
+                    <option key={r.id}>{r.item}</option>
+                  ))}
+              </select>
+            </label>
+            <table>
+              <thead>
+                <tr>
+                  <th>项目</th>
+                  <th>原价</th>
+                  <th>单项折扣%</th>
+                  <th>实价</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quote.rows.map((r) => (
+                  <tr key={r.item}>
+                    <td>
+                      {r.item}
+                      {extraItems.includes(r.item) && (
+                        <button
+                          className="text-btn"
+                          onClick={() =>
+                            setExtraItems(
+                              extraItems.filter((i) => i !== r.item),
+                            )
+                          }
+                        >
+                          移除附加
+                        </button>
+                      )}
+                    </td>
+                    <td>{r.price.toFixed(2)}</td>
+                    <td>
+                      {r.nonDiscount ? (
+                        "禁止折扣"
+                      ) : (
+                        <input
+                          aria-label={r.item + "单项折扣"}
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={r.percent}
+                          onChange={(e) =>
+                            setLineDiscounts({
+                              ...lineDiscounts,
+                              [r.item]: Number(e.target.value),
+                            })
+                          }
+                        />
+                      )}
+                    </td>
+                    <td>{r.amount.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {resolved.added.length > 0 && (
+              <p>必检/依赖自动带入：{resolved.added.join("、")}</p>
+            )}
+            {orderingErrors.length > 0 && (
+              <div className="error">{orderingErrors.join("；")}</div>
+            )}
+            {orderingErrors.some((e) => e.includes("婚姻")) && (
+              <label>
+                强制添加理由
+                <input
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder="明确记录覆盖适用警示的演示理由"
+                />
+              </label>
+            )}
+          </details>
           <div className="callout">
             <HeartPulse size={20} />
             <div>
@@ -713,10 +1144,7 @@ export function Appointments() {
           </label>
           {error && <p className="error">{error}</p>}
           <div className="modal-actions">
-            <strong>
-              合计 ¥
-              {Math.round((pack.price * discount) / 100) + (extra ? 80 : 0)}
-            </strong>
+            <strong>合计 ¥{quote.amount.toFixed(2)}</strong>
             <button className="btn" onClick={() => setOpen(false)}>
               取消
             </button>
@@ -771,6 +1199,17 @@ export function Appointments() {
                     state,
                     e.target.value,
                     a.id,
+                    {
+                      patientId: a.patientId,
+                      company: state.patients.find((p) => p.id === a.patientId)
+                        ?.company,
+                      kind:
+                        state.patients.find((p) => p.id === a.patientId)
+                          ?.company === "个检"
+                          ? "individual"
+                          : "group",
+                      time: a.time,
+                    },
                   );
                   if (!available.allowed) {
                     setError(available.error);
@@ -790,6 +1229,15 @@ export function Appointments() {
               {error}
             </p>
           )}
+          <button
+            className="btn"
+            onClick={() => {
+              setProfile(a.patientId);
+              setDetail("");
+            }}
+          >
+            编辑客户基本资料
+          </button>
           <h3>检查项目与结果</h3>
           <div className="item-grid">
             {a.items.map((x) => (
@@ -801,7 +1249,16 @@ export function Appointments() {
                 <button
                   className="text-btn danger"
                   disabled={
-                    a.locked || a.items.length <= 1 || !state.config.allowRemove
+                    a.locked ||
+                    a.items.length <= 1 ||
+                    !state.config.allowRemove ||
+                    getOrderRules(state).some(
+                      (r) =>
+                        r.enabled !== false &&
+                        r.ruleEnabled !== false &&
+                        r.item === x &&
+                        r.required,
+                    )
                   }
                   onClick={() =>
                     act({
@@ -819,6 +1276,94 @@ export function Appointments() {
               </div>
             ))}
           </div>
+          <details>
+            <summary>团检替检与双向追踪</summary>
+            <p>
+              仅可替换未开始检查的团检订单，保留原名单；已检查结果不转移给其他人。
+            </p>
+            <div className="form-grid">
+              <label>
+                替检人
+                <select
+                  aria-label="替检人"
+                  value={replacement}
+                  onChange={(e) => setReplacement(e.target.value)}
+                >
+                  <option value="">请选择</option>
+                  {state.patients
+                    .filter((p) => p.id !== a.patientId)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} · {p.sex} · {p.company}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                替检原因
+                <input
+                  aria-label="替检原因"
+                  value={replacementReason}
+                  onChange={(e) => setReplacementReason(e.target.value)}
+                />
+              </label>
+            </div>
+            <button
+              className="btn"
+              disabled={a.locked || !["booked", "paid"].includes(a.status)}
+              onClick={() => {
+                if (!replacement || !replacementReason.trim())
+                  return setError("请选择替检人并填写原因");
+                const old = state.patients.find((p) => p.id === a.patientId)!;
+                if (old.company === "个检") return setError("仅团检订单可替检");
+                const items = a.items.filter(
+                  (item) =>
+                    !getOrderRules(state).some(
+                      (r) =>
+                        r.item === item &&
+                        r.sex &&
+                        r.sex !== "不限" &&
+                        r.sex !==
+                          state.patients.find((p) => p.id === replacement)?.sex,
+                    ),
+                );
+                act({
+                  type: "UPDATE_APPOINTMENT",
+                  payload: {
+                    id: a.id,
+                    patientId: replacement,
+                    items,
+                    results: {},
+                    replacements: [
+                      ...(a.replacements || []),
+                      {
+                        originalPatientId: a.patientId,
+                        replacementPatientId: replacement,
+                        reason: replacementReason,
+                        at: new Date().toISOString(),
+                      },
+                    ],
+                  },
+                });
+                setReplacement("");
+                setReplacementReason("");
+                setError("");
+              }}
+            >
+              确认替检并更新订单
+            </button>
+            {(a.replacements || []).map((r: any, i: number) => (
+              <p key={i}>
+                {state.patients.find((p) => p.id === r.originalPatientId)?.name}{" "}
+                →{" "}
+                {
+                  state.patients.find((p) => p.id === r.replacementPatientId)
+                    ?.name
+                }{" "}
+                · {r.reason}
+              </p>
+            ))}
+          </details>
           <div className="actions">
             <button
               className="btn"
@@ -902,6 +1447,7 @@ export function Exam() {
   const [sample, setSample] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [critical, setCritical] = useState(false);
+  const [specimenType, setSpecimenType] = useState("静脉血");
   if (!a)
     return (
       <>
@@ -910,6 +1456,7 @@ export function Exam() {
           description="先在开单登记完成到检，再进行科室检查。"
         />
         <Empty text="当前无待检查客户" />
+        <UndoExam />
         <a className="btn btn-primary" href="#/appointments">
           前往登记
         </a>
@@ -971,6 +1518,11 @@ export function Exam() {
           </select>
         }
       />
+      <UndoExam />
+      <details>
+        <summary>妇科标本待采与病理标签</summary>
+        <GynecologySpecimens />
+      </details>
       <div className="clinical-layout">
         <aside className="panel patient-list">
           <h3>
@@ -1002,7 +1554,15 @@ export function Exam() {
             );
           })}
         </aside>
-        <section className="panel clinical-main">
+        <section
+          className="panel clinical-main"
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              e.preventDefault();
+              save(true);
+            }
+          }}
+        >
           <div className="clinical-person">
             <span className="avatar large">{p.name.slice(-2)}</span>
             <div>
@@ -1133,6 +1693,10 @@ export function Exam() {
               ))}
             </tbody>
           </table>
+          <ExamExtras key={a.id} appointmentId={a.id} />
+          <p className="muted">
+            快捷提交：Ctrl / ⌘ + Enter，执行同一必填与锁定校验。
+          </p>
           <label className="field">
             分检小结 / 医学建议（演示）
             <textarea
@@ -1179,7 +1743,20 @@ export function Exam() {
           <div className="fake-barcode" aria-label="演示条码" />
           <div className="detail-grid">
             <div>
-              标本类型<strong>静脉血 / 尿液</strong>
+              标本类型
+              <select
+                aria-label="标本类型"
+                value={specimenType}
+                onChange={(e) => setSpecimenType(e.target.value)}
+              >
+                <option>静脉血</option>
+                <option>尿液</option>
+                <option>妇科标本</option>
+                <option>病理组织</option>
+              </select>
+              <strong>
+                DEMO-{a.id}-{specimenType}
+              </strong>
             </div>
             <div>
               检验组合<strong>血常规、肝肾功能、血脂</strong>
@@ -1203,6 +1780,22 @@ export function Exam() {
                 act({
                   type: "UPDATE_APPOINTMENT",
                   payload: { id: a.id, sampled: true },
+                });
+                act({
+                  type: "UPSERT_RECORD",
+                  payload: {
+                    collection: "reportSpecimens",
+                    record: {
+                      id: "SPEC-" + a.id + "-" + specimenType,
+                      appointmentId: a.id,
+                      patientId: p.id,
+                      type: specimenType,
+                      specimenType,
+                      operator: state.config.role,
+                      at: new Date().toISOString(),
+                      status: "已采集",
+                    },
+                  },
                 });
                 setSample(false);
               }}
@@ -1236,13 +1829,13 @@ export function Review() {
   const [overdueOnly, setOverdueOnly] = useState(false);
   const daysOld = (a: Appointment) =>
     Math.floor((Date.now() - new Date(a.date).getTime()) / 86400000);
-  const list = state.appointments
-    .filter(
+  const list = sortReviewAppointments(
+    state,
+    state.appointments.filter(
       (a) =>
-        a.status === "review" &&
-        (!overdueOnly || daysOld(a) > state.config.reportDeadline),
-    )
-    .sort((a, b) => daysOld(b) - daysOld(a));
+        a.status === "review" && (!overdueOnly || isReportOverdue(state, a)),
+    ),
+  );
   const [id, setId] = useState(list[0]?.id || "");
   const [text, setText] = useState("");
   const [reason, setReason] = useState("");
@@ -1307,7 +1900,10 @@ export function Review() {
                   {["初审", "主检", "总检"][x.reviewStage || 0]} ·{" "}
                   {x.doctor || "未分配"}
                 </small>
-                {daysOld(x) > state.config.reportDeadline && (
+                {isCriticalReviewAppointment(state, x) && (
+                  <Badge tone="red">危急 · 优先审核</Badge>
+                )}
+                {isReportOverdue(state, x) && (
                   <Badge tone="red">超期{daysOld(x)}天</Badge>
                 )}
               </span>
@@ -1468,6 +2064,8 @@ export function Review() {
                   payload: {
                     patientId: p.id,
                     title: "总检异常跟进",
+                    id: "REVIEW-FOLLOW-" + a.id,
+                    appointmentId: a.id,
                     risk: p.risk,
                   },
                 });
@@ -1476,6 +2074,13 @@ export function Review() {
               创建随访任务
             </button>
           </div>
+          <details>
+            <summary>排班分配、重大阳性与复查控制</summary>
+            <ReviewTools appointmentId={a.id} />
+            <button className="btn" onClick={() => setText(a.conclusion)}>
+              将工具保存的结论载入编辑区
+            </button>
+          </details>
           <div className="modal-actions">
             <button className="btn danger" onClick={() => setReject(true)}>
               驳回重检
@@ -1767,7 +2372,7 @@ export function Reports() {
             ))}
           </div>
           <article className="report-paper" id="report-print">
-            <div className="report-mark">青禾 · 健康管理中心</div>
+            <div className="report-mark">红创 · 健康管理中心</div>
             <h2>{template}</h2>
             <p className="report-warning">
               合成数据 / 展示样本 / 不作为诊疗依据
@@ -1881,6 +2486,10 @@ export function Reports() {
           </div>
         </Modal>
       )}
+      <details>
+        <summary>报告解读、标本与回收工作量</summary>
+        <ReportOperations />
+      </details>
     </>
   );
 }
@@ -2026,6 +2635,26 @@ export function Finance() {
                     <td>
                       <strong>{b.name}</strong>
                       <small>到期 {b.deadline}</small>
+                      {b.deadline < today() && b.paid < b.total && (
+                        <Badge tone="red">回款已到期 · 本地提醒</Badge>
+                      )}
+                      <label className="muted">
+                        应回款日
+                        <input
+                          type="date"
+                          aria-label={b.name + "应回款日"}
+                          value={b.deadline}
+                          onChange={(e) =>
+                            act({
+                              type: "UPSERT_RECORD",
+                              payload: {
+                                collection: "bills",
+                                record: { ...b, deadline: e.target.value },
+                              },
+                            })
+                          }
+                        />
+                      </label>
                     </td>
                     <td>
                       ¥{b.total.toLocaleString()}
@@ -2097,7 +2726,10 @@ export function Finance() {
                       <small>{a.id}</small>
                     </td>
                     <td>¥{a.amount}</td>
-                    <td>¥0 / ¥{a.amount}</td>
+                    <td>
+                      ¥{a.groupSplit?.unit || 0} / ¥
+                      {a.groupSplit?.personal ?? a.amount}
+                    </td>
                     <td>
                       <StatusBadge status={a.status} />
                       {a.refunded && <Badge tone="amber">已模拟退款</Badge>}
@@ -2273,6 +2905,14 @@ export function Finance() {
           </div>
         </Modal>
       )}
+      <details>
+        <summary>单位预算、预付款与项目结算</summary>
+        <GroupContractWorkbench />
+      </details>
+      <details>
+        <summary>交易关联发票台账</summary>
+        <InvoiceLedger />
+      </details>
     </>
   );
 }

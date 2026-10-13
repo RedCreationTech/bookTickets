@@ -207,7 +207,7 @@ describe("Audit-driven workload analytics", () => {
         message: "模拟打印并装订报告 TJ1001",
       },
     ];
-    localStorage.setItem("qinghe.health.demo.v1", JSON.stringify(initial));
+    localStorage.setItem("hongchuang.health.demo.v1", JSON.stringify(initial));
     mount(<Analytics />);
     const workload = screen.getByRole("table", { name: "人员工作量" });
     expect(within(workload).getAllByRole("row")).toHaveLength(3);

@@ -15,7 +15,7 @@ STEPS=[
 def font(n):return ImageFont.truetype(FONT,n)
 def make_frame(i,title,subtitle,desc,foot):
  im=Image.new('RGB',(1280,720),'#f3f7f3');d=ImageDraw.Draw(im)
- d.rectangle((0,0,1280,122),fill='#173e35');d.text((64,33),'青禾 · 智慧体检',font=font(32),fill='#e7f1e8');d.text((851,43),'操作引导 / 流程示意',font=font(20),fill='#aac6b8')
+ d.rectangle((0,0,1280,122),fill='#173e35');d.text((64,33),'红创 · 智慧体检',font=font(32),fill='#e7f1e8');d.text((851,43),'操作引导 / 流程示意',font=font(20),fill='#aac6b8')
  d.rounded_rectangle((63,159,167,198),radius=12,fill='#e3eee4');d.text((79,166),f'第 {i+1} 步',font=font(20),fill='#35725c')
  d.text((62,219),title,font=font(54),fill='#24493b');d.text((65,311),subtitle,font=font(30),fill='#5f8a73');d.text((65,377),desc,font=font(25),fill='#748879')
  d.rounded_rectangle((63,456,1216,533),radius=15,fill='#e6efe5');d.text((89,479),foot,font=font(23),fill='#587953')

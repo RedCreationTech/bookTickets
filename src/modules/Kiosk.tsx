@@ -27,7 +27,23 @@ import {
 } from "lucide-react";
 import { useDemo } from "../store";
 import "./devices.css";
-import { getBookingAvailability } from "../bookingRules";
+import {
+  getBookingAvailability,
+  getOnlineExtraCatalog,
+  getGroupBookingSchedules,
+  getBookingSlots,
+  getBookingDates,
+  bookingDateOffset,
+  getBookingNow,
+  hasCompletedQuestionnaire,
+  QUESTIONNAIRE_OPTIONS,
+  recommendedBookingItems,
+} from "../bookingRules";
+import {
+  getOrderingIssues,
+  packageIsApplicable,
+  getOrderRules,
+} from "../orderingRules";
 
 type Screen =
   | "home"
@@ -40,12 +56,6 @@ type Screen =
   | "printing"
   | "complete";
 type Fault = "normal" | "offline" | "paper" | "jam";
-const kioskExtras = [
-  { name: "甲状腺彩超", price: 120 },
-  { name: "糖化血红蛋白", price: 65 },
-  { name: "骨密度检查", price: 95 },
-];
-
 export default function Kiosk() {
   const { state, act } = useDemo();
   const [mode, setMode] = useState(
@@ -64,6 +74,11 @@ export default function Kiosk() {
   const [packId, setPackId] = useState(state.packages[0]?.id || "");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("08:00-08:30");
+  useEffect(() => {
+    const slots = getBookingSlots(state);
+    if (!slots.some((slot) => slot.time === time))
+      setTime(slots[0]?.time || "");
+  }, [state.config.timeSlots]);
   const [campus, setCampus] = useState(state.config.campus || "中心院区");
   const [countdown, setCountdown] = useState(120);
   const [fault, setFault] = useState<Fault>("normal");
@@ -78,6 +93,18 @@ export default function Kiosk() {
   const bookingSubmitted = useRef(false);
   const [excludedItems, setExcludedItems] = useState<string[]>([]);
   const [addedItems, setAddedItems] = useState<string[]>([]);
+  const [bookingKind, setBookingKind] = useState<"individual" | "group">(
+    "individual",
+  );
+  const [groupCompany, setGroupCompany] = useState(
+    state.patients[0]?.company || "",
+  );
+  const [questionAnswers, setQuestionAnswers] = useState<string[]>([]);
+  const [questionContext, setQuestionContext] = useState({
+    history: "",
+    medication: "",
+    family: "",
+  });
   const patient = state.patients.find((p) => p.id === patientId);
   const orders = state.appointments.filter(
     (a) => a.patientId === patientId && a.status !== "cancelled",
@@ -92,24 +119,58 @@ export default function Kiosk() {
       ? eligible[0]
       : orders.find((a) => !["approved", "printed"].includes(a.status))) ||
     orders[0];
-  const pack = state.packages.find((p) => p.id === packId);
+  const applicablePackages = state.packages.filter(
+    (p) =>
+      patient &&
+      packageIsApplicable(state, patient, p.id) &&
+      (state.records.packageRules || []).find((r) => r.packageId === p.id)
+        ?.onlineEnabled !== false &&
+      p.onlineEnabled !== false,
+  );
+  const pack = applicablePackages.find((p) => p.id === packId);
+  const requiredItems = getOrderRules(state)
+    .filter((r) => r.required && r.enabled !== false && r.ruleEnabled !== false)
+    .map((r) => r.item);
   const allowAdd = state.config.allowAdd !== false;
   const allowRemove = state.config.allowRemove !== false;
   const displayPrices =
     state.config.showPrices !== false && state.config.priceMode !== "不显示";
   const baseItems = (pack?.items || []).filter(
-    (item) => !allowRemove || !excludedItems.includes(item),
+    (item) => !excludedItems.includes(item),
   );
-  const activeExtras = allowAdd ? addedItems : [];
+  const kioskExtras = getOnlineExtraCatalog(state, patientId).filter(
+    (extra) => !pack?.items.includes(extra.name),
+  );
+  const activeExtras = allowAdd
+    ? addedItems.filter((name) => kioskExtras.some((row) => row.name === name))
+    : [];
   const bookingTotal =
     (pack?.price || 0) +
     kioskExtras
       .filter((item) => activeExtras.includes(item.name))
       .reduce((sum, item) => sum + item.price, 0);
-  const availability = getBookingAvailability(state, date);
-  useEffect(() => setExcludedItems([]), [packId]);
+  const availability = getBookingAvailability(state, date, undefined, {
+    patientId,
+    kind: bookingKind,
+    company: groupCompany,
+    time,
+  });
+  useEffect(
+    () =>
+      setExcludedItems(
+        state.config.defaultSelected === false
+          ? (pack?.items || []).filter((item) => !requiredItems.includes(item))
+          : [],
+      ),
+    [packId, state.config.defaultSelected],
+  );
+  useEffect(() => {
+    setQuestionAnswers([]);
+    setQuestionContext({ history: "", medication: "", family: "" });
+  }, [patientId]);
   const reset = (text = "") => {
     bookingSubmitted.current = false;
+    setBookingKind("individual");
     setIdentified(false);
     setOrderId("");
     setScreen("home");
@@ -184,6 +245,7 @@ export default function Kiosk() {
       orders.find((a) => !["approved", "printed"].includes(a.status)) ||
       orders[0];
     setCampus(selectedOrder?.campus || state.config.campus || "中心院区");
+    setGroupCompany(patient.company);
     setIdentified(true);
     setCountdown(120);
     setOrderId("");
@@ -223,6 +285,14 @@ export default function Kiosk() {
   const createBooking = () => {
     if (bookingSubmitted.current) return;
     if (!availability.allowed) return setNotice(availability.error);
+    if (!pack) return setNotice("请选择适合该体检人的线上套餐");
+    const issues = getOrderingIssues(
+      state,
+      patientId,
+      [...baseItems, ...activeExtras],
+      [packId],
+    );
+    if (issues.length) return setNotice(issues.join("；"));
     if (!baseItems.length && !activeExtras.length)
       return setNotice("请至少保留一个检查项目");
     bookingSubmitted.current = true;
@@ -236,7 +306,14 @@ export default function Kiosk() {
         campus,
         amount: bookingTotal,
         items: [...baseItems, ...activeExtras],
-        source: "自助机模拟预约",
+        source: bookingKind === "group" ? "自助机团检预约" : "自助机模拟预约",
+        bookingKind,
+        groupCompany: bookingKind === "group" ? groupCompany : "",
+        questionnaireCompleted: hasCompletedQuestionnaire(state, patientId),
+        questionnaireAnswers:
+          state.records.bookingQuestionnaires?.find(
+            (row) => row.patientId === patientId,
+          )?.answers || [],
       },
     });
     setScreen("payment");
@@ -319,8 +396,8 @@ export default function Kiosk() {
             <HeartPulse size={32} />
           </span>
           <div>
-            <b>青禾健康体检中心</b>
-            <small>QINGHE HEALTH EXAMINATION CENTER</small>
+            <b>红创健康体检中心</b>
+            <small>HONGCHUANG HEALTH EXAMINATION CENTER</small>
           </div>
         </div>
         <div className="ks-header-right">
@@ -515,8 +592,37 @@ export default function Kiosk() {
               <h2>选择体检套餐</h2>
               <span>体检人：{patient?.name}</span>
             </div>
+            <div className="ks-book-fields">
+              <label>
+                预约类型
+                <select
+                  value={bookingKind}
+                  onChange={(e) =>
+                    setBookingKind(e.target.value as "individual" | "group")
+                  }
+                >
+                  <option value="individual">个人预约</option>
+                  <option value="group">单位预约</option>
+                </select>
+              </label>
+              {bookingKind === "group" && (
+                <label>
+                  团检单位
+                  <select
+                    value={groupCompany}
+                    onChange={(e) => setGroupCompany(e.target.value)}
+                  >
+                    {getGroupBookingSchedules(state).map((row) => (
+                      <option value={row.company} key={row.id}>
+                        {row.company}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
             <div className="ks-package-grid">
-              {state.packages.map((p) => (
+              {applicablePackages.map((p) => (
                 <button
                   key={p.id}
                   className={p.id === packId ? "selected" : ""}
@@ -552,14 +658,22 @@ export default function Kiosk() {
                     type="checkbox"
                     aria-label={`套餐项目：${item}`}
                     checked={baseItems.includes(item)}
-                    disabled={!allowRemove}
-                    onChange={() =>
+                    disabled={
+                      requiredItems.includes(item) ||
+                      (!allowRemove && baseItems.includes(item))
+                    }
+                    onChange={() => {
+                      if (
+                        requiredItems.includes(item) ||
+                        (!allowRemove && baseItems.includes(item))
+                      )
+                        return;
                       setExcludedItems(
                         excludedItems.includes(item)
                           ? excludedItems.filter((x) => x !== item)
                           : [...excludedItems, item],
-                      )
-                    }
+                      );
+                    }}
                   />
                   {item}
                 </label>
@@ -590,6 +704,156 @@ export default function Kiosk() {
             {!allowAdd && (
               <p className="ks-rule-note">当前配置不允许增加套餐外项目。</p>
             )}
+            {state.config.questionnaireEnabled !== false && (
+              <section
+                className="ks-identity-preview"
+                style={{ display: "block" }}
+              >
+                <h3>
+                  检前问卷
+                  {hasCompletedQuestionnaire(state, patientId)
+                    ? " · 已完成"
+                    : ""}
+                </h3>
+                <p className="ks-rule-note">
+                  {state.config.questionnaireSkippable === false
+                    ? "预约前必须完成，不允许跳过。"
+                    : "可选填；不填写也可继续预约。"}
+                  全部内容为合成问卷，非医学决策。
+                </p>
+                <div className="ks-book-fields">
+                  {(
+                    [
+                      ["history", "合成既往史"],
+                      ["medication", "合成用药记录"],
+                      ["family", "合成家族史"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key}>
+                      {label}（可选）
+                      <select
+                        value={questionContext[key]}
+                        onChange={(e) =>
+                          setQuestionContext({
+                            ...questionContext,
+                            [key]: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="">未填写</option>
+                        <option value={`${label}样例A（非真实信息）`}>
+                          {label}样例A（非真实信息）
+                        </option>
+                        <option value="明确无相关演示记录">
+                          明确无相关演示记录
+                        </option>
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <div className="ks-project-select">
+                  {QUESTIONNAIRE_OPTIONS.map((answer) => (
+                    <label key={answer}>
+                      <input
+                        type="checkbox"
+                        checked={questionAnswers.includes(answer)}
+                        onChange={() =>
+                          setQuestionAnswers(
+                            questionAnswers.includes(answer)
+                              ? questionAnswers.filter((a) => a !== answer)
+                              : [...questionAnswers, answer],
+                          )
+                        }
+                      />
+                      {answer}
+                    </label>
+                  ))}
+                </div>
+                <button
+                  className="ks-secondary"
+                  disabled={!questionAnswers.length}
+                  onClick={() => {
+                    const recommended =
+                      state.config.recommendationEnabled !== false
+                        ? recommendedBookingItems(questionAnswers)
+                        : [];
+                    act({
+                      type: "UPSERT_RECORD",
+                      payload: {
+                        collection: "bookingQuestionnaires",
+                        record: {
+                          id: `Q-${patientId}`,
+                          patientId,
+                          ...questionContext,
+                          answers: questionAnswers,
+                          status: "completed",
+                          completedAt: getBookingNow(state).toISOString(),
+                          recommended,
+                        },
+                      },
+                    });
+                    if (
+                      state.config.recommendationEnabled !== false &&
+                      allowAdd
+                    )
+                      setAddedItems(recommended);
+                    setNotice(
+                      recommended.length
+                        ? `问卷已保存，已添加演示参考项目：${recommended.join("、")}`
+                        : "问卷已保存；未增加参考项目。",
+                    );
+                  }}
+                >
+                  提交自助机问卷
+                </button>
+                {state.config.questionnaireSkippable !== false && (
+                  <button
+                    className="ks-secondary"
+                    style={{ marginLeft: 10 }}
+                    onClick={() => {
+                      act({
+                        type: "UPSERT_RECORD",
+                        payload: {
+                          collection: "bookingQuestionnaires",
+                          record: {
+                            id: `Q-${patientId}`,
+                            patientId,
+                            history: "",
+                            medication: "",
+                            family: "",
+                            recommended: [],
+                            answers: [],
+                            status: "skipped",
+                          },
+                        },
+                      });
+                      setNotice("已记录跳过问卷，可继续预约");
+                    }}
+                  >
+                    跳过自助机问卷
+                  </button>
+                )}
+              </section>
+            )}
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                margin: "18px 0",
+              }}
+            >
+              {getBookingDates(state).map((day) => (
+                <button
+                  key={day}
+                  className="ks-secondary"
+                  style={{ minHeight: 40, fontSize: 11, padding: "8px 12px" }}
+                  onClick={() => setDate(day)}
+                >
+                  {day.slice(5)}
+                </button>
+              ))}
+            </div>
             <div className="ks-book-fields">
               <label>
                 预约院区
@@ -605,7 +869,7 @@ export default function Kiosk() {
                 预约日期
                 <input
                   type="date"
-                  min={new Date().toISOString().slice(0, 10)}
+                  min={bookingDateOffset(state)}
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                 />
@@ -613,9 +877,9 @@ export default function Kiosk() {
               <label>
                 预约时段
                 <select value={time} onChange={(e) => setTime(e.target.value)}>
-                  <option>08:00-08:30</option>
-                  <option>08:30-09:00</option>
-                  <option>09:00-09:30</option>
+                  {getBookingSlots(state).map((slot) => (
+                    <option key={slot.time}>{slot.time}</option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -905,7 +1169,7 @@ export default function Kiosk() {
                   <div className="ks-paper">
                     <div>
                       <HeartPulse size={24} />
-                      <b>青禾健康体检中心</b>
+                      <b>红创健康体检中心</b>
                     </div>
                     <h3>健康体检报告</h3>
                     <small>HEALTH EXAMINATION REPORT</small>

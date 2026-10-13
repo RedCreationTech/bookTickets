@@ -1880,3 +1880,49 @@ tr:last-child td {
 .queue-row .icon-btn {
   padding: 4px;
 }
+
+/* Specialized task drawers retain the same clinical information hierarchy. */
+.main-content details:not(.requirement) {
+  margin: 14px 0;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #dce7e1;
+  border-radius: 10px;
+  min-width: 0;
+}
+.main-content details:not(.requirement) > summary {
+  cursor: pointer;
+  font-weight: 650;
+  color: #276e60;
+  line-height: 1.8;
+}
+.main-content details[open]:not(.requirement) > summary {
+  margin-bottom: 15px;
+}
+.main-content details:not(.requirement) > label {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+.main-content details:not(.requirement) table {
+  margin-top: 14px;
+}
+.main-content details audio {
+  max-width: 100%;
+  margin: 8px;
+}
+.main-content details pre {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #f4f8f6;
+  padding: 12px;
+  border-radius: 7px;
+}
+@media (max-width: 700px) {
+  .main-content details:not(.requirement) {
+    padding: 12px;
+    overflow: auto;
+  }
+}

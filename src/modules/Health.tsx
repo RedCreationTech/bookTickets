@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -28,6 +28,7 @@ import {
   FormFields,
   Metrics,
   RecordWorkspace,
+  useCollection,
   Tag,
 } from "./Operations";
 import type { FieldSpec, Row, WorkspaceSpec } from "./Operations";
@@ -114,6 +115,7 @@ const templatesSpec: WorkspaceSpec = {
       "评估医嘱",
       "再检推荐",
     ]),
+    field("version", "模板版本", "text" as any, undefined, false),
     field("population", "适用人群", "select", [
       "成人",
       "儿童",
@@ -123,6 +125,20 @@ const templatesSpec: WorkspaceSpec = {
     ]),
     field("owner", "维护人员"),
     field("description", "模板内容", "textarea"),
+    field(
+      "unitsText",
+      "执行单元（每行：天数|任务标题）",
+      "textarea",
+      undefined,
+      false,
+    ),
+    field(
+      "recheckItems",
+      "再检资料项目（逗号分隔）",
+      "textarea",
+      undefined,
+      false,
+    ),
   ],
   statuses: ["草稿", "待审核", "已启用", "已停用"],
   transitions: {
@@ -133,6 +149,7 @@ const templatesSpec: WorkspaceSpec = {
   },
   seeds: [
     {
+      unitsText: "0|登记基线\n7|健康知识教育\n30|回访与记录",
       id: "HT1001",
       name: "基础健康教育 · 30 天",
       category: "健康计划模板",
@@ -153,6 +170,7 @@ const templatesSpec: WorkspaceSpec = {
       status: "待审核",
     },
     {
+      unitsText: "0|日常活动教育记录",
       id: "HT1003",
       name: "日常活动教育单元",
       category: "计划单元",
@@ -163,6 +181,57 @@ const templatesSpec: WorkspaceSpec = {
     },
   ],
 };
+templatesSpec.seeds.push(
+  {
+    id: "HT1004",
+    name: "个体目标记录词条",
+    category: "处方词条",
+    population: "通用",
+    owner: "健康管理科",
+    description: "按专业人员已经确认的个体目标记录执行情况；仅作教育演示。",
+    status: "已启用",
+  },
+  {
+    id: "HT1005",
+    name: "随访沟通词条",
+    category: "干预词条",
+    population: "通用",
+    owner: "健康管理科",
+    description:
+      "询问计划执行情况并记录本人反馈，无法确认的事项交专业人员复核。",
+    status: "已启用",
+  },
+  {
+    id: "HT1006",
+    name: "资料专业复核提醒",
+    category: "评估医嘱",
+    population: "通用",
+    owner: "健康管理科",
+    description: "本地合成资料需由专业人员复核，不自动推导临床决定。",
+    status: "已启用",
+  },
+  {
+    id: "HT1007",
+    name: "报告资料再核对",
+    category: "再检推荐",
+    population: "通用",
+    owner: "健康管理科",
+    description: "为专业人员创建资料复核任务，不代表实际推荐检查。",
+    recheckItems: "历史报告核对,指标记录复核",
+    status: "已启用",
+  },
+  {
+    id: "HT1008",
+    name: "非药物健康教育处方模板",
+    category: "健康处方模板",
+    population: "成人",
+    owner: "健康管理科",
+    description:
+      "合成非药物教育模板；记录医护人员确认的目标及执行反馈，不给出实际剂量或强度。",
+    unitsText: "0|确认教育目标\n30|复核执行记录",
+    status: "已启用",
+  },
+);
 const groupSpec: WorkspaceSpec = {
   key: "healthGroups",
   label: "人群与工作分组",
@@ -990,6 +1059,14 @@ function Profiles() {
                   setNotice("年龄需在 0–120 岁之间");
                   return;
                 }
+                if (editor.knownConditionsText !== undefined)
+                  editor.health = {
+                    ...(editor.health ?? getPatientHealth(editor)),
+                    knownConditions: String(editor.knownConditionsText)
+                      .split(/[，,]/)
+                      .map((x: string) => x.trim())
+                      .filter(Boolean),
+                  };
                 act({ type: "UPSERT_PATIENT", payload: editor });
                 setSelected(editor.id);
                 setNotice("健康档案已保存，信息已同步至共享客户数据。");
@@ -1002,6 +1079,79 @@ function Profiles() {
                   draft={editor}
                   setDraft={setEditor}
                 />
+                <div className="ops-span2">
+                  <h3 style={{ fontSize: 13 }}>合成指标与生活方式档案</h3>
+                  <p style={{ fontSize: 11, color: "#8a9b90" }}>
+                    以下字段直接用于企业人群统计；留空表示缺失。
+                  </p>
+                </div>
+                <FormFields
+                  fields={healthFields.map((f) => {
+                    const category =
+                      f.key === "occupation"
+                        ? "职业"
+                        : f.key === "education"
+                          ? "教育程度"
+                          : null;
+                    const custom = category
+                      ? (state.records.dictionaries || [])
+                          .filter(
+                            (d: Row) =>
+                              d.category === category && d.status !== "已停用",
+                          )
+                          .map((d: Row) =>
+                            String(d.name).split("·").at(-1)?.trim(),
+                          )
+                      : [];
+                    return custom.length
+                      ? {
+                          ...f,
+                          options: [
+                            ...new Set([...(f.options || []), ...custom]),
+                          ],
+                        }
+                      : f;
+                  })}
+                  draft={editor.health ?? getPatientHealth(editor)}
+                  setDraft={(health) => setEditor({ ...editor, health })}
+                />
+                <label className="ops-field">
+                  <span>档案完整性</span>
+                  <select
+                    value={String(
+                      (editor.health ?? getPatientHealth(editor))
+                        .archiveComplete ?? false,
+                    )}
+                    onChange={(e) =>
+                      setEditor({
+                        ...editor,
+                        health: {
+                          ...(editor.health ?? getPatientHealth(editor)),
+                          archiveComplete: e.target.value === "true",
+                        },
+                      })
+                    }
+                  >
+                    <option value="false">资料待补充</option>
+                    <option value="true">档案完整</option>
+                  </select>
+                </label>
+                <label className="ops-field">
+                  <span>既往状况记录（合成，逗号分隔）</span>
+                  <input
+                    aria-label="既往状况记录"
+                    value={
+                      editor.knownConditionsText ??
+                      (getPatientHealth(editor).knownConditions || []).join(",")
+                    }
+                    onChange={(e) =>
+                      setEditor({
+                        ...editor,
+                        knownConditionsText: e.target.value,
+                      })
+                    }
+                  />
+                </label>
               </div>
               <div className="ops-modal-actions">
                 <button
@@ -1038,11 +1188,20 @@ function Followup() {
         query,
       ),
   );
-  const statuses = ["待处理", "进行中", "已完成"];
+  const statuses = ["待处理", "进行中", "已完成", "已取消"];
   const selected = detail
     ? state.tasks.find((t: Row) => t.id === detail.id)
     : null;
   const update = (t: Row, status: string) => {
+    const actor = state.config.operatorName || state.config.role || "admin";
+    const lock = (state.records.followupLocks || []).find(
+      (l: Row) => l.patientId === t.patientId && l.status === "locked",
+    );
+    if (lock && lock.owner !== actor) {
+      setDetail(t);
+      setError(`客户已由 ${lock.owner} 锁定，当前人员不能处理。`);
+      return;
+    }
     if (status === "已完成" && !note.trim()) {
       setDetail(t);
       setError("完成前请记录本次随访结果。");
@@ -1186,7 +1345,7 @@ function Followup() {
                         <CalendarDays size={12} />
                         {t.date}
                       </span>
-                      {s !== "已完成" ? (
+                      {!["已完成", "已取消"].includes(s) ? (
                         <button
                           onClick={() =>
                             update(t, s === "待处理" ? "进行中" : "已完成")
@@ -1439,36 +1598,308 @@ function Followup() {
     </>
   );
 }
-function Assessments() {
-  const { state, act } = useDemo() as any;
-  const [patient, setPatient] = useState(state.patients[0]?.id);
-  const [type, setType] = useState("慢病风险教育");
-  const [answers, setAnswers] = useState<Row>({
-    activity: "偶尔",
-    sleep: "一般",
-    diet: "一般",
-    smoke: "否",
-    followup: "是",
-  });
-  const [generated, setGenerated] = useState<Row | null>(null);
-  const [saved, setSaved] = useState(false);
-  const questions = [
+const healthSeed: Record<string, Row> = {
+  P001: {
+    systolic: 128,
+    diastolic: 82,
+    totalCholesterol: 5.4,
+    fastingGlucose: 5.8,
+    bmi: 23.6,
+    smoking: "无吸烟记录",
+    occupation: "技术人员",
+    education: "本科",
+    diet: "规律",
+    exercise: "偶尔",
+    alcohol: "偶尔",
+    archiveComplete: true,
+    archiveCount: 3,
+    knownConditions: [],
+  },
+  P002: {
+    systolic: 118,
+    diastolic: 76,
+    totalCholesterol: 4.6,
+    fastingGlucose: 5.1,
+    bmi: 21.8,
+    smoking: "无吸烟记录",
+    occupation: "设计人员",
+    education: "本科",
+    diet: "规律",
+    exercise: "规律",
+    alcohol: "无",
+    archiveComplete: true,
+    archiveCount: 2,
+    knownConditions: [],
+  },
+  P003: {
+    systolic: 148,
+    diastolic: 94,
+    totalCholesterol: 6.2,
+    fastingGlucose: 8.9,
+    bmi: 27.2,
+    smoking: "有吸烟记录",
+    occupation: "管理人员",
+    education: "专科",
+    diet: "待改善",
+    exercise: "较少",
+    alcohol: "偶尔",
+    archiveComplete: true,
+    archiveCount: 4,
+    knownConditions: ["合成既往状况记录A"],
+  },
+  P004: {
+    systolic: 112,
+    diastolic: 72,
+    totalCholesterol: 4.5,
+    fastingGlucose: 4.9,
+    bmi: 19.6,
+    smoking: "无吸烟记录",
+    occupation: "行政人员",
+    education: "研究生",
+    diet: "规律",
+    exercise: "规律",
+    alcohol: "无",
+    archiveComplete: false,
+    archiveCount: 1,
+    knownConditions: [],
+  },
+  P005: {
+    systolic: 138,
+    diastolic: 86,
+    totalCholesterol: 5.8,
+    fastingGlucose: 6.4,
+    bmi: 25.4,
+    smoking: "无吸烟记录",
+    occupation: "生产人员",
+    education: "专科",
+    diet: "待改善",
+    exercise: "较少",
+    alcohol: "无",
+    archiveComplete: true,
+    archiveCount: 3,
+    knownConditions: ["合成既往状况记录B"],
+  },
+  P006: {
+    systolic: 126,
+    diastolic: 80,
+    totalCholesterol: 4.8,
+    fastingGlucose: 5.3,
+    bmi: 23.1,
+    smoking: "有吸烟记录",
+    occupation: "生产人员",
+    education: "专科",
+    diet: "规律",
+    exercise: "偶尔",
+    alcohol: "偶尔",
+    archiveComplete: true,
+    archiveCount: 2,
+    knownConditions: [],
+  },
+  P007: {
+    systolic: 134,
+    diastolic: 84,
+    totalCholesterol: 5.2,
+    fastingGlucose: 6.1,
+    bmi: 24.6,
+    smoking: "无吸烟记录",
+    occupation: "设计人员",
+    education: "本科",
+    diet: "待改善",
+    exercise: "偶尔",
+    alcohol: "偶尔",
+    archiveComplete: false,
+    archiveCount: 2,
+    knownConditions: [],
+  },
+  P008: {
+    systolic: 116,
+    diastolic: 74,
+    totalCholesterol: 4.4,
+    fastingGlucose: 5,
+    bmi: 21.2,
+    smoking: "无吸烟记录",
+    occupation: "行政人员",
+    education: "本科",
+    diet: "规律",
+    exercise: "规律",
+    alcohol: "无",
+    archiveComplete: true,
+    archiveCount: 1,
+    knownConditions: [],
+  },
+};
+export const getPatientHealth = (p: Row) => p.health ?? healthSeed[p.id] ?? {};
+const healthFields: FieldSpec[] = [
+  field("systolic", "收缩压 / mmHg", "number", undefined, false),
+  field("diastolic", "舒张压 / mmHg", "number", undefined, false),
+  field("totalCholesterol", "总胆固醇 / mmol/L", "number", undefined, false),
+  field("fastingGlucose", "空腹血糖 / mmol/L", "number", undefined, false),
+  field("bmi", "体重指数 BMI", "number", undefined, false),
+  field(
+    "smoking",
+    "吸烟记录",
+    "select",
+    ["无吸烟记录", "有吸烟记录", "已戒烟"],
+    false,
+  ),
+  field(
+    "occupation",
+    "职业",
+    "select",
+    ["技术人员", "设计人员", "行政人员", "生产人员", "管理人员"],
+    false,
+  ),
+  field(
+    "education",
+    "文化程度",
+    "select",
+    ["高中", "专科", "本科", "研究生"],
+    false,
+  ),
+  field("diet", "膳食自评", "select", ["规律", "待改善"], false),
+  field("exercise", "运动频率", "select", ["规律", "偶尔", "较少"], false),
+  field("alcohol", "饮酒记录", "select", ["无", "偶尔", "经常"], false),
+  field("archiveCount", "建档次数", "number", undefined, false),
+];
+type DemoQuestion = [string, string, string[]];
+const assessmentForms: Record<string, DemoQuestion[]> = {
+  慢病风险教育: [
     ["activity", "日常活动频率", ["规律", "偶尔", "较少"]],
     ["sleep", "近期自评睡眠", ["良好", "一般", "待改善"]],
     ["diet", "自评饮食规律", ["规律", "一般", "不规律"]],
     ["smoke", "是否有吸烟习惯", ["否", "是"]],
     ["followup", "是否了解报告随访安排", ["是", "否"]],
-  ];
+  ],
+  心理健康自评流程: [
+    [
+      "mood",
+      "近一周情绪舒适感",
+      ["总是舒适", "大多舒适", "偶尔舒适", "很少舒适"],
+    ],
+    ["stress", "近一周压力感受频率", ["无", "偶尔", "多次", "几乎每天"]],
+    ["energy", "日常精力自评", ["充足", "一般", "偏少", "很少"]],
+    ["connection", "可获得的交流支持", ["充分", "基本充分", "较少", "暂无"]],
+  ],
+  中医体质辨识流程: [
+    ["cold", "怕冷感受频率", ["无", "偶尔", "经常"]],
+    ["warm", "怕热感受频率", ["无", "偶尔", "经常"]],
+    ["tired", "容易疲倦感受", ["无", "偶尔", "经常"]],
+    ["digest", "餐后舒适感变化", ["无", "偶尔", "经常"]],
+    ["dry", "口干感受频率", ["无", "偶尔", "经常"]],
+    ["rest", "休息后精力恢复", ["充分", "一般", "较少"]],
+  ],
+  设备慢病评估套餐: [
+    ["deviceSource", "测量资料来源", ["演示血压设备", "演示综合设备"]],
+    ["measurementState", "本次测量资料完整性", ["完整", "缺少部分字段"]],
+    ["deviceConfirmed", "已核对合成设备编号", ["是", "否"]],
+  ],
+  机构团检报告: [
+    ["scope", "机构汇总口径", ["全体样本", "重点关注样本"]],
+    ["archiveCheck", "档案完整性复核", ["已核对", "待核对"]],
+  ],
+};
+export function scoreDemoAssessment(
+  type: string,
+  answers: Row,
+  metrics: Row = {},
+) {
+  const qs = assessmentForms[type] || [];
+  const raw = qs.map(([key, , options]) =>
+    Math.max(0, options.indexOf(answers[key])),
+  );
+  let dimensions: Row[];
+  if (type === "中医体质辨识流程")
+    dimensions = [
+      { name: "寒热感受演示维度", value: raw[0] + raw[1], max: 4 },
+      { name: "精力作息演示维度", value: raw[2] + raw[5], max: 4 },
+      { name: "消化与口干感受演示维度", value: raw[3] + raw[4], max: 4 },
+    ];
+  else if (type === "心理健康自评流程")
+    dimensions = [
+      { name: "情绪与压力演示分值", value: raw[0] + raw[1], max: 6 },
+      { name: "精力与支持演示分值", value: raw[2] + raw[3], max: 6 },
+    ];
+  else if (type === "设备慢病评估套餐")
+    dimensions = [
+      {
+        name: "测量字段已采集数",
+        value: ["systolic", "diastolic", "fastingGlucose", "bmi"].filter(
+          (k) =>
+            metrics[k] !== "" &&
+            metrics[k] !== undefined &&
+            Number.isFinite(Number(metrics[k])),
+        ).length,
+        max: 4,
+      },
+    ];
+  else if (type === "机构团检报告")
+    dimensions = [
+      {
+        name: "纳入客户数",
+        value: Number(metrics.people || 0),
+        max: Number(metrics.people || 0),
+      },
+      {
+        name: "完整档案数",
+        value: Number(metrics.complete || 0),
+        max: Number(metrics.people || 0),
+      },
+    ];
+  else
+    dimensions = [
+      {
+        name: "生活方式教育关注项",
+        value: raw.reduce((a, b) => a + (b > 0 ? 1 : 0), 0),
+        max: qs.length,
+      },
+    ];
+  return {
+    modelVersion: "SYNTHETIC-EDU-2",
+    total: dimensions.reduce((s, d) => s + d.value, 0),
+    max: dimensions.reduce((s, d) => s + d.max, 0),
+    dimensions,
+    disclaimer:
+      "独立合成演示计分，不是已验证临床量表，不代表医学评估结论，不输出心理诊断或中医体质诊断。",
+  };
+}
+function Assessments() {
+  const { state, act } = useDemo() as any;
+  const [patient, setPatient] = useState(state.patients[0]?.id);
+  const [type, setType] = useState("慢病风险教育");
+  const defaultAnswers = (t: string) =>
+    Object.fromEntries(
+      assessmentForms[t].map(([key, , opts]) => [
+        key,
+        t === "慢病风险教育" && ["activity", "sleep", "diet"].includes(key)
+          ? opts[1]
+          : opts[0],
+      ]),
+    );
+  const [answers, setAnswers] = useState<Row>(defaultAnswers("慢病风险教育"));
+  const [metrics, setMetrics] = useState<Row>(
+    getPatientHealth(state.patients[0] || {}),
+  );
+  const [company, setCompany] = useState(state.patients[0]?.company || "");
+  const [generated, setGenerated] = useState<Row | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [review, setReview] = useState("");
+  const questions = assessmentForms[type];
   const reports = (state.records.assessments || []).filter(
     (r: Row) => r.patientId === patient,
   );
+  const changeType = (t: string) => {
+    setType(t);
+    setAnswers(defaultAnswers(t));
+    setGenerated(null);
+    setSaved(false);
+  };
   return (
     <div className="health-assess-grid">
       <section className="panel ops-panel">
         <div className="ops-panel-title">
           <div>
             <h2>风险评估工作台</h2>
-            <p>按客户与人群选择问卷，演示采集与报告存档流程</p>
+            <p>不同评估类型使用独立字段、演示维度与计分版本。</p>
           </div>
           <ClipboardList size={22} />
         </div>
@@ -1477,15 +1908,23 @@ function Assessments() {
             <label className="ops-field">
               <span>评估客户</span>
               <select
+                aria-label="评估客户"
                 value={patient}
                 onChange={(e) => {
                   setPatient(e.target.value);
+                  setMetrics(
+                    getPatientHealth(
+                      state.patients.find(
+                        (p: Row) => p.id === e.target.value,
+                      ) || {},
+                    ),
+                  );
                   setGenerated(null);
                   setSaved(false);
                 }}
               >
                 {state.patients.map((p: Row) => (
-                  <option key={p.id} value={p.id}>
+                  <option value={p.id} key={p.id}>
                     {p.name} · {p.profileType || "成人档案"}
                   </option>
                 ))}
@@ -1494,41 +1933,63 @@ function Assessments() {
             <label className="ops-field">
               <span>评估类型</span>
               <select
+                aria-label="评估类型"
                 value={type}
-                onChange={(e) => {
-                  setType(e.target.value);
-                  setGenerated(null);
-                  setSaved(false);
-                }}
+                onChange={(e) => changeType(e.target.value)}
               >
-                {[
-                  "慢病风险教育",
-                  "心理健康自评流程",
-                  "中医体质辨识流程",
-                  "设备慢病评估套餐",
-                  "机构团检报告",
-                ].map((x) => (
-                  <option key={x}>{x}</option>
+                {Object.keys(assessmentForms).map((t) => (
+                  <option key={t}>{t}</option>
                 ))}
               </select>
             </label>
           </div>
           <Banner>
-            此简化问卷不属于临床量表，不生成疾病风险评分、心理诊断或中医体质结论。
+            心理、中医、慢病计分均为明确标注的非临床模型，只验证不同表单、算法、存档与复核流程。
           </Banner>
+          {type === "设备慢病评估套餐" && (
+            <div className="ops-form-grid">
+              <FormFields
+                fields={healthFields
+                  .slice(0, 5)
+                  .filter((f) => f.key !== "totalCholesterol")}
+                draft={metrics}
+                setDraft={(m) => {
+                  setMetrics(m);
+                  setGenerated(null);
+                  setSaved(false);
+                }}
+              />
+            </div>
+          )}
+          {type === "机构团检报告" && (
+            <label className="ops-field" style={{ marginTop: 16 }}>
+              <span>团检机构</span>
+              <select
+                aria-label="评估团检机构"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+              >
+                {[
+                  ...new Set<string>(state.patients.map((p: Row) => p.company)),
+                ].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+          )}
           {questions.map(([key, label, opts], i) => (
-            <div className="health-question" key={String(key)}>
+            <div className="health-question" key={key}>
               <label>
                 <span>{String(i + 1).padStart(2, "0")}</span>
                 {label}
               </label>
-              <div>
-                {(opts as string[]).map((o) => (
+              <div style={{ flexWrap: "wrap" }}>
+                {opts.map((o) => (
                   <button
-                    className={answers[String(key)] === o ? "selected" : ""}
                     key={o}
+                    className={answers[key] === o ? "selected" : ""}
                     onClick={() => {
-                      setAnswers({ ...answers, [String(key)]: o });
+                      setAnswers({ ...answers, [key]: o });
                       setGenerated(null);
                       setSaved(false);
                     }}
@@ -1542,6 +2003,24 @@ function Assessments() {
           <button
             className="btn btn-primary health-full"
             onClick={() => {
+              const cohort = state.patients.filter(
+                (p: Row) =>
+                  p.company === company &&
+                  (answers.scope !== "重点关注样本" ||
+                    ["A类", "B类"].includes(p.risk)),
+              );
+              const snapshot =
+                type === "机构团检报告"
+                  ? {
+                      people: cohort.length,
+                      complete: cohort.filter(
+                        (p: Row) => getPatientHealth(p).archiveComplete,
+                      ).length,
+                      company,
+                      patientIds: cohort.map((p: Row) => p.id),
+                    }
+                  : metrics;
+              const score = scoreDemoAssessment(type, answers, snapshot);
               setGenerated({
                 id: fid(),
                 name: `${type} · ${state.patients.find((p: Row) => p.id === patient)?.name}`,
@@ -1549,9 +2028,11 @@ function Assessments() {
                 category: type,
                 date: dateNow(),
                 status: "待专业复核",
-                answers,
-                description:
-                  "已完成 5 项示例问卷。此结果仅证明数据采集流程完成，不代表医学评估结论。",
+                answers: { ...answers },
+                metricSnapshot: { ...snapshot },
+                score,
+                questionSnapshot: questions,
+                description: `已完成 ${questions.length} 项 ${type} 数据采集。${score.disclaimer}`,
               });
               setSaved(false);
             }}
@@ -1562,11 +2043,11 @@ function Assessments() {
         </div>
       </section>
       <div>
-        <section className="panel ops-panel health-assess-result">
+        <section className="panel ops-panel">
           <div className="ops-panel-title">
             <div>
               <h2>评估报告</h2>
-              <p>采集结果与专业复核分开管理</p>
+              <p>表单答案、输入指标及演示算法结果均保存快照</p>
             </div>
             <ShieldCheck size={21} />
           </div>
@@ -1578,12 +2059,22 @@ function Assessments() {
               <h3>问卷采集完成</h3>
               <p>{generated.description}</p>
               <div className="health-answer-summary">
-                {questions.map(([key, label]) => (
-                  <div key={String(key)}>
-                    <span>{label}</span>
-                    <b>{answers[String(key)]}</b>
+                {(generated.score?.dimensions || []).map((d: Row) => (
+                  <div key={d.name}>
+                    <span>{d.name}</span>
+                    <b>
+                      {d.value} / {d.max}
+                    </b>
                   </div>
                 ))}
+                {(generated.questionSnapshot || questions).map(
+                  ([key, label]: DemoQuestion) => (
+                    <div key={key}>
+                      <span>{label}</span>
+                      <b>{generated.answers[key]}</b>
+                    </div>
+                  ),
+                )}
               </div>
               <button
                 className="btn btn-primary health-full"
@@ -1599,34 +2090,48 @@ function Assessments() {
                 {saved ? "已存入客户评估档案" : "保存报告，等待专业复核"}
               </button>
               {saved && (
-                <button
-                  className="btn health-full"
-                  style={{ marginTop: 10 }}
-                  onClick={() => {
-                    const updated = {
-                      ...generated,
-                      status: "已复核（模拟）",
-                      reviewedAt: dateNow(),
-                    };
-                    act({
-                      type: "UPSERT_RECORD",
-                      payload: { collection: "assessments", record: updated },
-                    });
-                    setGenerated(updated);
-                  }}
-                  disabled={generated.status === "已复核（模拟）"}
-                >
-                  {generated.status === "已复核（模拟）"
-                    ? "已完成模拟复核"
-                    : "记录专业复核（模拟）"}
-                </button>
+                <>
+                  <label
+                    className="ops-field"
+                    style={{ marginTop: 16, textAlign: "left" }}
+                  >
+                    <span>专业复核记录（合成）</span>
+                    <textarea
+                      aria-label="评估复核记录"
+                      value={review}
+                      onChange={(e) => setReview(e.target.value)}
+                      placeholder="记录资料核验结果，不自动添加诊疗建议"
+                    />
+                  </label>
+                  <button
+                    className="btn health-full"
+                    disabled={!review.trim()}
+                    style={{ marginTop: 10 }}
+                    onClick={() => {
+                      const next = {
+                        ...generated,
+                        status: "已复核（模拟）",
+                        review,
+                        reviewedAt: dateNow(),
+                      };
+                      act({
+                        type: "UPSERT_RECORD",
+                        payload: { collection: "assessments", record: next },
+                      });
+                      setGenerated(next);
+                      setReview("");
+                    }}
+                  >
+                    保存专业复核记录
+                  </button>
+                </>
               )}
             </div>
           ) : (
             <div className="ops-empty">
               <ClipboardList size={38} />
               <h3>等待采集结果</h3>
-              <p>填写左侧问卷后可生成演示报告</p>
+              <p>完成左侧独立表单后生成演示报告</p>
             </div>
           )}
         </section>
@@ -1639,14 +2144,16 @@ function Assessments() {
             <div className="health-attention-row" key={r.id}>
               <div>
                 <b>{r.category}</b>
-                <small>{r.date}</small>
+                <small>
+                  {r.date} · {r.score?.modelVersion || "旧版"} · {r.status}
+                </small>
               </div>
               <button
                 className="ops-text-btn"
                 onClick={() => {
                   setGenerated(r);
-                  setAnswers(r.answers);
                   setType(r.category);
+                  setAnswers(r.answers);
                   setSaved(true);
                 }}
               >
@@ -1654,14 +2161,12 @@ function Assessments() {
               </button>
             </div>
           ))}
-          {!reports.length && (
-            <p className="ops-muted">该客户暂无已保存评估报告</p>
-          )}
         </section>
       </div>
     </div>
   );
 }
+
 const dimensions = [
   "危险因素",
   "年龄",
@@ -1679,42 +2184,83 @@ const dimensions = [
   "运动",
   "饮酒",
 ];
-function cohortLabel(p: Row, i: number, dimension: string, previous = false) {
-  const n = i + (previous ? 1 : 0);
+export function cohortLabel(
+  p: Row,
+  _index: number,
+  dimension: string,
+  previous = false,
+) {
+  const h = previous ? p.healthPrevious : getPatientHealth(p);
+  if (previous && !h) return "无上期数据";
+  if (dimension === "年龄")
+    return p.age < 35 ? "35 岁以下" : p.age < 50 ? "35–49 岁" : "50 岁及以上";
+  if (dimension === "性别") return p.sex || "待补充";
+  if (dimension === "危险因素")
+    return p.risk === "A类"
+      ? "重点复核"
+      : p.risk === "B类"
+        ? "持续关注"
+        : "一般管理";
+  if (!h) return "待补充";
+  const num = (key: string) =>
+    h[key] !== undefined && h[key] !== "" && Number.isFinite(Number(h[key]))
+      ? Number(h[key])
+      : null;
   switch (dimension) {
-    case "年龄":
-      return p.age < 35 ? "35 岁以下" : p.age < 50 ? "35–49 岁" : "50 岁及以上";
-    case "性别":
-      return p.sex;
-    case "危险因素":
-    case "慢病分类":
-      return p.risk === "A类"
-        ? "重点复核"
-        : p.risk === "B类"
-          ? "持续关注"
-          : "一般管理";
     case "血压":
-      return n % 4 === 0 ? "待复核" : "已记录";
+      return num("systolic") === null || num("diastolic") === null
+        ? "待补充"
+        : num("systolic")! >= 140 || num("diastolic")! >= 90
+          ? "≥140/90 数值组"
+          : "＜140/90 数值组";
     case "血脂":
-      return n % 3 === 0 ? "待复核" : "已记录";
+      return num("totalCholesterol") === null
+        ? "待补充"
+        : num("totalCholesterol")! < 5
+          ? "＜5.0 mmol/L"
+          : num("totalCholesterol")! < 6
+            ? "5.0–5.9 mmol/L"
+            : "≥6.0 mmol/L";
     case "血糖":
-      return n % 5 === 0 ? "待复核" : "已记录";
-    case "吸烟":
-      return n % 3 === 0 ? "有吸烟记录" : "无吸烟记录";
+      return num("fastingGlucose") === null
+        ? "待补充"
+        : num("fastingGlucose")! < 6
+          ? "＜6.0 mmol/L"
+          : num("fastingGlucose")! < 7
+            ? "6.0–6.9 mmol/L"
+            : "≥7.0 mmol/L";
     case "体重":
-      return ["一般区间", "偏高区间", "一般区间", "待补充"][n % 4];
+      return num("bmi") === null
+        ? "待补充"
+        : num("bmi")! < 20
+          ? "BMI ＜20"
+          : num("bmi")! < 25
+            ? "BMI 20–24.9"
+            : "BMI ≥25";
+    case "吸烟":
+      return h.smoking || "待补充";
+    case "慢病分类":
+      return !Array.isArray(h.knownConditions)
+        ? "待补充"
+        : h.knownConditions.length
+          ? h.knownConditions.join("、")
+          : "未记录既往状况";
     case "建档情况":
-      return n % 6 === 0 ? "资料待补充" : "已建档";
+      return h.archiveComplete === undefined
+        ? "待补充"
+        : h.archiveComplete
+          ? "档案完整"
+          : "资料待补充";
     case "职业":
-      return ["技术人员", "行政人员", "生产人员"][n % 3];
+      return h.occupation || "待补充";
     case "文化程度":
-      return ["本科", "专科", "研究生"][n % 3];
+      return h.education || "待补充";
     case "膳食":
-      return n % 3 === 0 ? "自评待改善" : "自评规律";
+      return h.diet || "待补充";
     case "运动":
-      return n % 3 === 0 ? "较少" : n % 3 === 1 ? "偶尔" : "规律";
+      return h.exercise || "待补充";
     case "饮酒":
-      return n % 3 === 0 ? "偶尔饮酒" : "无饮酒记录";
+      return h.alcohol || "待补充";
     default:
       return "未分类";
   }
@@ -1787,7 +2333,7 @@ function Enterprise() {
         </div>
       </div>
       <Banner>
-        所有客户与指标均为合成演示数据。生活方式、职业等维度为预置样本，图表不能用于临床或真实企业决策。
+        所有客户与指标均为合成演示数据。图表按客户档案中稳定保存的指标和生活方式字段分类；数值区间仅为演示统计分箱，不是临床判断。
       </Banner>
       <div className="ops-tabbar">
         {[
@@ -2080,6 +2626,7 @@ function Enterprise() {
                     <th>工作单位</th>
                     <th>{dimension}</th>
                     <th>关注标识</th>
+                    <th>建档次数</th>
                     <th>随访任务</th>
                   </tr>
                 </thead>
@@ -2104,6 +2651,7 @@ function Enterprise() {
                       <td>
                         <Tag value={p.risk} />
                       </td>
+                      <td>{getPatientHealth(p).archiveCount ?? "未记录"}</td>
                       <td>
                         {
                           state.tasks.filter((t: Row) => t.patientId === p.id)
@@ -2164,7 +2712,7 @@ function Enterprise() {
               ))}
               <h3>统计口径</h3>
               <p>
-                本期来自当前浏览器中的客户样本。非基础档案维度及上期数据使用预置合成分类。小样本不宜外推，正式分析需经数据核验。
+                本期来自当前浏览器中的客户样本。所有维度来自客户档案字段；未提供字段或上期记录时明确列为缺失。分箱是描述性统计，不代表临床风险，小样本不可外推。
               </p>
             </div>
             <div className="ops-modal-actions">
@@ -2208,6 +2756,991 @@ function Enterprise() {
     </div>
   );
 }
+const shiftDay = (date: string, days: number) => {
+  const d = new Date(`${date}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+export function parsePlanUnits(text: string) {
+  return text
+    .split(/\r?\n/)
+    .filter((s) => s.trim())
+    .map((line, i) => {
+      const [day, ...title] = line.split("|");
+      return {
+        id: `U${i + 1}`,
+        day: Number(day),
+        title: title.join("|").trim(),
+      };
+    });
+}
+function PlanComposer() {
+  const { state, act } = useDemo() as any;
+  const templates = useCollection(templatesSpec).rows;
+  useCollection(planSpec);
+  const [patientId, setPatientId] = useState(state.patients[0]?.id || "");
+  const [templateId, setTemplateId] = useState("HT1001");
+  const [terms, setTerms] = useState<string[]>([]);
+  const [start, setStart] = useState(dateNow());
+  const [owner, setOwner] = useState("陈晓");
+  const [confirmed, setConfirmed] = useState(false);
+  const [applicationComplete, setApplicationComplete] = useState(false);
+  // React batches state updates; this synchronous latch also guards stale handlers.
+  const applicationSubmitted = useRef(false);
+  const [notice, setNotice] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState("");
+  const [reason, setReason] = useState("");
+  const person = state.patients.find((p: Row) => p.id === patientId);
+  const template = templates.find((t) => t.id === templateId);
+  const termRows = templates.filter(
+    (t) =>
+      ["处方词条", "干预词条", "评估医嘱", "再检推荐"].includes(t.category) &&
+      t.status === "已启用",
+  );
+  const units = parsePlanUnits(
+    template?.unitsText || "0|登记基线\n30|计划结果回访",
+  );
+  const chosenTerms = termRows.filter((t) => terms.includes(t.id));
+  const rechecks = [
+    ...new Set<string>(
+      chosenTerms.flatMap((t) =>
+        String(t.recheckItems || "")
+          .split(/[，,]/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    ),
+  ];
+  const plans = (state.records.healthPlans || []).filter(
+    (p: Row) => p.patientId === patientId,
+  );
+  const selected = plans.find((p: Row) => p.id === selectedPlan) || plans[0];
+  const linked = state.tasks.filter((t: Row) => t.planId === selected?.id);
+  const allowedPopulation = person?.profileType?.includes("儿童")
+    ? "儿童"
+    : person?.profileType?.includes("孕产")
+      ? "孕产妇"
+      : person?.profileType?.includes("精神")
+        ? "精神卫生管理"
+        : "成人";
+  const valid =
+    !!template &&
+    template.status === "已启用" &&
+    [allowedPopulation, "通用"].includes(template.population) &&
+    units.length > 0 &&
+    units.every(
+      (u) => Number.isInteger(u.day) && u.day >= 0 && u.day <= 365 && u.title,
+    );
+  const create = () => {
+    if (applicationSubmitted.current) return;
+    if (!valid || !confirmed || !owner.trim() || !start) {
+      setNotice("请核对适用人群、执行单元、负责人及专业复核确认。");
+      return;
+    }
+    applicationSubmitted.current = true;
+    setApplicationComplete(true);
+    const id = fid(),
+      allUnits = [
+        ...units,
+        ...rechecks.map((title, i) => ({
+          id: `R${i + 1}`,
+          day: 30,
+          title: `再检资料复核 · ${title}`,
+        })),
+      ];
+    const snapshot = JSON.parse(JSON.stringify(template));
+    const plan = {
+      id,
+      name: `${template.name} · ${person.name}`,
+      patient: person.name,
+      patientId,
+      category:
+        template.category === "健康处方模板" ? "非药物教育" : "成人健康管理",
+      owner,
+      date: start,
+      period: `${Math.max(...allUnits.map((u) => u.day))} 天`,
+      description: [
+        template.description,
+        ...chosenTerms.map((t) => `${t.category}：${t.description}`),
+      ].join("\n"),
+      status: "进行中",
+      templateId,
+      sourceVersion: template.updatedAt || "seed-v1",
+      templateSnapshot: snapshot,
+      termsSnapshot: JSON.parse(JSON.stringify(chosenTerms)),
+      units: allUnits.map((u) => ({
+        ...u,
+        date: shiftDay(start, u.day),
+        taskId: `${id}-${u.id}`,
+      })),
+      history: [{ at: dateNow(), text: "由启用模板应用，已确认合成专业复核" }],
+    };
+    act({
+      type: "UPSERT_RECORD",
+      payload: { collection: "healthPlans", record: plan },
+    });
+    allUnits.forEach((u) =>
+      act({
+        type: "ADD_TASK",
+        payload: {
+          id: `${id}-${u.id}`,
+          planId: id,
+          unitId: u.id,
+          title: `${template.name} · ${u.title}`,
+          patientId,
+          owner,
+          date: shiftDay(start, u.day),
+          period: `${u.day} 天`,
+          risk: person.risk,
+          description: plan.description,
+        },
+      }),
+    );
+    if (
+      template.category === "健康处方模板" ||
+      chosenTerms.some((t) => t.category === "处方词条")
+    )
+      act({
+        type: "UPSERT_RECORD",
+        payload: {
+          collection: "medicalRecords",
+          record: {
+            id: `RX-${id}`,
+            name: `${person.name} · 模板应用记录`,
+            patient: person.name,
+            patientId,
+            category: "非药物处方记录",
+            owner,
+            date: start,
+            description: plan.description,
+            status: "已复核",
+            sourcePlanId: id,
+            templateSnapshot: snapshot,
+          },
+        },
+      });
+    setSelectedPlan(id);
+    setConfirmed(false);
+    setNotice(
+      `已应用模板，生成 1 项计划、${allUnits.length} 项关联任务${template.category === "健康处方模板" || chosenTerms.some((t) => t.category === "处方词条") ? "和 1 份处方资料记录" : ""}。`,
+    );
+  };
+  return (
+    <section className="panel ops-panel" style={{ marginBottom: 24 }}>
+      <div className="ops-panel-title">
+        <div>
+          <h2>模板应用与执行工作台</h2>
+          <p>模板、词条、再检项目会保存快照，并生成客户计划与实际随访任务。</p>
+        </div>
+        <Target size={22} />
+      </div>
+      <Banner>
+        计划内容为教育性合成模板。用药、运动强度和诊疗决定必须由专业人员在真实系统另行确认。
+      </Banner>
+      <div className="ops-form-grid">
+        <label className="ops-field">
+          <span>计划服务客户</span>
+          <select
+            aria-label="计划服务客户"
+            value={patientId}
+            onChange={(e) => {
+              setPatientId(e.target.value);
+              setSelectedPlan("");
+              setConfirmed(false);
+            }}
+          >
+            {state.patients.map((p: Row) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="ops-field">
+          <span>应用模板</span>
+          <select
+            aria-label="应用计划模板"
+            value={templateId}
+            onChange={(e) => {
+              setTemplateId(e.target.value);
+              setConfirmed(false);
+            }}
+          >
+            {templates
+              .filter((t) =>
+                ["健康计划模板", "健康处方模板", "计划单元"].includes(
+                  t.category,
+                ),
+              )
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} · {t.status} · {t.population}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label className="ops-field">
+          <span>计划开始日期</span>
+          <input
+            type="date"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+            aria-label="计划开始日期"
+          />
+        </label>
+        <label className="ops-field">
+          <span>任务负责人</span>
+          <input
+            value={owner}
+            onChange={(e) => setOwner(e.target.value)}
+            aria-label="计划任务负责人"
+          />
+        </label>
+        <div className="ops-span2">
+          <h3 style={{ fontSize: 13 }}>选择可应用词条与再检推荐</h3>
+          <div className="ops-permissions">
+            {termRows.map((t) => (
+              <label key={t.id}>
+                <input
+                  type="checkbox"
+                  checked={terms.includes(t.id)}
+                  onChange={(e) =>
+                    setTerms(
+                      e.target.checked
+                        ? [...terms, t.id]
+                        : terms.filter((id) => id !== t.id),
+                    )
+                  }
+                />
+                {t.name} · {t.category}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="ops-table-wrap">
+        <table className="ops-table" aria-label="计划任务预览">
+          <thead>
+            <tr>
+              <th>执行节点</th>
+              <th>生成任务</th>
+              <th>日期</th>
+            </tr>
+          </thead>
+          <tbody>
+            {units.map((u) => (
+              <tr key={u.id}>
+                <td>第 {u.day} 天</td>
+                <td>{u.title || "未填写"}</td>
+                <td>
+                  {Number.isFinite(u.day) && u.day >= 0 && u.day <= 365 && start
+                    ? shiftDay(start, u.day)
+                    : "无效"}
+                </td>
+              </tr>
+            ))}
+            {rechecks.map((r) => (
+              <tr key={r}>
+                <td>第 30 天</td>
+                <td>再检资料复核 · {r}</td>
+                <td>{start ? shiftDay(start, 30) : "未设置"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!valid && (
+        <p className="ops-error" role="alert">
+          模板须启用且适合当前人群；执行单元格式为「0|任务名称」，天数为 0–365
+          的整数。
+        </p>
+      )}
+      <div className="ops-modal-actions">
+        <label
+          style={{
+            fontSize: 11,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={confirmed}
+            disabled={applicationComplete}
+            onChange={(e) => setConfirmed(e.target.checked)}
+          />
+          已确认模板及词条适合本次合成演示
+        </label>
+        <button
+          className="btn btn-primary"
+          disabled={applicationComplete || !valid || !confirmed}
+          onClick={create}
+        >
+          应用模板并生成计划任务
+        </button>
+        {applicationComplete && (
+          <button
+            className="btn"
+            onClick={() => {
+              applicationSubmitted.current = false;
+              setApplicationComplete(false);
+              setConfirmed(false);
+              setNotice("已开始新的模板应用，请重新核对并确认。");
+            }}
+          >
+            开始新的模板应用
+          </button>
+        )}
+      </div>
+      {notice && (
+        <div className="ops-feedback" role="status">
+          {notice}
+        </div>
+      )}
+      {plans.length > 0 && (
+        <div style={{ padding: 24 }}>
+          <label className="ops-field">
+            <span>已应用计划</span>
+            <select
+              value={selected?.id || ""}
+              onChange={(e) => setSelectedPlan(e.target.value)}
+              aria-label="已应用计划"
+            >
+              {plans.map((p: Row) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="health-effect-row" style={{ padding: "20px 0" }}>
+            <div>
+              <span>当前状态</span>
+              <strong>
+                <Tag value={selected?.status} />
+              </strong>
+            </div>
+            <div>
+              <span>关联任务完成</span>
+              <strong>
+                {linked.filter((t: Row) => t.status === "已完成").length} /{" "}
+                {linked.length}
+              </strong>
+            </div>
+          </div>
+          {linked.map((t: Row) => (
+            <div className="health-attention-row" key={t.id}>
+              <div>
+                <b>{t.title}</b>
+                <small>
+                  {t.date} · {t.owner}
+                </small>
+              </div>
+              <Tag value={t.status} />
+            </div>
+          ))}
+          <div className="ops-inline-controls" style={{ marginTop: 18 }}>
+            <input
+              aria-label="计划终止原因"
+              placeholder="终止计划时请填写原因"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              style={{ maxWidth: "none" }}
+            />
+            <button
+              className="btn"
+              disabled={selected?.status !== "进行中"}
+              onClick={() => {
+                if (!reason.trim()) {
+                  setNotice("请填写计划终止原因。");
+                  return;
+                }
+                linked
+                  .filter((t: Row) => !["已完成", "已取消"].includes(t.status))
+                  .forEach((t: Row) =>
+                    act({
+                      type: "UPDATE_TASK",
+                      payload: {
+                        id: t.id,
+                        status: "已取消",
+                        note: `计划终止：${reason}`,
+                      },
+                    }),
+                  );
+                act({
+                  type: "UPSERT_RECORD",
+                  payload: {
+                    collection: "healthPlans",
+                    record: {
+                      ...selected,
+                      status: "已终止",
+                      stopReason: reason,
+                    },
+                  },
+                });
+                setNotice("计划已终止，未完成关联任务已取消。");
+              }}
+            >
+              终止关联计划
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={
+                !linked.length ||
+                linked.some((t: Row) => t.status !== "已完成") ||
+                selected?.status !== "进行中"
+              }
+              onClick={() => {
+                act({
+                  type: "UPSERT_RECORD",
+                  payload: {
+                    collection: "healthPlans",
+                    record: {
+                      ...selected,
+                      status: "已完成",
+                      completedAt: dateNow(),
+                    },
+                  },
+                });
+                setNotice("已根据关联任务同步完成计划。");
+              }}
+            >
+              同步完成计划
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function GroupBuilder() {
+  const { state, act } = useDemo() as any;
+  const [name, setName] = useState("筛选客户健康服务组");
+  const [company, setCompany] = useState("所有单位");
+  const [risk, setRisk] = useState("全部风险");
+  const [type, setType] = useState("全部人群");
+  const [min, setMin] = useState(0);
+  const [max, setMax] = useState(120);
+  const [excluded, setExcluded] = useState<string[]>([]);
+  const [notice, setNotice] = useState("");
+  const people = state.patients.filter(
+    (p: Row) =>
+      (company === "所有单位" || p.company === company) &&
+      (risk === "全部风险" || p.risk === risk) &&
+      (type === "全部人群" || (p.profileType || "成人档案") === type) &&
+      p.age >= min &&
+      p.age <= max,
+  );
+  const selected = people.filter((p: Row) => !excluded.includes(p.id));
+  const save = (createTasks: boolean) => {
+    if (!name.trim() || min > max || !selected.length) {
+      setNotice("请填写分组名称、有效年龄范围并选择客户。");
+      return;
+    }
+    const id = `GROUP-${name.trim()}`;
+    const record = {
+      id,
+      name: name.trim(),
+      category: "工作分组",
+      condition: `${company} / ${risk} / ${type} / ${min}–${max} 岁`,
+      owner: "陈晓",
+      status: "已启用",
+      description: "由可执行条件生成的客户分组",
+      rule: { company, risk, type, minAge: min, maxAge: max },
+      memberIds: selected.map((p: Row) => p.id),
+      generatedAt: dateNow(),
+    };
+    act({
+      type: "UPSERT_RECORD",
+      payload: { collection: "healthGroups", record },
+    });
+    let created = 0;
+    if (createTasks)
+      selected.forEach((p: Row) => {
+        if (
+          !state.tasks.some(
+            (t: Row) =>
+              t.groupId === id &&
+              t.patientId === p.id &&
+              !["已完成", "已取消"].includes(t.status),
+          )
+        ) {
+          act({
+            type: "ADD_TASK",
+            payload: {
+              // Stable for the same customer and generation, including stale double-click handlers.
+              id: `GROUP-TASK-${JSON.stringify([
+                id,
+                p.id,
+                state.tasks.filter(
+                  (t: Row) => t.groupId === id && t.patientId === p.id,
+                ).length + 1,
+              ])}`,
+              title: `${name} · 分组健康教育`,
+              patientId: p.id,
+              groupId: id,
+              owner: "陈晓",
+              date: dateNow(),
+              risk: p.risk,
+            },
+          });
+          created++;
+        }
+      });
+    setNotice(
+      `已保存 ${selected.length} 人的分组${createTasks ? `，生成 ${created} 项新随访任务（自动跳过重复）` : ""}。`,
+    );
+  };
+  return (
+    <section className="panel ops-panel" style={{ marginBottom: 22 }}>
+      <div className="ops-panel-title">
+        <div>
+          <h2>可执行人群分组</h2>
+          <p>条件实时筛选并保存成员快照，可排除个别客户后建立干预任务。</p>
+        </div>
+      </div>
+      <div className="ops-form-grid">
+        <label className="ops-field">
+          <span>分组名称</span>
+          <input
+            aria-label="规则分组名称"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+        <label className="ops-field">
+          <span>单位条件</span>
+          <select
+            aria-label="分组单位条件"
+            value={company}
+            onChange={(e) => {
+              setCompany(e.target.value);
+              setExcluded([]);
+            }}
+          >
+            <option>所有单位</option>
+            {[
+              ...new Set<string>(state.patients.map((p: Row) => p.company)),
+            ].map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+        <label className="ops-field">
+          <span>风险条件</span>
+          <select
+            aria-label="分组风险条件"
+            value={risk}
+            onChange={(e) => setRisk(e.target.value)}
+          >
+            {["全部风险", "A类", "B类", "C类", "低风险"].map((r) => (
+              <option key={r}>{r}</option>
+            ))}
+          </select>
+        </label>
+        <label className="ops-field">
+          <span>人群入口</span>
+          <select
+            aria-label="分组人群条件"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+          >
+            {[
+              "全部人群",
+              "成人档案",
+              "儿童档案",
+              "孕产妇档案",
+              "精神卫生档案",
+            ].map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </label>
+        <label className="ops-field">
+          <span>最小年龄</span>
+          <input
+            type="number"
+            aria-label="分组最小年龄"
+            min={0}
+            value={min}
+            onChange={(e) => setMin(Number(e.target.value))}
+          />
+        </label>
+        <label className="ops-field">
+          <span>最大年龄</span>
+          <input
+            type="number"
+            aria-label="分组最大年龄"
+            max={120}
+            value={max}
+            onChange={(e) => setMax(Number(e.target.value))}
+          />
+        </label>
+      </div>
+      <div style={{ padding: "0 24px 20px" }}>
+        <h3 style={{ fontSize: 13 }}>
+          筛选预览 · {selected.length} / {people.length} 人
+        </h3>
+        <div className="ops-permissions">
+          {people.map((p: Row) => (
+            <label key={p.id}>
+              <input
+                type="checkbox"
+                checked={!excluded.includes(p.id)}
+                onChange={(e) =>
+                  setExcluded(
+                    e.target.checked
+                      ? excluded.filter((id) => id !== p.id)
+                      : [...excluded, p.id],
+                  )
+                }
+              />
+              {p.name} · {p.age} 岁 · {p.risk}
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="ops-modal-actions">
+        <button className="btn" onClick={() => save(false)}>
+          保存成员分组
+        </button>
+        <button className="btn btn-primary" onClick={() => save(true)}>
+          保存分组并生成干预任务
+        </button>
+      </div>
+      {notice && (
+        <div className="ops-feedback" role="status">
+          {notice}
+        </div>
+      )}
+    </section>
+  );
+}
+const riskSpec: WorkspaceSpec = {
+  key: "riskLevels",
+  label: "异常等级",
+  description: "异常等级名称和颜色同时用于档案和随访标签。",
+  fields: [],
+  seeds: [
+    { id: "RISK-A", code: "A类", name: "重点复核", color: "#c87b63" },
+    { id: "RISK-B", code: "B类", name: "持续关注", color: "#b9934e" },
+    { id: "RISK-C", code: "C类", name: "常规随访", color: "#638bb3" },
+    { id: "RISK-D", code: "D类", name: "一般管理", color: "#679c7e" },
+  ],
+};
+function RiskManagement() {
+  const { state, act } = useDemo() as any;
+  const levels = useCollection(riskSpec).rows;
+  const [levelId, setLevelId] = useState("RISK-A");
+  const [levelName, setLevelName] = useState("重点复核");
+  const [color, setColor] = useState("#c87b63");
+  const [code, setCode] = useState("A类");
+  const [orderId, setOrderId] = useState(state.appointments[0]?.id || "");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [notice, setNotice] = useState("");
+  const [title, setTitle] = useState("同订单异常合并随访");
+  const [newTitle, setNewTitle] = useState("");
+  const [unlock, setUnlock] = useState(false);
+  const actor = state.config.operatorName || state.config.role || "admin";
+  const order = state.appointments.find((a: Row) => a.id === orderId);
+  const alerts = (state.records.alerts || []).filter(
+    (a: Row) => a.appointmentId === orderId,
+  );
+  const locks = state.records.followupLocks || [];
+  const lock = locks.find(
+    (l: Row) => l.patientId === order?.patientId && l.status === "locked",
+  );
+  const save = (collection: string, record: Row) =>
+    act({ type: "UPSERT_RECORD", payload: { collection, record } });
+  const merge = () => {
+    if (!selected.length || !title.trim()) {
+      setNotice("请选择至少一项异常并填写任务名称。");
+      return;
+    }
+    if (lock && lock.owner !== actor) {
+      setNotice(`客户已由 ${lock.owner} 锁定，不能创建合并任务。`);
+      return;
+    }
+    const alertIds = [...selected].sort();
+    const key = `MERGE-${orderId}-${alertIds.join("|")}`;
+    if (state.tasks.some((t: Row) => t.mergeKey === key)) {
+      setNotice("相同订单和异常集合已合并，不重复创建任务。");
+      return;
+    }
+    const id = fid();
+    act({
+      type: "ADD_TASK",
+      payload: {
+        id,
+        title,
+        patientId: order.patientId,
+        appointmentId: orderId,
+        alertIds,
+        mergeKey: key,
+        risk:
+          levels.find((l) =>
+            selected.some(
+              (aid) => alerts.find((a: Row) => a.id === aid)?.risk === l.code,
+            ),
+          )?.code || "A类",
+        owner: actor,
+        date: dateNow(),
+        description: alerts
+          .filter((a: Row) => selected.includes(a.id))
+          .map((a: Row) => a.title)
+          .join("；"),
+      },
+    });
+    alerts
+      .filter((a: Row) => selected.includes(a.id))
+      .forEach((a: Row) => save("alerts", { ...a, followupTaskId: id }));
+    setNotice(
+      `已合并 ${selected.length} 项同订单异常为 1 项随访任务，并保存关联项。`,
+    );
+  };
+  return (
+    <>
+      <section className="panel ops-panel" style={{ marginBottom: 22 }}>
+        <div className="ops-panel-title">
+          <div>
+            <h2>异常等级名称与颜色</h2>
+            <p>修改后立即影响客户档案、队列任务中的同等级标签。</p>
+          </div>
+        </div>
+        <div className="ops-form-grid">
+          <label className="ops-field">
+            <span>编辑等级</span>
+            <select
+              aria-label="编辑异常等级"
+              value={levelId}
+              onChange={(e) => {
+                const r = levels.find((r) => r.id === e.target.value);
+                setLevelId(r?.id || "new");
+                setLevelName(r?.name || "");
+                setColor(r?.color || "#679c7e");
+                setCode(r?.code || "");
+              }}
+            >
+              {levels.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.code} · {l.name}
+                </option>
+              ))}
+              <option value="new">新增等级</option>
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>等级编码</span>
+            <input
+              aria-label="异常等级编码"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+          </label>
+          <label className="ops-field">
+            <span>显示名称</span>
+            <input
+              aria-label="异常等级名称"
+              value={levelName}
+              onChange={(e) => setLevelName(e.target.value)}
+            />
+          </label>
+          <label className="ops-field">
+            <span>等级颜色</span>
+            <input
+              aria-label="异常等级颜色"
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="ops-modal-actions">
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              if (
+                !code.trim() ||
+                !levelName.trim() ||
+                levels.some((l) => l.code === code && l.id !== levelId)
+              ) {
+                setNotice("编码和名称必填，编码不能重复。");
+                return;
+              }
+              save("riskLevels", {
+                id: levelId === "new" ? fid() : levelId,
+                code,
+                name: levelName,
+                color,
+              });
+              setNotice("等级已保存，相关客户与任务标签已更新。");
+            }}
+          >
+            保存等级显示
+          </button>
+        </div>
+      </section>
+      <section className="panel ops-panel">
+        <div className="ops-panel-title">
+          <div>
+            <h2>同订单异常合并与客户锁定</h2>
+            <p>
+              选择同一订单多项异常生成单个随访任务；锁定只保证当前浏览器规则。
+            </p>
+          </div>
+        </div>
+        <div className="ops-form-grid">
+          <label className="ops-field">
+            <span>体检订单</span>
+            <select
+              aria-label="异常合并订单"
+              value={orderId}
+              onChange={(e) => {
+                setOrderId(e.target.value);
+                setSelected([]);
+                setUnlock(false);
+              }}
+            >
+              {state.appointments.map((a: Row) => (
+                <option key={a.id} value={a.id}>
+                  {a.id} ·{" "}
+                  {state.patients.find((p: Row) => p.id === a.patientId)?.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ops-field">
+            <span>合并任务名称</span>
+            <input
+              aria-label="异常合并任务名称"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </label>
+        </div>
+        <div style={{ padding: "0 24px 20px" }}>
+          <Banner>
+            当前操作人员：{actor}。客户锁：
+            {lock ? `${lock.owner} 已锁定` : "未锁定"}。
+          </Banner>
+          <div className="ops-action-wrap" style={{ margin: "16px 0" }}>
+            {!lock ? (
+              <button
+                className="btn"
+                onClick={() => {
+                  save("followupLocks", {
+                    id: `LOCK-${order.patientId}`,
+                    patientId: order.patientId,
+                    owner: actor,
+                    status: "locked",
+                    lockedAt: cleanDateLocal(),
+                  });
+                  setNotice("当前回访客户已绑定本演示人员。");
+                }}
+              >
+                认领并锁定回访客户
+              </button>
+            ) : lock.owner === actor ? (
+              <button className="btn" onClick={() => setUnlock(true)}>
+                申请解锁当前客户
+              </button>
+            ) : (
+              <Tag value={`由 ${lock.owner} 锁定`} />
+            )}
+          </div>
+          {unlock && (
+            <div className="ops-inline-box">
+              <p>解锁后其他演示人员可以认领此客户，是否确认？</p>
+              <button
+                className="btn"
+                onClick={() => {
+                  save("followupLocks", {
+                    ...lock,
+                    status: "released",
+                    releasedAt: cleanDateLocal(),
+                  });
+                  setUnlock(false);
+                  setNotice("客户锁已释放。");
+                }}
+              >
+                确认解锁客户
+              </button>
+              <button className="btn" onClick={() => setUnlock(false)}>
+                保留锁定
+              </button>
+            </div>
+          )}
+          {alerts.map((a: Row) => (
+            <label key={a.id} className="health-attention-row">
+              <input
+                type="checkbox"
+                checked={selected.includes(a.id)}
+                onChange={(e) =>
+                  setSelected(
+                    e.target.checked
+                      ? [...selected, a.id]
+                      : selected.filter((id) => id !== a.id),
+                  )
+                }
+              />
+              <span>
+                {a.title} <Tag value={a.risk || "A类"} />
+              </span>
+              <small>{a.followupTaskId ? "已关联任务" : "未关联"}</small>
+            </label>
+          ))}
+          {!alerts.length && (
+            <p className="ops-muted">
+              此订单暂无异常记录。可在分检上报，或添加明确标注的合成异常用于演示。
+            </p>
+          )}
+          <div className="ops-inline-controls">
+            <input
+              aria-label="新增合成异常标题"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="仅用于演示的异常描述"
+              style={{ maxWidth: "none" }}
+            />
+            <button
+              className="btn"
+              onClick={() => {
+                if (!newTitle.trim()) return;
+                save("alerts", {
+                  id: fid(),
+                  title: newTitle,
+                  patientId: order.patientId,
+                  appointmentId: orderId,
+                  status: "待处理",
+                  risk: code,
+                  source: "手工合成示例",
+                  date: dateNow(),
+                });
+                setNewTitle("");
+              }}
+            >
+              添加合成异常
+            </button>
+          </div>
+        </div>
+        <div className="ops-modal-actions">
+          <button className="btn btn-primary" onClick={merge}>
+            合并所选异常为一个随访
+          </button>
+        </div>
+        {notice && (
+          <div className="ops-feedback" role="status">
+            {notice}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+const cleanDateLocal = () => new Date().toISOString();
+
 export default function Health({ section = "health" }: { section?: string }) {
   const [tab, setTab] = useState("profiles");
   if (section.replace(/^\//, "").startsWith("enterprise"))
@@ -2239,6 +3772,7 @@ export default function Health({ section = "health" }: { section?: string }) {
           ["plans", "健康计划"],
           ["templates", "方案与词条"],
           ["groups", "人群分组"],
+          ["riskRules", "异常与随访规则"],
         ].map(([key, title]) => (
           <button
             key={key}
@@ -2255,16 +3789,22 @@ export default function Health({ section = "health" }: { section?: string }) {
         <Followup />
       ) : tab === "assessments" ? (
         <Assessments />
+      ) : tab === "riskRules" ? (
+        <RiskManagement />
       ) : (
-        <RecordWorkspace
-          spec={
-            tab === "plans"
-              ? planSpec
-              : tab === "templates"
-                ? templatesSpec
-                : groupSpec
-          }
-        />
+        <>
+          {(tab === "plans" || tab === "templates") && <PlanComposer />}
+          {tab === "groups" && <GroupBuilder />}
+          <RecordWorkspace
+            spec={
+              tab === "plans"
+                ? planSpec
+                : tab === "templates"
+                  ? templatesSpec
+                  : groupSpec
+            }
+          />
+        </>
       )}
     </div>
   );
