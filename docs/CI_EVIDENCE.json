@@ -19,7 +19,7 @@
     "screenshotsActuallyOpened": 24,
     "visualReview": "No obvious page-level horizontal overflow or overlapping primary controls. Mobile administrative tables intentionally scroll within their container. Not an accessibility or physical-device acceptance test."
   },
-  "finalSource": "Pending its corresponding run; prior success is not extrapolated.",
+  "finalSource": "Frontend implementation cb79155a has passed corresponding CI and image review. Later documentation-only commits do not alter application/test source; their exact run is checked separately.",
   "extensionSnapshot": {
     "commit": "7521d965dc7970a8947732b971e487b583460d55",
     "run": "https://github.com/RedCreationTech/bookTickets/actions/runs/38336988898",
@@ -61,5 +61,23 @@
       "editable DOCX desktop"
     ],
     "skipReason": "Mobile project does not repeat desktop-only role screenshots"
+  },
+  "completionVerifiedSnapshot": {
+    "commit": "cb79155a5036ee45be876db8f898bbd820c92c2b",
+    "run": "https://github.com/RedCreationTech/bookTickets/actions/runs/38346614641",
+    "jobId": 115129416944,
+    "conclusion": "success",
+    "vitest": 627,
+    "chromiumPassed": 27,
+    "chromiumSkipped": 1,
+    "skipReason": "Mobile project does not repeat desktop-only role screenshots",
+    "artifactId": 11788982569,
+    "screenshotCount": 35,
+    "screenshotsActuallyOpened": 35,
+    "downloads": [
+      "actual PDF desktop and mobile",
+      "editable DOCX desktop and mobile"
+    ],
+    "visualReview": "All 35 original images inspected. Mobile report viewport overflow fixed and strict device-width assertions passed. Finance details image supplies loaded evidence where role-finance caught a lazy-loading instant. Long full-page captures position fixed UI at its capture viewport. Headless PDF iframe is blank; downloadable PDF bytes separately parsed and rendered successfully. See VISUAL_EVIDENCE.md."
   }
 }

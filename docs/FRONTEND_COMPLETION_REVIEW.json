@@ -3,8 +3,8 @@
     "baselineCommit": "9014e7600c199ff9366687d50d18826023da04ed",
     "baselineAuditSha256": "67f1ad5def5547e70dfbbc5666fa6d780dd3c613f673b4d2deb4637e0d02fbfc",
     "reviewedAt": "2026-10-13T03:56:41.782634+00:00",
-    "reviewState": "scope-and-independent-local-correctness-verified-browser-ci-pending",
-    "releaseAcceptance": "not-claimed",
+    "reviewState": "scope-local-regression-and-corresponding-browser-ci-verified",
+    "releaseAcceptance": "frontend-demonstration-only; production-business-acceptance-not-claimed",
     "integrationRegressionGate": [
       {
         "area": "跨模块财务一致性",
@@ -105,9 +105,16 @@
       "baselineC81D8Unchanged": true,
       "baselineArtifactUnchanged": true
     },
-    "verificationCaveat": "Vitest是jsdom/逻辑及文件格式测试；附件owner浏览器/Word/硬件声明不能替代独立执行。本轮未执行Chromium。成功测试不消除真实外部、临床、硬件和未澄清边界；固定220项关闭的是可操作本地演示差异。",
+    "verificationCaveat": "Vitest是jsdom/逻辑及文件格式测试；附件owner浏览器/Word/硬件声明不能替代独立执行。独立原子复核时未执行Chromium；集成后对应cb79155a已执行真实Chromium，结果见browserEvidence和TEST_REPORT。成功测试不消除真实外部、临床、硬件和未澄清边界；固定220项关闭的是可操作本地演示差异。",
     "integrationUpdatedAt": "2026-10-13T04:26:32.152364+00:00",
-    "integrationParentCommit": "a401d469070306e28d6c7b0d58175ce157a3d3fd"
+    "integrationParentCommit": "a401d469070306e28d6c7b0d58175ce157a3d3fd",
+    "browserEvidence": {
+      "commit": "cb79155a5036ee45be876db8f898bbd820c92c2b",
+      "run": "https://github.com/RedCreationTech/bookTickets/actions/runs/38346614641",
+      "passed": 27,
+      "skipped": 1,
+      "screenshotsViewed": 35
+    }
   },
   "items": [
     {
