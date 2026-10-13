@@ -358,6 +358,34 @@ test("ep01 总览片自动录屏", async ({ page }) => {
       ).toBeTruthy();
     });
 
+    await scene("queue", async () => {
+      await go("/queue");
+      // 上游把队列改成显式取号：先手动入队，再呼叫，画面才有真实叫号可拍。
+      const enroll = page.getByRole("button", { name: /手动入队/ });
+      if ((await enroll.count()) && (await enroll.first().isEnabled())) {
+        await enroll.first().click();
+        await nap(1.8);
+        await page.getByRole("button", { name: /确认入队/ }).click();
+        await nap(2);
+      }
+      const call = page.getByRole("button", { name: /呼叫下一位/ });
+      // 队列为空、未开放或没有在线导检用户时按钮禁用，此时只展示调度台。
+      if ((await call.count()) && (await call.first().isEnabled())) {
+        await call.first().click();
+        await expect(appText(/呼叫已分配至/)).toBeVisible({ timeout: 10000 });
+        await nap(2.6);
+      }
+      const mask = page.getByRole("checkbox", { name: /隐藏姓名中间字/ });
+      if ((await mask.count()) && (await mask.first().isEnabled())) {
+        await mask.first().check();
+        await nap(1.6);
+      }
+      await go("/queue?screen=1");
+      await nap(6);
+      await go("/queue");
+      await nap(1.5);
+    });
+
     await scene("exam", async () => {
       await go("/exam");
       await page
@@ -381,10 +409,10 @@ test("ep01 总览片自动录屏", async ({ page }) => {
         .fill("演示样例：空腹血糖高于演示阈值，建议复查并转入随访跟踪。");
       await nap(1.2);
       await page.getByRole("button", { name: /提交分检结果/ }).click();
-      await expect(appText(/重大异常已上报/)).toBeVisible({
-        timeout: 15000,
-      });
+      // 该弹窗依赖 Core.tsx 不再在 a?.id 变化时重置 critical；这里既是分镜动作也是回归哨兵。
+      await expect(appText(/重大异常已上报/)).toBeVisible({ timeout: 15000 });
       await nap(2.4);
+      // 全局处置弹窗随后盖在本页弹窗之上，关闭动作统一放到下一幕。
     });
 
     await scene("alert", async () => {
@@ -504,14 +532,6 @@ test("ep01 总览片自动录屏", async ({ page }) => {
       await nap(2.6);
       await page.getByRole("button", { name: "关闭", exact: true }).first().click();
       await nap(1.4);
-      await go("/queue?screen=1");
-      await nap(6);
-      await go("/queue");
-      const call = page.getByRole("button", { name: /呼叫下一位/ });
-      if (await call.count()) {
-        await call.first().click();
-        await nap(2.6);
-      }
     });
 
     await scene("health", async () => {

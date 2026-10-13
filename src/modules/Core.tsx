@@ -1866,7 +1866,6 @@ export function Exam() {
     setExamDoctor("");
     setExamRoom("");
     setSample(false);
-    setCritical(false);
   }, [a?.id]);
   const allDepartments = [
     ...new Set(clinicalRules(state).map((r) => r.department)),
