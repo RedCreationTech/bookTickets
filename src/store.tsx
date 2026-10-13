@@ -183,24 +183,40 @@ export function useDemo() {
       !role.allowedPatientIds?.length || role.allowedPatientIds.includes(p.id),
   );
   const ids = new Set(patients.map((p) => p.id));
-  const appointments = state.appointments.filter(
-    (a) =>
-      ids.has(a.patientId) &&
-      (!role.allowedCampus || a.campus === role.allowedCampus) &&
-      (!role.examTypes?.length ||
-        role.examTypes.includes(
-          a.orderType ||
-            (state.patients.find((p) => p.id === a.patientId)?.company ===
-            "个检"
-              ? "个检"
-              : "团检"),
-        )),
+  const archivedAppointments = (state.records.cancelledAppointmentArchive || [])
+    .map((row) => row.appointment)
+    .filter(Boolean);
+  const scopedAppointment = (a: any) =>
+    ids.has(a.patientId) &&
+    (!role.allowedCampus || a.campus === role.allowedCampus) &&
+    (!role.examTypes?.length ||
+      role.examTypes.includes(
+        a.orderType ||
+          (state.patients.find((p) => p.id === a.patientId)?.company === "个检"
+            ? "个检"
+            : "团检"),
+      ));
+  const appointments = state.appointments.filter(scopedAppointment);
+  const appointmentIds = new Set(
+    [...appointments, ...archivedAppointments.filter(scopedAppointment)].map(
+      (a) => a.id,
+    ),
   );
-  const appointmentIds = new Set(appointments.map((a) => a.id));
   const knownPatients = new Set(state.patients.map((p) => p.id));
-  const knownAppointments = new Set(state.appointments.map((a) => a.id));
-  const permitted = (record: any): boolean => {
+  const knownAppointments = new Set(
+    [...state.appointments, ...archivedAppointments].map((a) => a.id),
+  );
+  const permitted = (
+    record: any,
+    checked: Set<string> = new Set(),
+  ): boolean => {
     if (!record || typeof record !== "object") return true;
+    if (
+      record.appointment?.id &&
+      knownAppointments.has(record.appointment.id) &&
+      !appointmentIds.has(record.appointment.id)
+    )
+      return false;
     for (const key of ["patientId", "customerId"])
       if (
         record[key] &&
@@ -219,6 +235,16 @@ export function useDemo() {
       if (knownPatients.has(id) && !ids.has(id)) return false;
     for (const id of record.appointmentIds || [])
       if (knownAppointments.has(id) && !appointmentIds.has(id)) return false;
+    if (record.invoiceId && !checked.has(record.invoiceId)) {
+      const invoice = (state.records.invoiceLedger || []).find(
+        (row) => row.id === record.invoiceId,
+      );
+      if (
+        invoice &&
+        !permitted(invoice, new Set([...checked, record.invoiceId]))
+      )
+        return false;
+    }
     const namedPatient = state.patients.find(
       (p) => record.patient === p.name || record.customer === p.name,
     );
@@ -227,7 +253,7 @@ export function useDemo() {
   const records = Object.fromEntries(
     Object.entries(state.records).map(([key, rows]) => [
       key,
-      rows.filter(permitted),
+      rows.filter((row) => permitted(row)),
     ]),
   );
   const audit = state.audit.filter(
@@ -245,7 +271,7 @@ export function useDemo() {
       appointments,
       records,
       audit,
-      tasks: state.tasks.filter(permitted),
+      tasks: state.tasks.filter((row) => permitted(row)),
     },
   };
 }

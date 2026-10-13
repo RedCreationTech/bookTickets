@@ -20,6 +20,7 @@ import { Banner, Metrics, RecordWorkspace } from "./Operations";
 import type { WorkspaceSpec } from "./Operations";
 import "./operations.css";
 import { UnitBookingCalendar } from "./Patient";
+import { isReportOverdue } from "./ReviewTools";
 
 const uid = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -70,19 +71,19 @@ function AppointmentSelect({
 const templates = {
   report: {
     label: "报告完成 / 领取通知",
-    text: "【清和演示】{姓名}，您的体检报告已完成，请通过演示报告中心查看。体检号：{体检号}。",
+    text: "【红创演示】{姓名}，您的体检报告已完成，请通过演示报告中心查看。体检号：{体检号}。",
   },
   appointment: {
     label: "预约 / 体检前一天提醒",
-    text: "【清和演示】{姓名}，您的体检预约为 {日期} {时段}，地点：{院区}。请查看体检前注意事项。",
+    text: "【红创演示】{姓名}，您的体检预约为 {日期} {时段}，地点：{院区}。请查看体检前注意事项。",
   },
   abnormal: {
     label: "异常项目复核通知",
-    text: "【清和演示】{姓名}，本次演示检查有待复核项目：{异常项目}。请联系演示健康管理师。此消息不构成诊疗建议。",
+    text: "【红创演示】{姓名}，本次演示检查有待复核项目：{异常项目}。请联系演示健康管理师。此消息不构成诊疗建议。",
   },
   recheck: {
     label: "复查项目时间提醒",
-    text: "【清和演示】{姓名}，请按已确认的复查安排查看项目及时间。体检号：{体检号}。",
+    text: "【红创演示】{姓名}，请按已确认的复查安排查看项目及时间。体检号：{体检号}。",
   },
 };
 type TemplateKey = keyof typeof templates;
@@ -1627,11 +1628,411 @@ const portalSpecs: WorkspaceSpec[] = [
     ],
   },
 ];
+function PortalPosters() {
+  const { state, act } = useDemo();
+  const blank = () => ({
+    id: uid("POSTER"),
+    name: "",
+    alt: "",
+    date: new Date().toISOString().slice(0, 10),
+    order: 1,
+    target: "预约体检",
+    imageData: "",
+    enabled: false,
+  });
+  const [draft, setDraft] = useState(blank);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [reading, setReading] = useState(false);
+  const uploadVersion = useRef(0);
+  const posters = state.records.portalPosters || [];
+  const select = (row?: typeof draft) => {
+    uploadVersion.current++;
+    setReading(false);
+    setDraft(row ? { ...blank(), ...row } : blank());
+    setError("");
+    setNotice("");
+  };
+  const upload = (file?: File) => {
+    if (!file) return;
+    if (
+      !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+      file.size > 512 * 1024
+    ) {
+      uploadVersion.current++;
+      setReading(false);
+      setError("海报只接受 512KB 以内的 PNG、JPEG 或 WebP 图片。");
+      return;
+    }
+    const version = ++uploadVersion.current;
+    const reader = new FileReader();
+    setReading(true);
+    setError("");
+    reader.onload = () => {
+      if (uploadVersion.current !== version) return;
+      const imageData = String(reader.result || "");
+      setReading(false);
+      if (
+        !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=\r\n]+$/.test(
+          imageData,
+        )
+      ) {
+        setError("未能读取安全的本地图片内容，请重新选择文件。");
+        return;
+      }
+      setDraft((d) => ({ ...d, imageData }));
+    };
+    reader.onerror = () => {
+      if (uploadVersion.current === version) {
+        setReading(false);
+        setError("读取图片失败，请重新选择本地文件。");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  const save = () => {
+    if (
+      !draft.name.trim() ||
+      !draft.alt.trim() ||
+      !draft.imageData ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(draft.date) ||
+      !Number.isInteger(draft.order) ||
+      draft.order < 0
+    ) {
+      setError(
+        "请填写海报标题、图片说明、发布日期、非负整数顺序，并上传本地图片。",
+      );
+      return;
+    }
+    act({
+      type: "UPSERT_RECORD",
+      payload: {
+        collection: "portalPosters",
+        record: {
+          ...draft,
+          name: draft.name.trim(),
+          alt: draft.alt.trim(),
+          status: draft.enabled ? "已发布" : "草稿",
+        },
+      },
+    });
+    setError("");
+    setNotice(
+      draft.enabled
+        ? "图片海报已在本地发布；患者端将按发布日期和排序展示。"
+        : "图片海报草稿已保存，患者端暂不展示。",
+    );
+  };
+  return (
+    <div style={columns}>
+      <section className="panel">
+        <div className="panel-heading">
+          <h2>图片海报管理</h2>
+          <button className="btn" onClick={() => select()}>
+            新建图片海报
+          </button>
+        </div>
+        <Banner>
+          仅上传合成演示海报，图片保存在浏览器内；未上传到真实公众号或微信服务器。
+        </Banner>
+        <label className="field">
+          海报标题
+          <input
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
+        </label>
+        <label className="field">
+          海报图片说明
+          <input
+            value={draft.alt}
+            onChange={(e) => setDraft({ ...draft, alt: e.target.value })}
+          />
+        </label>
+        <label className="field">
+          海报图片文件
+          <input
+            key={draft.id}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(e) => upload(e.target.files?.[0])}
+          />
+        </label>
+        <div className="form-grid">
+          <label>
+            海报发布日期
+            <input
+              type="date"
+              value={draft.date}
+              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+            />
+          </label>
+          <label>
+            海报显示顺序
+            <input
+              type="number"
+              min="0"
+              value={draft.order}
+              onChange={(e) =>
+                setDraft({ ...draft, order: Number(e.target.value) })
+              }
+            />
+          </label>
+          <label>
+            海报导航目标
+            <select
+              value={draft.target}
+              onChange={(e) => setDraft({ ...draft, target: e.target.value })}
+            >
+              <option>预约体检</option>
+              <option>报告查询</option>
+              <option>健康科普</option>
+              <option>服务中心</option>
+            </select>
+          </label>
+        </div>
+        <label className="check-line">
+          <input
+            type="checkbox"
+            checked={draft.enabled}
+            onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })}
+          />
+          在患者端发布图片海报
+        </label>
+        <button
+          className="btn btn-primary"
+          style={{ marginTop: 16 }}
+          disabled={reading}
+          onClick={save}
+        >
+          {reading ? "正在读取本地图片" : "保存图片海报"}
+        </button>
+        {error && <Notice error>{error}</Notice>}
+        {notice && <Notice>{notice}</Notice>}
+      </section>
+      <section className="panel">
+        <h2>草稿即时预览</h2>
+        {draft.imageData ? (
+          <figure style={{ margin: 0 }}>
+            <img
+              src={draft.imageData}
+              alt={`海报草稿预览：${draft.alt || "待填写说明"}`}
+              style={{
+                width: "100%",
+                maxHeight: 320,
+                objectFit: "contain",
+                borderRadius: 10,
+              }}
+            />
+            <figcaption>
+              {draft.name || "未命名海报"} ·{" "}
+              {draft.enabled ? "计划发布" : "草稿"}
+            </figcaption>
+          </figure>
+        ) : (
+          <Empty text="上传图片后可预览海报" />
+        )}
+        <h3 style={{ marginTop: 24 }}>已保存海报</h3>
+        {[...posters]
+          .sort((a, b) => a.order - b.order)
+          .map((row) => (
+            <article className="callout" key={row.id}>
+              <div>
+                <strong>{row.name}</strong>
+                <p>
+                  {row.date} · {row.status} · 顺序 {row.order}
+                </p>
+                <button
+                  className="btn"
+                  onClick={() => select(row as typeof draft)}
+                >
+                  编辑海报 {row.name}
+                </button>
+              </div>
+            </article>
+          ))}
+      </section>
+    </div>
+  );
+}
+function safePortalUrl(value: string) {
+  try {
+    const input = value.trim();
+    if (/\s/.test(input)) return "";
+    const url = new URL(input);
+    return url.protocol === "https:" &&
+      !!url.hostname &&
+      !url.username &&
+      !url.password
+      ? url.href
+      : "";
+  } catch {
+    return "";
+  }
+}
+function PortalLinks() {
+  const { state, act } = useDemo();
+  const blank = () => ({
+    id: uid("LINK"),
+    name: "",
+    url: "",
+    description: "",
+    order: 1,
+    enabled: false,
+  });
+  const [draft, setDraft] = useState(blank);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const rows = state.records.portalLinks || [];
+  const save = () => {
+    const url = safePortalUrl(draft.url);
+    if (!url) {
+      setError("链接必须是有效的 HTTPS 地址，且不能包含账号、密码或空白字符。");
+      return;
+    }
+    if (
+      !draft.name.trim() ||
+      !draft.description.trim() ||
+      !Number.isInteger(draft.order) ||
+      draft.order < 0
+    ) {
+      setError("请填写链接名称、说明及非负整数显示顺序。");
+      return;
+    }
+    act({
+      type: "UPSERT_RECORD",
+      payload: {
+        collection: "portalLinks",
+        record: {
+          ...draft,
+          url,
+          name: draft.name.trim(),
+          description: draft.description.trim(),
+          status: draft.enabled ? "已发布" : "草稿",
+        },
+      },
+    });
+    setDraft({ ...draft, url });
+    setError("");
+    setNotice(
+      "友情链接已本地保存；患者端仅显示已发布的安全 HTTPS 链接。未在此处访问外部网站。",
+    );
+  };
+  return (
+    <div style={columns}>
+      <section className="panel">
+        <div className="panel-heading">
+          <h2>友情链接管理</h2>
+          <button
+            className="btn"
+            onClick={() => {
+              setDraft(blank());
+              setError("");
+              setNotice("");
+            }}
+          >
+            新建友情链接
+          </button>
+        </div>
+        <label className="field">
+          友情链接名称
+          <input
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
+        </label>
+        <label className="field">
+          友情链接 HTTPS 地址
+          <input
+            type="url"
+            value={draft.url}
+            onChange={(e) => setDraft({ ...draft, url: e.target.value })}
+            placeholder="https://example.org/help"
+          />
+        </label>
+        <label className="field">
+          友情链接说明
+          <textarea
+            value={draft.description}
+            onChange={(e) =>
+              setDraft({ ...draft, description: e.target.value })
+            }
+          />
+        </label>
+        <label className="field">
+          友情链接显示顺序
+          <input
+            type="number"
+            min="0"
+            value={draft.order}
+            onChange={(e) =>
+              setDraft({ ...draft, order: Number(e.target.value) })
+            }
+          />
+        </label>
+        <label className="check-line">
+          <input
+            type="checkbox"
+            checked={draft.enabled}
+            onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })}
+          />
+          在患者端发布友情链接
+        </label>
+        <button
+          className="btn btn-primary"
+          style={{ marginTop: 16 }}
+          onClick={save}
+        >
+          保存友情链接
+        </button>
+        {error && <Notice error>{error}</Notice>}
+        {notice && <Notice>{notice}</Notice>}
+      </section>
+      <section className="panel">
+        <h2>已保存友情链接</h2>
+        {[...rows]
+          .sort((a, b) => a.order - b.order)
+          .map((row) => (
+            <article key={row.id} className="callout">
+              <div>
+                <strong>{row.name}</strong>
+                <p>
+                  {row.url}
+                  <br />
+                  {row.description}
+                  <br />
+                  {row.status} · 顺序 {row.order}
+                </p>
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setDraft({
+                      ...blank(),
+                      ...row,
+                      enabled:
+                        row.enabled ??
+                        ["已发布", "已启用"].includes(row.status),
+                    });
+                    setError("");
+                    setNotice("");
+                  }}
+                >
+                  编辑链接 {row.name}
+                </button>
+              </div>
+            </article>
+          ))}
+        {!rows.length && <Empty text="尚未保存友情链接" />}
+      </section>
+    </div>
+  );
+}
+
 function PortalConfiguration() {
   const { state, act } = useDemo();
   const [tab, setTab] = useState("hospital");
   const [draft, setDraft] = useState({
-    name: "清和健康体检中心（演示）",
+    name: "红创健康体检中心（演示）",
     intro: "提供预约、体检、报告与健康管理的一体化合成演示。",
     address: "演示城市 · 合成健康路 1 号（非真实地址）",
     hotline: "DEMO-0000",
@@ -1667,6 +2068,14 @@ function PortalConfiguration() {
           onClick={() => setTab("hospital")}
         >
           医院信息
+        </button>
+        <button
+          role="tab"
+          aria-selected={tab === "portalPosters"}
+          className={tab === "portalPosters" ? "active" : ""}
+          onClick={() => setTab("portalPosters")}
+        >
+          图片海报
         </button>
         {portalSpecs.map((s) => (
           <button
@@ -1736,6 +2145,10 @@ function PortalConfiguration() {
             </a>
           </section>
         </div>
+      ) : tab === "portalPosters" ? (
+        <PortalPosters />
+      ) : tab === "portalLinks" ? (
+        <PortalLinks />
       ) : (
         spec && <RecordWorkspace key={spec.key} spec={spec} />
       )}
@@ -1871,6 +2284,14 @@ function PasswordDemo() {
 export function getControlTodos(state: DemoState) {
   return [
     {
+      id: "station-notifications",
+      label: "未读事件与祝福",
+      count: (state.records.stationNotifications || []).filter(
+        (r) => r.status === "未读",
+      ).length,
+      href: "#/controls?section=event-notifications",
+    },
+    {
       id: "notification-failures",
       label: "模拟通知待重试",
       count: (state.records.controlNotifications || []).filter(
@@ -2004,8 +2425,363 @@ function AbnormalLevels() {
     </section>
   );
 }
+export function deriveStationNotifications(state: DemoState, clock: string) {
+  const now = Date.parse(clock);
+  if (!Number.isFinite(now)) return [];
+  const date = new Date(now).toISOString().slice(0, 10);
+  const monthDay = date.slice(5);
+  const year = date.slice(0, 4);
+  const rows: {
+    id: string;
+    kind: string;
+    title: string;
+    content: string;
+    appointmentId?: string;
+    patientId?: string;
+    recipient: string;
+    recipientRole: string;
+    channel: string;
+    sourceId: string;
+    at: string;
+  }[] = [];
+  for (const audit of state.audit.filter(
+    (a) => a.action === "REJECT" && Date.parse(a.time) <= now,
+  )) {
+    const stage = Number(audit.before?.reviewStage || 0);
+    const title =
+      stage >= 2
+        ? "总检驳回通知"
+        : stage === 1
+          ? "主检驳回通知"
+          : "初审驳回通知";
+    rows.push({
+      id: `NOTICE-REJECT-${audit.id}`,
+      kind: "审核驳回",
+      title,
+      content: `${audit.entity}：${audit.after?.rejectReason || audit.message}。请处理并复核。`,
+      appointmentId: audit.entity,
+      recipient: audit.before?.doctor || "分检医生",
+      recipientRole: stage >= 2 ? "reviewer" : "doctor",
+      channel: "站内消息（本地）",
+      sourceId: audit.id,
+      at: clock,
+    });
+  }
+  for (const a of state.appointments.filter((a) =>
+    isReportOverdue(state, a, now),
+  )) {
+    rows.push({
+      id: `NOTICE-OVERDUE-${a.id}`,
+      kind: "报告超期",
+      title: "报告超期提醒",
+      content: `${a.id} 已超过当前报告周期，请查看报告进度并处理。`,
+      appointmentId: a.id,
+      patientId: a.patientId,
+      recipient: a.doctor || "报告审核岗位",
+      recipientRole: "reviewer",
+      channel: "站内消息（本地）",
+      sourceId: a.id,
+      at: clock,
+    });
+  }
+  const festivals = [
+    { id: "NEWYEAR", day: "01-01", name: "元旦" },
+    { id: "LABORDAY", day: "05-01", name: "劳动节" },
+    { id: "NATIONALDAY", day: "10-01", name: "国庆节" },
+  ];
+  for (const p of state.patients) {
+    const birthday = String(p.demoBirthday || p.birthday || p.birthDate || "");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(birthday) && birthday.slice(5) === monthDay)
+      rows.push({
+        id: `NOTICE-BIRTHDAY-${year}-${p.id}`,
+        kind: "生日祝福",
+        title: "生日祝福（演示）",
+        content: `【红创演示】${p.name}，生日快乐！祝您健康平安。`,
+        patientId: p.id,
+        recipient: p.name,
+        recipientRole: "patient",
+        channel: "短信（本地模拟）",
+        sourceId: `BIRTHDAY-${p.id}`,
+        at: clock,
+      });
+    for (const festival of festivals.filter((f) => f.day === monthDay))
+      rows.push({
+        id: `NOTICE-HOLIDAY-${date}-${festival.id}-${p.id}`,
+        kind: "节日祝福",
+        title: `${festival.name}祝福（演示）`,
+        content: `【红创演示】${p.name}，${festival.name}快乐，祝您健康平安。`,
+        patientId: p.id,
+        recipient: p.name,
+        recipientRole: "patient",
+        channel: "短信（本地模拟）",
+        sourceId: festival.id,
+        at: clock,
+      });
+  }
+  return rows;
+}
+function EventNotifications() {
+  const { state, act } = useDemo();
+  const [clock, setClock] = useState(
+    (state.config.notificationClock || new Date().toISOString()).slice(0, 16),
+  );
+  const [kind, setKind] = useState("全部类型");
+  const [role, setRole] = useState("全部岗位");
+  const [onlyUnread, setOnlyUnread] = useState(false);
+  const [message, setMessage] = useState("");
+  const [patientId, setPatientId] = useState(state.patients[0]?.id || "");
+  const [birthday, setBirthday] = useState("");
+  const scanRef = useRef("");
+  const readRef = useRef(new Set<string>());
+  const rows = state.records.stationNotifications || [];
+  const advance = () => {
+    const iso = `${clock}:00Z`;
+    if (
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(clock) ||
+      !Number.isFinite(Date.parse(iso))
+    ) {
+      setMessage("请填写有效的通知演示时钟（UTC）。");
+      return;
+    }
+    const candidates = deriveStationNotifications(state, iso);
+    const key = JSON.stringify([iso, candidates.map((r) => r.id)]);
+    if (scanRef.current === key || state.config.notificationScanKey === key) {
+      setMessage("此演示时刻与事件已扫描，通知不会重复入队。");
+      return;
+    }
+    scanRef.current = key;
+    const fresh = candidates.filter(
+      (r) => !rows.some((existing) => existing.id === r.id),
+    );
+    for (const row of fresh) {
+      act({
+        type: "UPSERT_RECORD",
+        payload: {
+          collection: "stationNotifications",
+          record: {
+            ...row,
+            status: "未读",
+            deliveryStatus: "本地已生成",
+            synthetic: true,
+          },
+        },
+      });
+      if (row.channel.startsWith("短信"))
+        act({
+          type: "UPSERT_RECORD",
+          payload: {
+            collection: "controlNotifications",
+            record: {
+              id: row.id,
+              appointmentId: "",
+              patientId: row.patientId,
+              patientName: row.recipient,
+              template: row.kind,
+              channel: row.channel,
+              content: row.content,
+              status: "模拟送达",
+              abnormalItems: [],
+              attempts: [{ at: iso, actor: "演示时钟", status: "模拟送达" }],
+              sourceId: row.sourceId,
+            },
+          },
+        });
+    }
+    act({
+      type: "UPDATE_CONFIG",
+      payload: { notificationClock: iso, notificationScanKey: key },
+    });
+    setMessage(
+      `已按 ${clock.replace("T", " ")} UTC 自动匹配事件并新增 ${fresh.length} 条本地通知；未调用短信或消息网关。`,
+    );
+  };
+  const markRead = (row: any) => {
+    if (row.status === "已读" || readRef.current.has(row.id)) return;
+    readRef.current.add(row.id);
+    act({
+      type: "UPSERT_RECORD",
+      payload: {
+        collection: "stationNotifications",
+        record: {
+          ...row,
+          status: "已读",
+          readAt: new Date().toISOString(),
+          readBy: state.config.role,
+        },
+      },
+    });
+  };
+  const visible = rows.filter(
+    (r) =>
+      (kind === "全部类型" || r.kind === kind) &&
+      (role === "全部岗位" || r.recipientRole === role) &&
+      (!onlyUnread || r.status === "未读"),
+  );
+  return (
+    <>
+      <Banner>
+        推进本地演示时钟时自动扫描审核驳回、报告超期和当天生日 /
+        内置节日，幂等入队。没有后台定时运行，不发送外网通知；跳转日期只匹配目标日期的祝福。
+      </Banner>
+      <section className="panel">
+        <h2>通知事件演示时钟</h2>
+        <label className="field">
+          通知演示时钟（UTC）
+          <input
+            type="datetime-local"
+            value={clock}
+            onChange={(e) => setClock(e.target.value)}
+          />
+        </label>
+        <button className="btn btn-primary" onClick={advance}>
+          推进通知演示时钟并触发
+        </button>
+        {message && <Notice>{message}</Notice>}
+        <details>
+          <summary>设置合成客户演示生日</summary>
+          <div className="form-grid">
+            <label>
+              生日演示客户
+              <select
+                value={patientId}
+                onChange={(e) => {
+                  setPatientId(e.target.value);
+                  setBirthday(
+                    state.patients.find((p) => p.id === e.target.value)
+                      ?.demoBirthday || "",
+                  );
+                }}
+              >
+                {state.patients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              合成演示生日
+              <input
+                type="date"
+                value={birthday}
+                onChange={(e) => setBirthday(e.target.value)}
+              />
+            </label>
+          </div>
+          <button
+            className="btn"
+            onClick={() => {
+              if (
+                !/^\d{4}-\d{2}-\d{2}$/.test(birthday) ||
+                !Number.isFinite(Date.parse(birthday))
+              ) {
+                setMessage("请填写有效的合成生日。");
+                return;
+              }
+              act({
+                type: "UPSERT_PATIENT",
+                payload: {
+                  ...state.patients.find((p) => p.id === patientId),
+                  id: patientId,
+                  demoBirthday: birthday,
+                },
+              });
+              setMessage(
+                "合成生日已保存；推进到对应月日会生成每年一次的本地生日祝福。",
+              );
+            }}
+          >
+            保存合成生日
+          </button>
+          <p>内置阳历节日：元旦 01-01、劳动节 05-01、国庆节 10-01。</p>
+        </details>
+      </section>
+      <Metrics
+        items={[
+          { label: "事件通知", value: rows.length },
+          {
+            label: "未读通知",
+            value: rows.filter((r) => r.status === "未读").length,
+          },
+          {
+            label: "本地祝福",
+            value: rows.filter((r) => ["生日祝福", "节日祝福"].includes(r.kind))
+              .length,
+          },
+          { label: "真实外发", value: 0 },
+        ]}
+      />
+      <section className="panel">
+        <h2>站内通知与祝福队列</h2>
+        <div className="form-grid">
+          <label>
+            事件通知类型
+            <select value={kind} onChange={(e) => setKind(e.target.value)}>
+              {["全部类型", "审核驳回", "报告超期", "生日祝福", "节日祝福"].map(
+                (k) => (
+                  <option key={k}>{k}</option>
+                ),
+              )}
+            </select>
+          </label>
+          <label>
+            通知接收岗位
+            <select value={role} onChange={(e) => setRole(e.target.value)}>
+              <option>全部岗位</option>
+              <option value="doctor">分检医生</option>
+              <option value="reviewer">审核岗位</option>
+              <option value="patient">合成客户</option>
+            </select>
+          </label>
+        </div>
+        <label className="check-line">
+          <input
+            type="checkbox"
+            checked={onlyUnread}
+            onChange={(e) => setOnlyUnread(e.target.checked)}
+          />
+          仅看未读事件通知
+        </label>
+        {visible.map((row) => (
+          <article className="callout" key={row.id}>
+            <div style={{ flex: 1 }}>
+              <strong>
+                {row.title} · {row.status}
+              </strong>
+              <p>
+                {row.content}
+                <br />
+                接收：{row.recipient} · {row.channel}
+                <br />
+                事件标识：{row.sourceId}
+              </p>
+              {row.appointmentId && (
+                <a
+                  className="link-btn"
+                  href={row.kind === "报告超期" ? "#/reports" : "#/review"}
+                >
+                  查看关联订单 {row.appointmentId}
+                </a>
+              )}
+              <button
+                className="btn"
+                disabled={row.status === "已读"}
+                onClick={() => markRead(row)}
+              >
+                标记已读 {row.title}
+              </button>
+            </div>
+          </article>
+        ))}
+        {!visible.length && <Empty text="当前没有匹配的事件通知" />}
+      </section>
+    </>
+  );
+}
+
 const tabs = [
   { id: "notifications", label: "通知工作台", icon: Bell },
+  { id: "event-notifications", label: "事件与祝福", icon: Bell },
   { id: "identity", label: "替检核验", icon: Fingerprint },
   { id: "signatures", label: "签名档案", icon: PenLine },
   { id: "rejections", label: "驳回质控", icon: ShieldCheck },
@@ -2052,6 +2828,7 @@ export default function ControlCenter({ section }: { section?: string }) {
       </div>
       <div role="tabpanel" aria-label={tabs.find((t) => t.id === tab)?.label}>
         {tab === "notifications" && <Notifications />}
+        {tab === "event-notifications" && <EventNotifications />}
         {tab === "identity" && <IdentityQuality />}
         {tab === "signatures" && <Signatures />}
         {tab === "rejections" && <RejectionQuality />}
@@ -2064,4 +2841,23 @@ export default function ControlCenter({ section }: { section?: string }) {
   );
 }
 
-export function ControlTodoList({onNavigate}:{onNavigate:()=>void}){const {state}=useDemo();return <div>{getControlTodos(state).filter(t=>t.count>0).map(t=><a className="notification" key={t.id} href={t.href} onClick={onNavigate}><strong>{t.label}</strong><Badge>{t.count}</Badge></a>)}</div>}
+export function ControlTodoList({ onNavigate }: { onNavigate: () => void }) {
+  const { state } = useDemo();
+  return (
+    <div>
+      {getControlTodos(state)
+        .filter((t) => t.count > 0)
+        .map((t) => (
+          <a
+            className="notification"
+            key={t.id}
+            href={t.href}
+            onClick={onNavigate}
+          >
+            <strong>{t.label}</strong>
+            <Badge>{t.count}</Badge>
+          </a>
+        ))}
+    </div>
+  );
+}

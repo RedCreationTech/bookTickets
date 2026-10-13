@@ -116,11 +116,27 @@ test("all role workbenches produce real browser visual evidence", async ({
   for (const role of roles) {
     await page.getByLabel("切换演示角色").selectOption(role);
     await expect(page.locator("main h1").first()).toBeVisible();
+    if (role === "doctor")
+      await expect(
+        page.getByRole("region", { name: "共享身份核验资料" }),
+      ).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({
       path: `test-results/role-${role}-desktop.png`,
       fullPage: true,
     });
+    if (role === "finance") {
+      await page
+        .getByText("订单支付明细与分组结算小计", { exact: true })
+        .click();
+      await expect(
+        page.getByRole("table", { name: "分组结算小计" }),
+      ).toBeVisible();
+      await page.screenshot({
+        path: "test-results/finance-details-desktop.png",
+        fullPage: true,
+      });
+    }
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth + 2,
     );
@@ -218,4 +234,60 @@ test("complete cross-surface lifecycle persists from booking to follow-up", asyn
   expect(final.appointments[0].status).toBe("printed");
   expect(final.appointments[0].printCount).toBe(1);
   expect(final.tasks[0].status).toBe("已完成");
+});
+
+test("pause slip resumes its original queue only once after reload", async ({
+  page,
+}) => {
+  await page.goto("/#/queue");
+  await page
+    .getByRole("button", { name: "暂停并生成凭条", exact: true })
+    .first()
+    .click();
+  await page.getByLabel("中断检查原因").fill("合成临时离开");
+  await page.getByRole("button", { name: "确认暂停并生成凭条" }).click();
+  const token = await page.getByLabel("演示凭条编号").inputValue();
+  expect(token).toMatch(/^DEMO-RESUME-/);
+  await page.screenshot({
+    path: `test-results/queue-pause-slip-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "关闭凭条预览" }).click();
+  await page.reload();
+  await page.getByLabel("扫描模拟 / 输入凭条编号").fill(token);
+  await page.getByRole("button", { name: "核验凭条并恢复原队列" }).click();
+  await page.getByLabel("扫描模拟 / 输入凭条编号").fill(token);
+  await page.getByRole("button", { name: "核验凭条并恢复原队列" }).click();
+  await expect(page.getByRole("alert")).toContainText("不能重复使用");
+});
+
+test("five-dimension patient survey validates and persists its result", async ({
+  page,
+}) => {
+  await page.goto("/#/patient");
+  await page.getByRole("button", { name: "查看消息", exact: true }).click();
+  await page.getByRole("button", { name: "提交满意度问卷" }).click();
+  await expect(page.getByRole("status")).toContainText("全部 5 道必答");
+  for (const label of [
+    "预约流程是否清晰便捷",
+    "工作人员服务是否耐心友善",
+    "体检环境与导检标识是否清晰",
+    "检查说明与报告沟通是否易懂",
+    "本次整体服务体验是否满意",
+  ]) {
+    await page.getByLabel(label, { exact: true }).selectOption("4");
+  }
+  await page.getByRole("button", { name: "提交满意度问卷" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "查看消息", exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "满意度问卷已提交结果" }),
+  ).toContainText("平均评分：4 / 5");
+  await expect(
+    page.getByRole("button", { name: "提交满意度问卷" }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: `test-results/satisfaction-${test.info().project.name}.png`,
+    fullPage: true,
+  });
 });

@@ -33,6 +33,7 @@ import {
 } from "./Operations";
 import type { FieldSpec, Row, WorkspaceSpec } from "./Operations";
 import "./operations.css";
+import ResearchFilters from "./ResearchFilters";
 const dateNow = () => new Date().toISOString().slice(0, 10);
 const fid = () =>
   `H${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -2338,6 +2339,7 @@ function Enterprise() {
       <div className="ops-tabbar">
         {[
           ["analytics", "人群健康分析"],
+          ["research", "科研复合筛选"],
           ["units", "工作单位管理"],
           ["groups", "工作分组"],
           ["families", "家庭客户"],
@@ -2351,7 +2353,9 @@ function Enterprise() {
           </button>
         ))}
       </div>
-      {tab !== "analytics" ? (
+      {tab === "research" ? (
+        <ResearchFilters getHealth={getPatientHealth} />
+      ) : tab !== "analytics" ? (
         <RecordWorkspace
           spec={
             tab === "units"

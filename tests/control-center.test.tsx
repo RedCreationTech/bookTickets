@@ -6,6 +6,7 @@ import {
   render,
   screen,
   within,
+  waitFor,
 } from "@testing-library/react";
 import ControlCenter from "../src/modules/ControlCenter";
 import {
@@ -335,5 +336,231 @@ describe("Additional persisted control workflows", () => {
     expect(screen.getByText("需及时复核（演示）")).toHaveStyle({
       borderLeft: "5px solid #123abc",
     });
+  });
+});
+
+describe("Published poster images and safe portal links", () => {
+  it("validates image types and size, then previews, publishes and edits a local poster", async () => {
+    mount("portal");
+    fireEvent.click(screen.getByRole("tab", { name: "图片海报", exact: true }));
+    const upload = screen.getByLabelText("海报图片文件");
+    fireEvent.change(upload, {
+      target: {
+        files: [new File(["<svg />"], "unsafe.svg", { type: "image/svg+xml" })],
+      },
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("512KB");
+    expect(state().records.portalPosters).toBeUndefined();
+    fireEvent.change(upload, {
+      target: {
+        files: [
+          new File([new Uint8Array(512 * 1024 + 1)], "large.png", {
+            type: "image/png",
+          }),
+        ],
+      },
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("512KB");
+    const bytes = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aNqUAAAAASUVORK5CYII=",
+      ),
+      (c) => c.charCodeAt(0),
+    );
+    change("海报标题", "红创预约服务海报");
+    change("海报图片说明", "合成绿色预约服务示意");
+    fireEvent.change(upload, {
+      target: {
+        files: [new File([bytes], "poster.png", { type: "image/png" })],
+      },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("img", { name: "海报草稿预览：合成绿色预约服务示意" }),
+      ).toHaveAttribute(
+        "src",
+        expect.stringContaining("data:image/png;base64,"),
+      ),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "在患者端发布图片海报" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "保存图片海报" }));
+    expect(state().records.portalPosters[0]).toMatchObject({
+      name: "红创预约服务海报",
+      alt: "合成绿色预约服务示意",
+      enabled: true,
+      status: "已发布",
+      target: "预约体检",
+    });
+    expect(state().records.portalPosters[0].imageData).toMatch(
+      /^data:image\/png;base64,/,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "编辑海报 红创预约服务海报" }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "在患者端发布图片海报" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "保存图片海报" }));
+    expect(state().records.portalPosters).toHaveLength(1);
+    expect(state().records.portalPosters[0].status).toBe("草稿");
+  });
+  it("rejects unsafe links and persists a normalized credential-free HTTPS link with publication status", () => {
+    mount("portal");
+    fireEvent.click(screen.getByRole("tab", { name: "友情链接", exact: true }));
+    change("友情链接名称", "演示服务帮助");
+    change("友情链接说明", "安全外部链接演示");
+    for (const url of [
+      "javascript:alert(1)",
+      "http://example.org/help",
+      "https://user:secret@example.org/help",
+      "https://example.org/unsafe path",
+    ]) {
+      change("友情链接 HTTPS 地址", url);
+      fireEvent.click(screen.getByRole("button", { name: "保存友情链接" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("有效的 HTTPS");
+      expect(state().records.portalLinks).toBeUndefined();
+    }
+    change("友情链接 HTTPS 地址", "https://example.org/help");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "在患者端发布友情链接" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "保存友情链接" }));
+    expect(state().records.portalLinks[0]).toMatchObject({
+      url: "https://example.org/help",
+      name: "演示服务帮助",
+      status: "已发布",
+      enabled: true,
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "编辑链接 演示服务帮助" }),
+    );
+    change("友情链接说明", "更新后的合成说明");
+    fireEvent.click(screen.getByRole("button", { name: "保存友情链接" }));
+    expect(state().records.portalLinks).toHaveLength(1);
+    expect(state().records.portalLinks[0].description).toBe("更新后的合成说明");
+  });
+});
+
+describe("C-group event-triggered local notifications", () => {
+  it("creates source-backed rejection and overdue station notifications and preserves read status on rescans", () => {
+    const initial = createInitialState();
+    initial.appointments[2].reviewStage = 2;
+    initial.appointments[0].date = "2026-10-01";
+    const rejected = reducer(initial, {
+      type: "REJECT",
+      payload: {
+        id: initial.appointments[2].id,
+        reason: "合成总检需要补充说明",
+      },
+    });
+    localStorage.setItem("hongchuang.health.demo.v1", JSON.stringify(rejected));
+    mount("event-notifications");
+    change("通知演示时钟（UTC）", "2026-10-13T08:01");
+    fireEvent.click(
+      screen.getByRole("button", { name: "推进通知演示时钟并触发" }),
+    );
+    expect(
+      state().records.stationNotifications.filter(
+        (r: any) => r.kind === "审核驳回",
+      ),
+    ).toHaveLength(1);
+    expect(
+      state().records.stationNotifications.find(
+        (r: any) => r.kind === "审核驳回",
+      ),
+    ).toMatchObject({
+      title: "总检驳回通知",
+      recipientRole: "reviewer",
+      sourceId: rejected.audit[0].id,
+    });
+    expect(
+      state().records.stationNotifications.some(
+        (r: any) =>
+          r.kind === "报告超期" &&
+          r.appointmentId === initial.appointments[0].id,
+      ),
+    ).toBe(true);
+    fireEvent.click(
+      screen.getByRole("button", { name: "标记已读 总检驳回通知" }),
+    );
+    const count = state().records.stationNotifications.length;
+    change("通知演示时钟（UTC）", "2026-10-13T08:02");
+    fireEvent.click(
+      screen.getByRole("button", { name: "推进通知演示时钟并触发" }),
+    );
+    expect(state().records.stationNotifications).toHaveLength(count);
+    expect(
+      state().records.stationNotifications.find(
+        (r: any) => r.kind === "审核驳回",
+      ).status,
+    ).toBe("已读");
+    fireEvent.click(screen.getByRole("checkbox", { name: "仅看未读事件通知" }));
+    expect(
+      screen.queryByRole("button", { name: "标记已读 总检驳回通知" }),
+    ).toBeNull();
+  });
+  it("matches birthdays and built-in holidays using the explicit date and generates idempotent local SMS logs", () => {
+    const initial = createInitialState();
+    initial.patients[0].demoBirthday = "1980-01-01";
+    localStorage.setItem("hongchuang.health.demo.v1", JSON.stringify(initial));
+    mount("event-notifications");
+    change("通知演示时钟（UTC）", "2026-01-01T08:00");
+    fireEvent.click(
+      screen.getByRole("button", { name: "推进通知演示时钟并触发" }),
+    );
+    expect(
+      state().records.stationNotifications.filter(
+        (r: any) => r.kind === "生日祝福",
+      ),
+    ).toHaveLength(1);
+    expect(
+      state().records.stationNotifications.filter(
+        (r: any) => r.kind === "节日祝福",
+      ),
+    ).toHaveLength(initial.patients.length);
+    expect(state().records.controlNotifications).toHaveLength(
+      initial.patients.length + 1,
+    );
+    expect(
+      state().records.controlNotifications.every(
+        (r: any) => r.status === "模拟送达" && r.channel === "短信（本地模拟）",
+      ),
+    ).toBe(true);
+    const snapshot = JSON.stringify(state());
+    fireEvent.click(
+      screen.getByRole("button", { name: "推进通知演示时钟并触发" }),
+    );
+    expect(JSON.stringify(state())).toBe(snapshot);
+    change("通知演示时钟（UTC）", "2027-01-01T08:00");
+    fireEvent.click(
+      screen.getByRole("button", { name: "推进通知演示时钟并触发" }),
+    );
+    expect(
+      state().records.stationNotifications.filter(
+        (r: any) => r.kind === "生日祝福",
+      ),
+    ).toHaveLength(2);
+  });
+  it("saves a synthetic birthday, filters notification types and never invents a birthday for other patients", () => {
+    mount("event-notifications");
+    fireEvent.click(screen.getByText("设置合成客户演示生日"));
+    change("合成演示生日", "1990-10-13");
+    fireEvent.click(screen.getByRole("button", { name: "保存合成生日" }));
+    expect(state().patients[0].demoBirthday).toBe("1990-10-13");
+    change("通知演示时钟（UTC）", "2026-10-13T08:00");
+    fireEvent.click(
+      screen.getByRole("button", { name: "推进通知演示时钟并触发" }),
+    );
+    change("事件通知类型", "生日祝福");
+    expect(
+      screen.getAllByRole("button", { name: "标记已读 生日祝福（演示）" }),
+    ).toHaveLength(1);
+    expect(
+      state()
+        .records.stationNotifications.filter((r: any) => r.kind === "生日祝福")
+        .map((r: any) => r.patientId),
+    ).toEqual(["P001"]);
   });
 });

@@ -2,6 +2,15 @@ import { getBookingAvailability } from "../bookingRules";
 const GroupImport = lazy(() =>
   import("./Advanced").then((m) => ({ default: m.GroupImport })),
 );
+const IdentityPhotoViewer = lazy(() =>
+  import("./ControlCenter").then((m) => ({ default: m.IdentityPhotoViewer })),
+);
+const SettlementDetails = lazy(() =>
+  import("./SettlementDetails").then((m) => ({ default: m.SettlementDetails })),
+);
+const InvoiceReminder = lazy(() =>
+  import("./InvoiceReminder").then((m) => ({ default: m.InvoiceReminder })),
+);
 import { analyzeDemoResults } from "../rules";
 import {
   getOrderRules,
@@ -10,6 +19,9 @@ import {
   quoteOrder,
   percentFromAmount,
   resolveDependencies,
+  normalizeOrderItems,
+  packageAvailableAtCampus,
+  getPackageOptionalBundles,
 } from "../orderingRules";
 import { PrintDesk, ExpiryDesk, GynecologySpecimens } from "./ExecutionDesk";
 import { RegistrationProfile, defaultCustomerTypes } from "./Registration";
@@ -25,7 +37,12 @@ import {
   InvoiceLedger,
   applicableGroup,
   splitGroupAmount,
+  groupDiscountPercent,
 } from "./Groups";
+import {
+  RegistrationConsents,
+  PastHistoryNotice,
+} from "./RegistrationConsents";
 import { ExamExtras, UndoExam } from "./ClinicalExtras";
 import { OrderingRuleEditor } from "./Ordering";
 import { useState, useRef, lazy, Suspense } from "react";
@@ -404,16 +421,35 @@ export function Appointments() {
         : "健康教育咨询";
   const group = applicableGroup(state, patient, date);
   const packageIds = [...new Set([pkg, ...otherPackages])];
-  const initialQuote = quoteOrder(state, packageIds, discount, lineDiscounts, [
-    ...extraItems,
-    ...(extra ? [recommendation] : []),
-  ]);
+  const effectiveDiscount = Math.min(discount, groupDiscountPercent(group));
+  const discountFloor = Math.min(
+    state.config.discountMin * 100,
+    groupDiscountPercent(group),
+  );
+  const optionalBundles = getPackageOptionalBundles(state, packageIds);
+  const initialQuote = quoteOrder(
+    state,
+    packageIds,
+    effectiveDiscount,
+    lineDiscounts,
+    [...extraItems, ...(extra ? [recommendation] : [])],
+  );
   const resolved = resolveDependencies(state, initialQuote.items);
-  const quote = quoteOrder(state, packageIds, discount, lineDiscounts, [
-    ...extraItems,
+  const normalized = normalizeOrderItems(state, [
+    ...initialQuote.items,
     ...resolved.added,
-    ...(extra ? [recommendation] : []),
   ]);
+  const excludedItems = [
+    ...new Set([...initialQuote.items, ...resolved.added]),
+  ].filter((item) => !normalized.items.includes(item));
+  const quote = quoteOrder(
+    state,
+    packageIds,
+    effectiveDiscount,
+    lineDiscounts,
+    [...extraItems, ...resolved.added, ...(extra ? [recommendation] : [])],
+    excludedItems,
+  );
   const orderingErrors = getOrderingIssues(
     state,
     patient,
@@ -422,15 +458,32 @@ export function Appointments() {
   );
   const submit = () => {
     if (submitting.current) return;
+    if (
+      !pkg ||
+      packageIds.some((id) => !packageAvailableAtCampus(state, id, campus))
+    )
+      return setError("所选套餐不适用于当前院区，请重新选择");
+    if (normalized.errors.length) return setError(normalized.errors.join("；"));
+    for (const bundle of optionalBundles)
+      if (
+        extraItems.filter((item) => bundle.items.includes(item)).length !==
+        bundle.choose
+      )
+        return setError(bundle.name + "自选包必须选择" + bundle.choose + "项");
     if (group && packageIds.some((id) => !group.packages.includes(id)))
       return setError("所选套餐不在该单位订单允许范围");
+    if (
+      group?.packageChooseCount &&
+      packageIds.length !== group.packageChooseCount
+    )
+      return setError("单位套餐必须选" + group.packageChooseCount + "套");
     if (group && group.mode === "固定套餐" && packageIds.length !== 1)
       return setError("固定套餐单位订单只允许一个套餐");
     if (
       group &&
       group.choose > 0 &&
-      extraItems.filter((i) => group.optionalItems.includes(i)).length !==
-        group.choose
+      extraItems.filter((i) => (group.optionalItems || []).includes(i))
+        .length !== group.choose
     )
       return setError("单位自选包必须选" + group.choose + "项");
     if (resolved.errors.length) return setError(resolved.errors.join("；"));
@@ -444,11 +497,7 @@ export function Appointments() {
             : []),
         ].join("；"),
       );
-    if (
-      quote.rows.some(
-        (r) => !r.nonDiscount && r.percent < state.config.discountMin * 100,
-      )
-    )
+    if (quote.rows.some((r) => !r.nonDiscount && r.percent < discountFloor))
       return setError("单项折扣低于角色授权下限");
     const availability = getBookingAvailability(state, date, undefined, {
       patientId: patient,
@@ -457,7 +506,7 @@ export function Appointments() {
       time,
     });
     if (!availability.allowed) return setError(availability.error);
-    if (discount < state.config.discountMin * 100)
+    if (discount < discountFloor)
       return setError("折扣超出当前权限，请在审批中心申请授权（演示）");
     submitting.current = true;
     act({
@@ -471,7 +520,10 @@ export function Appointments() {
         amount: quote.amount,
         items: quote.items,
         packageIds,
+        packageChooseCount: group?.packageChooseCount,
         pricing: quote.rows,
+        autoFilteredItems: normalized.removed,
+        appliedDiscount: effectiveDiscount,
         orderingOverride: overrideReason,
         source: "前台登记",
         orderType:
@@ -856,7 +908,23 @@ export function Appointments() {
               体检院区
               <select
                 value={campus}
-                onChange={(e) => setCampus(e.target.value)}
+                onChange={(e) => {
+                  setCampus(e.target.value);
+                  const candidate = state.packages.find(
+                    (pack) =>
+                      packageAvailableAtCampus(
+                        state,
+                        pack.id,
+                        e.target.value,
+                      ) &&
+                      packageIsApplicable(state, historyPatient, pack.id) &&
+                      (!group || group.packages.includes(pack.id)),
+                  );
+                  setPkg(candidate?.id || "");
+                  setOtherPackages([]);
+                  setExtraItems([]);
+                  setLineDiscounts({});
+                }}
               >
                 <option>中心院区</option>
                 <option>东院区</option>
@@ -892,12 +960,16 @@ export function Appointments() {
                 value={pkg}
                 onChange={(e) => {
                   setPkg(e.target.value);
+                  setExtraItems([]);
                   setLineDiscounts({});
                 }}
               >
                 {state.packages
-                  .filter((p) =>
-                    packageIsApplicable(state, historyPatient, p.id),
+                  .filter(
+                    (p) =>
+                      packageIsApplicable(state, historyPatient, p.id) &&
+                      packageAvailableAtCampus(state, p.id, campus) &&
+                      (!group || group.packages.includes(p.id)),
                   )
                   .map((p) => (
                     <option key={p.id} value={p.id}>
@@ -921,11 +993,44 @@ export function Appointments() {
               />
             </label>
           </div>
+          {normalized.removed.length > 0 && (
+            <div className="notice" aria-label="自动过滤项目说明">
+              自动过滤并重新计价：
+              {normalized.removed
+                .map((r) => r.item + "（" + r.reason + "）")
+                .join("；")}
+            </div>
+          )}
+          {optionalBundles.map((bundle) => (
+            <fieldset key={bundle.packageId}>
+              <legend>
+                {bundle.name} · 套餐独立自选包 {bundle.items.length} 选{" "}
+                {bundle.choose}
+              </legend>
+              {bundle.items.map((item) => (
+                <label className="check-line" key={item}>
+                  <input
+                    type="checkbox"
+                    checked={extraItems.includes(item)}
+                    onChange={(e) =>
+                      setExtraItems(
+                        e.target.checked
+                          ? [...new Set([...extraItems, item])]
+                          : extraItems.filter((i) => i !== item),
+                      )
+                    }
+                  />
+                  {item}
+                </label>
+              ))}
+            </fieldset>
+          ))}
           {group && (
             <div className="callout">
               <div>
                 <strong>
-                  单位订单：{group.name} · {group.mode}
+                  单位订单：{group.name} · {group.mode} · 协议折扣{" "}
+                  {groupDiscountPercent(group)}%
                 </strong>
                 <p>
                   单位承担 ¥
@@ -935,9 +1040,10 @@ export function Appointments() {
                   ；超预算差额自动转个人
                 </p>
                 <p>
-                  单位自选包：{group.optionalItems.length}选{group.choose}
+                  单位自选包：{(group.optionalItems || []).length}选
+                  {group.choose}
                 </p>
-                {group.optionalItems.map((item: string) => (
+                {(group.optionalItems || []).map((item: string) => (
                   <label className="check-line" key={item}>
                     <input
                       type="checkbox"
@@ -990,6 +1096,7 @@ export function Appointments() {
                         packageIds,
                         Number(e.target.value),
                         [...extraItems, ...(extra ? [recommendation] : [])],
+                        excludedItems,
                       ),
                     );
                     setLineDiscounts({});
@@ -1000,8 +1107,20 @@ export function Appointments() {
             <p>
               多套餐重复项目只计费一次；单项基价按套餐金额均分，叠加时取较高者，纯演示计价规则。
             </p>
+            {group?.packageChooseCount && (
+              <p>
+                该单位允许套餐中必须选择 {group.packageChooseCount} 套，当前已选{" "}
+                {packageIds.length} 套。
+              </p>
+            )}
             {state.packages
-              .filter((p) => p.id !== pkg)
+              .filter(
+                (p) =>
+                  p.id !== pkg &&
+                  (!group || group.packages.includes(p.id)) &&
+                  packageAvailableAtCampus(state, p.id, campus) &&
+                  packageIsApplicable(state, historyPatient, p.id),
+              )
               .map((p) => (
                 <label className="check-line" key={p.id}>
                   <input
@@ -1160,6 +1279,10 @@ export function Appointments() {
           onClose={() => setDetail("")}
           wide
         >
+          <RegistrationConsents
+            key={"registration-" + a.id}
+            appointmentId={a.id}
+          />
           <div className="detail-grid">
             <div>
               <label>体检号</label>
@@ -1693,6 +1816,14 @@ export function Exam() {
               ))}
             </tbody>
           </table>
+          <Suspense fallback={<p>载入身份对照…</p>}>
+            <IdentityPhotoViewer appointmentId={a.id} />
+          </Suspense>
+          <PastHistoryNotice
+            key={a.id + (p.pastMedicalHistory || "")}
+            appointmentId={a.id}
+          />
+          <RegistrationConsents key={"consent-" + a.id} appointmentId={a.id} />
           <ExamExtras key={a.id} appointmentId={a.id} />
           <p className="muted">
             快捷提交：Ctrl / ⌘ + Enter，执行同一必填与锁定校验。
@@ -2906,8 +3037,20 @@ export function Finance() {
         </Modal>
       )}
       <details>
+        <summary>订单支付明细与分组结算小计</summary>
+        <Suspense fallback={<p>载入结算明细…</p>}>
+          <SettlementDetails />
+        </Suspense>
+      </details>
+      <details>
         <summary>单位预算、预付款与项目结算</summary>
         <GroupContractWorkbench />
+      </details>
+      <details>
+        <summary>发票回款到期与业务员提醒</summary>
+        <Suspense fallback={<p>载入发票提醒…</p>}>
+          <InvoiceReminder />
+        </Suspense>
       </details>
       <details>
         <summary>交易关联发票台账</summary>

@@ -2,6 +2,17 @@ import { useState } from "react";
 import { useDemo } from "../store";
 import { getOrderRules } from "../orderingRules";
 import { Badge } from "../ui";
+
+const campusChoices = ["中心院区", "东院区"];
+const splitItemNames = (value: string) => [
+  ...new Set(
+    value
+      .split(/[、,，\n]/)
+      .map((name) => name.trim())
+      .filter(Boolean),
+  ),
+];
+
 export function OrderingRuleEditor() {
   const { state, act } = useDemo();
   const [item, setItem] = useState("腹部CT");
@@ -9,17 +20,52 @@ export function OrderingRuleEditor() {
   const [excludes, setExcludes] = useState("腹部彩超");
   const [sex, setSex] = useState("不限");
   const [marriage, setMarriage] = useState("不限");
+  const [bodyPart, setBodyPart] = useState("");
+  const [diseaseType, setDiseaseType] = useState("");
   const [nonDiscount, setNonDiscount] = useState(false);
   const [required, setRequired] = useState(false);
   const [price, setPrice] = useState(350);
-  const [pkg, setPkg] = useState("PK02");
-  const [minAge, setMinAge] = useState(0);
-  const [maxAge, setMaxAge] = useState(120);
-  const [company, setCompany] = useState("");
+  const initialPackageId = state.packages.some((p) => p.id === "PK02")
+    ? "PK02"
+    : state.packages[0]?.id || "";
+  const initialPackageRule = (state.records.packageRules || []).find(
+    (r) => r.packageId === initialPackageId,
+  );
+  const [pkg, setPkg] = useState(initialPackageId);
+  const [minAge, setMinAge] = useState(initialPackageRule?.minAge ?? 0);
+  const [maxAge, setMaxAge] = useState(initialPackageRule?.maxAge ?? 120);
+  const [company, setCompany] = useState(initialPackageRule?.company || "");
+  const [packageSex, setPackageSex] = useState(
+    initialPackageRule?.sex || "不限",
+  );
+  const [campuses, setCampuses] = useState<string[]>(
+    initialPackageRule?.campuses || [],
+  );
+  const [optionalItems, setOptionalItems] = useState(
+    (initialPackageRule?.optionalItems || []).join("、"),
+  );
+  const [choose, setChoose] = useState(initialPackageRule?.choose ?? 0);
   const [message, setMessage] = useState("");
+  const loadPackageRule = (packageId: string) => {
+    const rule = (state.records.packageRules || []).find(
+      (r) => r.packageId === packageId,
+    );
+    setPkg(packageId);
+    setMinAge(rule?.minAge ?? 0);
+    setMaxAge(rule?.maxAge ?? 120);
+    setCompany(rule?.company || "");
+    setPackageSex(rule?.sex || "不限");
+    setCampuses(rule?.campuses || []);
+    setOptionalItems((rule?.optionalItems || []).join("、"));
+    setChoose(rule?.choose ?? 0);
+    setMessage("");
+  };
   const persist = () => {
-    if (!item.trim() || price < 0) return setMessage("请输入项目名和非负价格");
-    for (const r of getOrderRules(state))
+    if (!item.trim() || !Number.isFinite(price) || price < 0)
+      return setMessage("请输入项目名和非负价格");
+    const rules = getOrderRules(state);
+    const existing = rules.find((r) => r.item === item.trim());
+    for (const r of rules)
       act({
         type: "UPSERT_RECORD",
         payload: { collection: "orderingRules", record: r },
@@ -29,14 +75,15 @@ export function OrderingRuleEditor() {
       payload: {
         collection: "orderingRules",
         record: {
-          id:
-            getOrderRules(state).find((r) => r.item === item.trim())?.id ||
-            "OR-" + item.trim(),
+          ...existing,
+          id: existing?.id || "OR-" + item.trim(),
           item: item.trim(),
           requires,
           excludes,
           sex,
           marriage,
+          bodyPart: bodyPart.trim(),
+          diseaseType: diseaseType.trim(),
           nonDiscount,
           required,
           price,
@@ -50,6 +97,54 @@ export function OrderingRuleEditor() {
       <div className="notice">
         以下规则仅为合成业务演示，不是医学适应证。保存后参与开单校验、去重与计费。
       </div>
+      <label>
+        小程序默认套餐必选套数
+        <input
+          type="number"
+          min="1"
+          max={state.packages.length}
+          value={state.config.packageChooseCount || 1}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (Number.isInteger(n) && n >= 1 && n <= state.packages.length)
+              act({
+                type: "UPDATE_CONFIG",
+                payload: { packageChooseCount: n },
+              });
+          }}
+        />
+      </label>
+      <p className="muted">
+        只影响个检 H5，单位优先使用团检订单约定；默认单套餐。
+      </p>
+      <label>
+        患者取消预约后的记录策略
+        <select
+          value={
+            state.config.cancellationPolicy === "deleteBusiness"
+              ? "deleteBusiness"
+              : "retain"
+          }
+          onChange={(e) =>
+            act({
+              type: "UPDATE_CONFIG",
+              payload: {
+                cancellationPolicy:
+                  e.target.value === "deleteBusiness"
+                    ? "deleteBusiness"
+                    : "retain",
+              },
+            })
+          }
+        >
+          <option value="retain">保留已取消记录（默认）</option>
+          <option value="deleteBusiness">删除可取消的本人本地业务记录</option>
+        </select>
+      </label>
+      <p className="muted">
+        删除策略仅作用于本人可取消的本地业务记录。审计记录和可恢复归档始终保留，
+        不会被取消操作删除或改写；这是本地合成演示，不涉及医院真实数据。
+      </p>
       <div className="form-grid">
         <label>
           规则项目
@@ -96,6 +191,22 @@ export function OrderingRuleEditor() {
             <option>未婚</option>
           </select>
         </label>
+        <label>
+          检查部位
+          <input
+            value={bodyPart}
+            onChange={(e) => setBodyPart(e.target.value)}
+            placeholder="例如：腹部"
+          />
+        </label>
+        <label>
+          疾病类型
+          <input
+            value={diseaseType}
+            onChange={(e) => setDiseaseType(e.target.value)}
+            placeholder="例如：代谢类（合成分类）"
+          />
+        </label>
       </div>
       <label className="check-line">
         <input
@@ -131,10 +242,15 @@ export function OrderingRuleEditor() {
               <td>
                 {r.item}
                 {r.required && <Badge>必检</Badge>}
+                {r.enabled === false && <Badge>项目停用</Badge>}
+                {r.ruleEnabled === false && <Badge>规则停用</Badge>}
               </td>
               <td>
                 {r.sex || "不限"} / {r.marriage || "不限"} · 依赖
                 {r.requires || "无"} · 互斥{r.excludes || "无"}
+                <br />
+                部位：{r.bodyPart || "未分类"} · 疾病类型：
+                {r.diseaseType || "未分类"}
               </td>
               <td>{r.nonDiscount ? "禁止折扣" : "可折扣"}</td>
               <td>
@@ -146,6 +262,8 @@ export function OrderingRuleEditor() {
                     setExcludes(r.excludes || "");
                     setSex(r.sex || "不限");
                     setMarriage(r.marriage || "不限");
+                    setBodyPart(r.bodyPart || "");
+                    setDiseaseType(r.diseaseType || "");
                     setRequired(!!r.required);
                     setNonDiscount(!!r.nonDiscount);
                     setPrice(r.price);
@@ -197,11 +315,11 @@ export function OrderingRuleEditor() {
           ))}
         </tbody>
       </table>
-      <h3>套餐适用与单位绑定</h3>
+      <h3>套餐适用、单位绑定与自选包</h3>
       <div className="form-grid">
         <label>
           规则套餐
-          <select value={pkg} onChange={(e) => setPkg(e.target.value)}>
+          <select value={pkg} onChange={(e) => loadPackageRule(e.target.value)}>
             {state.packages.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -231,22 +349,95 @@ export function OrderingRuleEditor() {
           限定单位（空为不限）
           <input value={company} onChange={(e) => setCompany(e.target.value)} />
         </label>
+        <label>
+          套餐适用性别
+          <select
+            value={packageSex}
+            onChange={(e) => setPackageSex(e.target.value)}
+          >
+            <option>不限</option>
+            <option>男</option>
+            <option>女</option>
+          </select>
+        </label>
+        <label>
+          套餐自选项目（以顿号、逗号或换行分隔）
+          <textarea
+            value={optionalItems}
+            onChange={(e) => setOptionalItems(e.target.value)}
+            placeholder="骨密度、腹部CT"
+          />
+        </label>
+        <label>
+          套餐自选项目必选数
+          <input
+            type="number"
+            min="0"
+            step="1"
+            max={splitItemNames(optionalItems).length}
+            value={choose}
+            onChange={(e) => setChoose(Number(e.target.value))}
+          />
+        </label>
       </div>
+      <fieldset>
+        <legend>套餐可预约院区（不勾选表示全部院区）</legend>
+        {campusChoices.map((campus) => (
+          <label className="check-line" key={campus}>
+            <input
+              type="checkbox"
+              checked={campuses.includes(campus)}
+              onChange={(e) =>
+                setCampuses((current) =>
+                  e.target.checked
+                    ? [...new Set([...current, campus])]
+                    : current.filter((value) => value !== campus),
+                )
+              }
+            />
+            {campus}
+          </label>
+        ))}
+      </fieldset>
+      <p className="muted">
+        自选包属于当前套餐，与默认必选套餐套数独立配置。当前有
+        {splitItemNames(optionalItems).length} 个去重后的自选项目，需选 {choose}{" "}
+        个。
+      </p>
       <button
         className="btn"
         onClick={() => {
-          if (minAge > maxAge) return setMessage("年龄区间无效");
+          if (!state.packages.some((p) => p.id === pkg))
+            return setMessage("请选择有效套餐");
+          if (
+            !Number.isInteger(minAge) ||
+            !Number.isInteger(maxAge) ||
+            minAge < 0 ||
+            maxAge > 120 ||
+            minAge > maxAge
+          )
+            return setMessage("年龄区间须为 0–120 岁以内的有效整数");
+          const names = splitItemNames(optionalItems);
+          if (!Number.isInteger(choose) || choose < 0 || choose > names.length)
+            return setMessage("自选必选数须为 0 到去重后自选项目数之间的整数");
+          const existing = (state.records.packageRules || []).find(
+            (r) => r.packageId === pkg,
+          );
           act({
             type: "UPSERT_RECORD",
             payload: {
               collection: "packageRules",
               record: {
-                id: "PKR-" + pkg,
+                ...existing,
+                id: existing?.id || "PKR-" + pkg,
                 packageId: pkg,
                 minAge,
                 maxAge,
-                sex,
-                company,
+                sex: packageSex,
+                company: company.trim(),
+                campuses: [...new Set(campuses)],
+                optionalItems: names,
+                choose,
               },
             },
           });
@@ -258,7 +449,16 @@ export function OrderingRuleEditor() {
       {(state.records.packageRules || []).map((r) => (
         <p key={r.id}>
           {state.packages.find((p) => p.id === r.packageId)?.name}：{r.minAge}–
-          {r.maxAge}岁 / {r.sex} / {r.company || "不限单位"}{" "}
+          {r.maxAge}岁 / {r.sex} / {r.company || "不限单位"} / 院区：
+          {r.campuses?.length ? r.campuses.join("、") : "全部院区"} / 自选：
+          {r.optionalItems?.length ? r.optionalItems.join("、") : "无"}
+          （选 {r.choose ?? 0} 项）{" "}
+          <button
+            className="text-btn"
+            onClick={() => loadPackageRule(r.packageId)}
+          >
+            载入套餐规则
+          </button>
           <button
             className="text-btn"
             onClick={() =>

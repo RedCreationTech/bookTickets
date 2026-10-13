@@ -1,5 +1,10 @@
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
+> hongchuang-health-demo@1.0.0 check
+> npm run lint && npm run typecheck && npm test && npm run build
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
 > hongchuang-health-demo@1.0.0 lint
 > eslint src
 
@@ -16,87 +21,20 @@ npm notice
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
 > hongchuang-health-demo@1.0.0 test
-> vitest run --reporter=default --reporter=json --outputFile=docs/all-test-results.json
+> vitest run
 
 
  RUN  v5.0.4 /workspace/scratch/a2368a7aae38/bookTickets
 
- ✓ tests/devices.test.tsx (40 tests) 8928ms
-   ✓ 患者 H5 业务流程 (6)
-     ✓ 从预约进入套餐比较，展示不同项目的具体检查意义 466ms
-     ✓ 预约需确认须知，创建后可模拟支付并在电子导检中查看 605ms
-     ✓ 单位入口二维码是真实 SVG，单位链接直接进入对应预约并拆分单位/自费金额 391ms
-     ✓ 改期与取消保留订单及操作记录 433ms
-   ✓ 预约规则与防重复提交 (7)
-     ✓ H5 开放增删时实际保留选择项目，重复确认只创建一单且新流程可再次预约 612ms
-   ✓ 自助终端业务与异常状态 (5)
-     ✓ 离线识别失败、恢复可重试，120秒无操作后清除身份 311ms
-   ✓ 单位排期、时钟、问卷与门户配置闭环 (11)
-     ✓ 必填问卷阻止H5预约，完成后写入问卷答案且推荐关闭不加项目 400ms
-     ✓ 问卷可跳过、关闭不拦截，开启推荐会选入对应参考项目 315ms
-   ✓ 合成身份、来源二维码与患者排队 (4)
-     ✓ 合成注册拒绝真实号码格式，新增体检人及常用关联并可移除关联 426ms
-     ✓ 个人推广二维码编码来源且新订单实时计入来源统计 310ms
-   ✓ 共享单位订单与问卷上下游 (4)
-     ✓ 共享单位订单限制套餐及自选数量，按共享规则计算单位与个人分摊 374ms
- ✓ tests/independent-qa.test.tsx (50 tests) 8493ms
-   ✓ independent QA: cross-surface lifecycle and persistence (3)
-     ✓ runs H5 booking/payment → kiosk check-in → exam → three-stage review → report printing/binding → followup 2281ms
-     ✓ supports cancel/back without cancelling until confirmed, survives remount, and blocks cancelled check-in 353ms
-   ✓ independent QA: selected star-clause interactions and regression cases (8)
-     ✓ T0015 group entry carries an explicit unit identifier and renders a real QR SVG (scan not tested) 318ms
-   ✓ independent QA: route render smoke (DOM only) (21)
-     ✓ /analytics mounts without an exception and renders a page heading 333ms
-     ✓ /controls mounts without an exception and renders a page heading 327ms
-     ✓ /coverage mounts without an exception and renders a page heading 489ms
-   ✓ independent QA: final entrypoint integration (3)
-     ✓ opens the actual appointment CSV import entry, validates a sample, and persists its booking once 550ms
- ✓ tests/operations.test.tsx (39 tests) 7000ms
-   ✓ Operations working business flows (9)
-     ✓ advances a service order only through its permitted lifecycle and retains history 425ms
-     ✓ never reseeds a deleted collection after navigating away and back 355ms
- ✓ tests/independent-v2.test.tsx (20 tests) 3823ms
-   ✓ Independent v2: scopes and repeat-activation regressions (4)
-     ✓ does not expose or let a scoped role handle another patient’s global alert 379ms
-   ✓ Independent v2: unit budget and personnel consumers (5)
-     ✓ H5 consumes the active unit contract and subgroup package, not the old fixed 800 budget 721ms
-   ✓ Independent v2: additional scope and cancellation edges (3)
-     ✓ scoped workload logs do not reveal another patient’s structured before/after snapshot 323ms
- ✓ tests/review-tools.test.tsx (22 tests) 2112ms
-   ✓ dedicated review controls and report operations (22)
-     ✓ RT01 / T0286 T0288 saves date schedules, assigns shared orders, updates workload and prevents duplicate assignments 345ms
- ✓ tests/control-center.test.tsx (13 tests) 1370ms
-   ✓ Dedicated local service and quality controls (8)
-     ✓ validates recipients, previews resolved messages, and records per-recipient failure and retry history 434ms
- ✓ tests/queue-controls.test.tsx (7 tests) 1197ms
-   ✓ Queue controls and display effects (6)
-     ✓ batch closing suspends calls and prevents adding/calling; reopening permits dispatch 444ms
- ✓ tests/execution-desk.test.tsx (9 tests) 1246ms
-   ✓ Print execution desk (4)
-     ✓ consumes automatic order-created tasks then confirms local execution with persisted target and prevents repeats 371ms
- ✓ tests/core.test.tsx (7 tests) 1382ms
-   ✓ core frontend interactions (7)
-     ✓ U01 creates a booking, persists it and records payment 357ms
- ✓ tests/ordering-clinical.test.tsx (17 tests) 983ms
- ✓ tests/advanced-core.test.tsx (7 tests) 811ms
-   ✓ advanced frontend scenarios (7)
-     ✓ A01 queue departments have independent membership and completion 304ms
- ✓ tests/independent-brand.test.tsx (5 tests) 659ms
-   ✓ Independent brand migration: existing business data preserved (5)
-     ✓ loads legacy data into the new key, replaces visible portal/template branding and preserves business identifiers and values 375ms
- ✓ tests/advanced.test.tsx (7 tests) 451ms
- ✓ tests/reliability.test.tsx (3 tests) 398ms
- ✓ tests/model.test.ts (9 tests) 18ms
 
- Test Files  15 passed (15)
-      Tests  255 passed (255)
-   Start at  10:36:43
-   Duration  54.93s (tests 74%, environment 18%, import 4%, setup 3%, transform 1%)
+ Test Files  19 passed (19)
+      Tests  335 passed (335)
+   Start at  11:21:35
+   Duration  77.77s (tests 77%, environment 16%, import 4%, setup 3%, transform 1%)
 
-    Isolate  15 workers spawned · ~782ms startup each (spawn + environment, per file)
-             at least ~10.95s faster with isolate: false — reuses workers across files instead of one per file
+    Isolate  19 workers spawned · ~769ms startup each (spawn + environment, per file)
+             at least ~13.84s faster with isolate: false — reuses workers across files instead of one per file
 
-JSON report written to /workspace/scratch/a2368a7aae38/bookTickets/docs/all-test-results.json
 npm notice
 npm notice New major version of npm available! 11.9.0 -> 12.2.0
 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
@@ -109,34 +47,42 @@ npm warn Unknown env config "http-proxy". This will stop working in the next maj
 
 vite v8.3.4 building client environment for production...
 transforming...
-✓ 1755 modules transformed.
+✓ 1759 modules transformed.
 rendering chunks...
 computing gzip size...
-dist/index.html                                  0.66 kB │ gzip:   0.49 kB
+dist/index.html                                  0.67 kB │ gzip:   0.50 kB
 dist/assets/devices-B8IuIHRz.css                50.66 kB │ gzip:  10.96 kB
 dist/assets/index-DJGUvhtu.css                  53.01 kB │ gzip:  12.00 kB
-dist/assets/chart-column-CcHP_zy5.js             0.23 kB │ gzip:   0.18 kB
-dist/assets/heart-BB_yxv6c.js                    0.57 kB │ gzip:   0.33 kB
-dist/assets/fingerprint-pattern-CCzgd_Gi.js      0.59 kB │ gzip:   0.34 kB
-dist/assets/devices-3QoQvArT.js                  0.72 kB │ gzip:   0.41 kB
-dist/assets/Advanced-BL10OFs7.js                18.65 kB │ gzip:   6.70 kB
-dist/assets/x-Bb2HgqRr.js                       19.31 kB │ gzip:   7.93 kB
-dist/assets/Kiosk-F7dWLGMa.js                   29.65 kB │ gzip:   9.41 kB
-dist/assets/ControlCenter-CKbNIUYP.js           43.76 kB │ gzip:  13.92 kB
-dist/assets/Patient-DIt31w1d.js                 67.04 kB │ gzip:  19.93 kB
-dist/assets/Health-vZCCTgye.js                  77.92 kB │ gzip:  22.08 kB
-dist/assets/index-DCi7y903.js                  556.52 kB │ gzip: 165.88 kB
-dist/assets/Coverage-A_Lt08Yj.js             1,334.11 kB │ gzip: 107.59 kB
+dist/assets/chart-column-Cb9znGYo.js             0.25 kB │ gzip:   0.19 kB
+dist/assets/heart-BSR9J6_-.js                    0.58 kB │ gzip:   0.34 kB
+dist/assets/fingerprint-pattern-Im0iCyJs.js      0.61 kB │ gzip:   0.35 kB
+dist/assets/devices-DzlnauQc.js                  0.73 kB │ gzip:   0.42 kB
+dist/assets/InvoiceReminder-BPekg21a.js          9.03 kB │ gzip:   3.70 kB
+dist/assets/SettlementDetails-BkJRbmO3.js        9.28 kB │ gzip:   3.36 kB
+dist/assets/Advanced--qp2cGs_.js                18.66 kB │ gzip:   6.71 kB
+dist/assets/createLucideIcon-DJQlMj-G.js        21.11 kB │ gzip:   8.44 kB
+dist/assets/Kiosk-h_8Czj_N.js                   29.66 kB │ gzip:   9.43 kB
+dist/assets/ControlCenter-DklnpbwD.js           59.02 kB │ gzip:  17.88 kB
+dist/assets/Patient-ChnW1XEJ.js                 77.88 kB │ gzip:  23.69 kB
+dist/assets/Health-PHjmYHPx.js                  86.60 kB │ gzip:  25.00 kB
+dist/assets/index-DXTwoUoY.js                  604.35 kB │ gzip: 179.01 kB
+dist/assets/Coverage-Cuq78luJ.js             1,352.15 kB │ gzip: 113.79 kB
 
+✓ built in 571ms
 [plugin builtin:vite-reporter] 
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 451ms
 npm notice
 npm notice New major version of npm available! 11.9.0 -> 12.2.0
 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
 npm notice To update run: npm install -g npm@12.2.0
 npm notice
-{"result": "PASS", "clauses": 225, "items": 945, "software": 778, "hardware": 167, "starItems": 14, "starClauses": 10, "status": {"partial": 419, "demonstrated": 308, "config-only": 51, "hardware-unverifiable": 167}, "classification": {"mock": 607, "frontend": 122, "unverifiable": 216}, "softwareClauseEntries": {"interaction-entry": 180, "config-only-entry": 24, "no-dedicated-entry": 0}, "automatedSubsetItems": 278, "businessAcceptance": "not-claimed"}
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice
+
+Coverage structure check: PASS (see coverage-check-result.json).

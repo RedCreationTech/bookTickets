@@ -1,0 +1,23 @@
+{
+  "baseline": {
+    "commit": "0054bc7e80044e89146db441a8dde5b8b93a0188",
+    "run": "https://github.com/RedCreationTech/bookTickets/actions/runs/38329801892",
+    "vitest": 123,
+    "chromiumPassed": 12
+  },
+  "redBrandSnapshot": {
+    "commit": "1bb6be07647a6ac3c295f8082c375c18bd9b30ff",
+    "run": "https://github.com/RedCreationTech/bookTickets/actions/runs/38333647742",
+    "jobId": 115088773436,
+    "conclusion": "success",
+    "vitest": 255,
+    "chromiumPassed": 17,
+    "chromiumSkipped": 1,
+    "skipReason": "Mobile project does not repeat desktop-only role screenshots",
+    "artifactId": 11783996978,
+    "screenshotCount": 24,
+    "screenshotsActuallyOpened": 24,
+    "visualReview": "No obvious page-level horizontal overflow or overlapping primary controls. Mobile administrative tables intentionally scroll within their container. Not an accessibility or physical-device acceptance test."
+  },
+  "finalSource": "Pending its corresponding run; prior success is not extrapolated."
+}

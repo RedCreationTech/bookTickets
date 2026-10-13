@@ -21,6 +21,9 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
     p?.customerType || "regular",
   );
   const [company, setCompany] = useState(p?.company || "个检");
+  const [pastMedicalHistory, setPastMedicalHistory] = useState(
+    p?.pastMedicalHistory || "合成：无特殊既往史",
+  );
   const [message, setMessage] = useState("");
   const [mapping, setMapping] = useState("regular");
   const types = state.records.customerTypes || defaultCustomerTypes;
@@ -102,6 +105,18 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
           <input value={company} onChange={(e) => setCompany(e.target.value)} />
         </label>
       </div>
+      <label>
+        自定义既往史（仅合成资料）
+        <textarea
+          aria-label="自定义既往史（仅合成资料）"
+          value={pastMedicalHistory}
+          onChange={(e) => setPastMedicalHistory(e.target.value)}
+          maxLength={500}
+        />
+      </label>
+      <p className="muted">
+        以“合成：”开头，此文本会提示后续分检医生，不生成医学诊断。
+      </p>
       <button
         className="btn btn-primary"
         onClick={() => {
@@ -118,6 +133,8 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
             )
           )
             return setMessage("合成证件已存在，请勿重复登记");
+          if (!pastMedicalHistory.startsWith("合成："))
+            return setMessage("既往史只接受以合成：开头的演示资料");
           act({
             type: "UPSERT_PATIENT",
             payload: {
@@ -129,6 +146,7 @@ export function RegistrationProfile({ patientId }: { patientId?: string }) {
               certificateType,
               certificate,
               customerType,
+              pastMedicalHistory,
               company,
               phone: p?.phone || "演示未填写",
               risk: p?.risk || "待评估",

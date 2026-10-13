@@ -25,6 +25,8 @@ import {
   isCriticalReviewAppointment,
   sortReviewAppointments,
   queryReportOperations,
+  resolveGuideRecoveryCode,
+  unfinishedGuideItems,
   REVIEW_ORDER_TYPES,
 } from "../src/modules/ReviewTools";
 const KEY = "hongchuang.health.demo.v1";
@@ -670,5 +672,304 @@ describe("dedicated review controls and report operations", () => {
     mount(<ReportOperations statisticsOnly />);
     change("统计标本类型", "其他外部合成类型");
     expect(screen.getByTestId("specimen-count")).toHaveTextContent("1");
+  });
+  it("RT23 / T0176 T0373 manual recovery previews unfinished items, excludes waived checks and saves the receipt snapshot without completing exams", () => {
+    const s = seed((s) => {
+      s.appointments[0].items = [
+        "已完成项目",
+        "待查项目",
+        "已弃检项目",
+        "空白结果项目",
+      ];
+      s.appointments[0].results = {
+        已完成项目: "合成已完成",
+        空白结果项目: "   ",
+      };
+      s.appointments[0].waived = ["已弃检项目"];
+    });
+    const a = s.appointments[0];
+    mount(<ReportOperations />);
+    expect(unfinishedGuideItems(a)).toEqual(["待查项目", "空白结果项目"]);
+    const notice = screen.getByLabelText("未完成检查项目提示");
+    expect(within(notice).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(notice).getByRole("list")).not.toHaveTextContent(
+      "已弃检项目",
+    );
+    change("业务登记订单", s.appointments[4].id);
+    expect(screen.getByLabelText("未完成检查项目提示")).toHaveTextContent(
+      "无未完成检查项目",
+    );
+    change("业务登记订单", a.id);
+    click("登记 / 更正导检单回收");
+    expect(screen.getByLabelText("回收确认未完成项目")).toHaveTextContent(
+      "待查项目",
+    );
+    dialogClick("保存业务登记");
+    expect(state().records.guideRecoveries[0]).toMatchObject({
+      appointmentId: a.id,
+      recoveryMode: "manual",
+      unfinishedItems: ["待查项目", "空白结果项目"],
+    });
+    expect(current(a.id).results).toEqual(a.results);
+    expect(current(a.id).status).toBe("in_exam");
+    expect(
+      screen.getByText(/回收时未完成项目：待查项目、空白结果项目/),
+    ).toBeInTheDocument();
+  });
+  it("RT24 / T0176 T0373 barcode mode resolves synthetic examination number and ID, cancels safely, then prevents duplicate recovery", () => {
+    const s = seed((s) => {
+      s.appointments[0].examNo = "DEMO-EXAM-001";
+    });
+    const a = s.appointments[0];
+    mount(<ReportOperations />);
+    change("导检单回收方式", "barcode");
+    expect(
+      screen.queryByRole("button", { name: "登记 / 更正导检单回收" }),
+    ).not.toBeInTheDocument();
+    change("合成导检单条码", " GUIDE-DEMO-EXAM-001 ");
+    click("识别导检单并登记回收");
+    expect(screen.getByRole("dialog")).toHaveTextContent(a.id);
+    expect(screen.getByRole("dialog")).toHaveTextContent("模拟条码输入");
+    dialogClick("取消");
+    expect(state().records.guideRecoveries).toBeUndefined();
+    change("合成导检单条码", a.id);
+    fireEvent.keyDown(screen.getByLabelText("合成导检单条码"), {
+      key: "Enter",
+    });
+    dialogClick("保存业务登记");
+    expect(state().records.guideRecoveries[0]).toMatchObject({
+      appointmentId: a.id,
+      recoveryMode: "barcode",
+      recoveryCode: a.id,
+    });
+    const audit = state().audit.length;
+    click("识别导检单并登记回收");
+    expect(screen.getByRole("alert")).toHaveTextContent("不能重复回收");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(state().records.guideRecoveries).toHaveLength(1);
+    expect(state().audit).toHaveLength(audit);
+    expect(screen.getByTestId("guide-count")).toHaveTextContent("1");
+  });
+  it("RT25 / T0176 T0373 empty, invalid, not-arrived and cancelled recovery codes are rejected without writes", () => {
+    const s = seed((s) => {
+      s.appointments[3].status = "cancelled";
+    });
+    mount(<ReportOperations />);
+    change("导检单回收方式", "barcode");
+    click("识别导检单并登记回收");
+    expect(screen.getByRole("alert")).toHaveTextContent("请输入合成预约 ID");
+    change("合成导检单条码", "INVALID-DEMO-ID");
+    click("识别导检单并登记回收");
+    expect(screen.getByRole("alert")).toHaveTextContent("未找到");
+    change("合成导检单条码", s.appointments[1].id);
+    click("识别导检单并登记回收");
+    expect(screen.getByRole("alert")).toHaveTextContent("尚未到检");
+    change("合成导检单条码", s.appointments[3].id);
+    click("识别导检单并登记回收");
+    expect(screen.getByRole("alert")).toHaveTextContent("已取消");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(state().records.guideRecoveries).toBeUndefined();
+    expect(state().audit).toHaveLength(s.audit.length);
+  });
+  it("RT26 / T0176 T0373 ambiguous examination numbers and codes outside a fixed order scope never select the wrong order", () => {
+    const s = seed((s) => {
+      s.appointments[0].examNumber = "DEMO-SHARED";
+      s.appointments[4].examNumber = "DEMO-SHARED";
+    });
+    expect(resolveGuideRecoveryCode(s, "DEMO-SHARED").error).toContain(
+      "多个订单",
+    );
+    expect(
+      resolveGuideRecoveryCode(s, s.appointments[0].id).appointment?.id,
+    ).toBe(s.appointments[0].id);
+    mount(<ReportOperations appointmentId={s.appointments[4].id} />);
+    change("导检单回收方式", "barcode");
+    change("合成导检单条码", s.appointments[0].id);
+    click("识别导检单并登记回收");
+    expect(screen.getByRole("alert")).toHaveTextContent("其他订单");
+    expect(state().records.guideRecoveries).toBeUndefined();
+  });
+  it("RT27 / T0373 manual corrections remain idempotent after a barcode receipt and do not create another workload record", () => {
+    const s = seed(),
+      a = s.appointments[0];
+    mount(<ReportOperations appointmentId={a.id} />);
+    change("导检单回收方式", "barcode");
+    change("合成导检单条码", a.id);
+    click("识别导检单并登记回收");
+    dialogClick("保存业务登记");
+    change("导检单回收方式", "manual");
+    click("登记 / 更正导检单回收");
+    change("业务登记说明", "合成更正说明");
+    dialogClick("保存业务登记");
+    expect(state().records.guideRecoveries).toHaveLength(1);
+    expect(screen.getByTestId("guide-count")).toHaveTextContent("1");
+    const n = state().audit.length;
+    click("登记 / 更正导检单回收");
+    dialogClick("保存业务登记");
+    expect(state().audit).toHaveLength(n);
+    expect(current(a.id).guideRecovered).toBe(true);
+  });
+  it("RT28 / T0373 barcode re-registration after explicit cancellation reuses the original receipt and removes cancelled workload", () => {
+    const s = seed(),
+      a = s.appointments[0];
+    mount(<ReportOperations appointmentId={a.id} />);
+    click("登记 / 更正导检单回收");
+    dialogClick("保存业务登记");
+    const id = state().records.guideRecoveries[0].id;
+    click(`撤销导检单回收${a.id}`);
+    change("业务登记说明", "合成重新回收");
+    dialogClick("确认撤销业务登记");
+    expect(screen.getByTestId("guide-count")).toHaveTextContent("0");
+    change("导检单回收方式", "barcode");
+    change("合成导检单条码", `GUIDE-${a.id}`);
+    click("识别导检单并登记回收");
+    dialogClick("保存业务登记");
+    expect(state().records.guideRecoveries).toHaveLength(1);
+    expect(state().records.guideRecoveries[0]).toMatchObject({
+      id,
+      status: "active",
+      recoveryMode: "barcode",
+    });
+    expect(screen.getByTestId("guide-count")).toHaveTextContent("1");
+  });
+  it("RT29 / T0176 T0373 switching recovery mode clears stale scan text and unarrived manual orders stay disabled", () => {
+    const s = seed();
+    const view = mount(<ReportOperations />);
+    change("导检单回收方式", "barcode");
+    change("合成导检单条码", "STALE-DEMO-CODE");
+    change("导检单回收方式", "manual");
+    change("导检单回收方式", "barcode");
+    expect(screen.getByLabelText("合成导检单条码")).toHaveValue("");
+    expect(state().records.guideRecoveries).toBeUndefined();
+    view.unmount();
+    mount(<ReportOperations appointmentId={s.appointments[1].id} />);
+    expect(
+      screen.getByRole("button", { name: "登记 / 更正导检单回收" }),
+    ).toBeDisabled();
+  });
+  it("RT30 / T0255 receive-only action preserves examination results, lock and stage and records no item confirmations", () => {
+    const s = seed((s) => {
+        s.appointments[0].locked = true;
+      }),
+      a = s.appointments[0];
+    mount(<ReportOperations appointmentId={a.id} />);
+    click("登记 / 更正导检单回收");
+    expect(screen.getByLabelText("导检单回收业务动作")).toHaveValue(
+      "receive_only",
+    );
+    expect(screen.queryByLabelText("回收项目人工确认")).not.toBeInTheDocument();
+    dialogClick("保存业务登记");
+    expect(state().records.guideRecoveries[0]).toMatchObject({
+      recoveryAction: "receive_only",
+      itemConfirmations: [],
+    });
+    expect(current(a.id).results).toEqual(a.results);
+    expect(current(a.id).locked).toBe(true);
+    expect(current(a.id).status).toBe(a.status);
+    expect(current(a.id).reviewStage).toBe(a.reviewStage);
+  });
+  it("RT31 / T0255 receive-and-confirm requires every item, rejects unsupported completion and saves explicit done/not-done snapshots", () => {
+    const s = seed((s) => {
+        s.appointments[0].items = ["合成已检项目", "合成未检项目"];
+        s.appointments[0].results = { 合成已检项目: "演示结果" };
+      }),
+      a = s.appointments[0];
+    mount(<ReportOperations appointmentId={a.id} />);
+    click("登记 / 更正导检单回收");
+    change("导检单回收业务动作", "receive_and_confirm");
+    dialogClick("保存业务登记");
+    expect(screen.getByRole("alert")).toHaveTextContent("2 个项目未人工确认");
+    expect(state().records.guideRecoveries).toBeUndefined();
+    change("确认回收项目 合成已检项目", "done");
+    dialogClick("保存业务登记");
+    expect(screen.getByRole("alert")).toHaveTextContent("1 个项目未人工确认");
+    expect(
+      within(screen.getByLabelText("确认回收项目 合成未检项目")).getByRole(
+        "option",
+        { name: "已做（已有分检结果）" },
+      ),
+    ).toBeDisabled();
+    change("确认回收项目 合成未检项目", "done");
+    dialogClick("保存业务登记");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "没有分检结果，不能确认已做",
+    );
+    change("确认回收项目 合成未检项目", "not_done");
+    dialogClick("保存业务登记");
+    expect(state().records.guideRecoveries[0]).toMatchObject({
+      recoveryAction: "receive_and_confirm",
+      itemConfirmations: [
+        {
+          item: "合成已检项目",
+          disposition: "done",
+          hasResult: true,
+          result: "演示结果",
+        },
+        {
+          item: "合成未检项目",
+          disposition: "not_done",
+          hasResult: false,
+          result: "",
+        },
+      ],
+    });
+    expect(current(a.id).results).toEqual(a.results);
+    expect(current(a.id).status).toBe("in_exam");
+    expect(
+      screen.getByText(
+        /项目确认：合成已检项目（已做）、合成未检项目（未做 \/ 待分检）/,
+      ),
+    ).toBeInTheDocument();
+  });
+  it("RT32 / T0255 cancelling item confirmation writes nothing, while reopening a saved confirmation retains values without duplicate work", () => {
+    const s = seed((s) => {
+        s.appointments[0].items = ["合成项目"];
+        s.appointments[0].results = {};
+      }),
+      a = s.appointments[0];
+    mount(<ReportOperations appointmentId={a.id} />);
+    click("登记 / 更正导检单回收");
+    change("导检单回收业务动作", "receive_and_confirm");
+    change("确认回收项目 合成项目", "not_done");
+    dialogClick("取消");
+    expect(state().records.guideRecoveries).toBeUndefined();
+    click("登记 / 更正导检单回收");
+    change("导检单回收业务动作", "receive_and_confirm");
+    change("确认回收项目 合成项目", "not_done");
+    dialogClick("保存业务登记");
+    const n = state().audit.length;
+    click("登记 / 更正导检单回收");
+    expect(screen.getByLabelText("导检单回收业务动作")).toHaveValue(
+      "receive_and_confirm",
+    );
+    expect(screen.getByLabelText("确认回收项目 合成项目")).toHaveValue(
+      "not_done",
+    );
+    dialogClick("保存业务登记");
+    expect(state().audit).toHaveLength(n);
+    expect(state().records.guideRecoveries).toHaveLength(1);
+    expect(screen.getByTestId("guide-count")).toHaveTextContent("1");
+  });
+  it("RT33 / T0255 barcode input independently supports the confirmation business action and still blocks duplicate receipt", () => {
+    const s = seed((s) => {
+        s.appointments[0].items = ["合成项目"];
+        s.appointments[0].results = { 合成项目: "已回传合成结果" };
+      }),
+      a = s.appointments[0];
+    mount(<ReportOperations appointmentId={a.id} />);
+    change("导检单回收方式", "barcode");
+    change("合成导检单条码", a.id);
+    click("识别导检单并登记回收");
+    change("导检单回收业务动作", "receive_and_confirm");
+    change("确认回收项目 合成项目", "done");
+    dialogClick("保存业务登记");
+    expect(state().records.guideRecoveries[0]).toMatchObject({
+      recoveryMode: "barcode",
+      recoveryAction: "receive_and_confirm",
+      itemConfirmations: [{ item: "合成项目", disposition: "done" }],
+    });
+    click("识别导检单并登记回收");
+    expect(screen.getByRole("alert")).toHaveTextContent("不能重复回收");
+    expect(state().records.guideRecoveries).toHaveLength(1);
   });
 });

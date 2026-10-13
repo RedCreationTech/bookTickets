@@ -27,10 +27,48 @@ export function applicableGroup(
         personnelGroupId: subgroup.id,
         personnelGroupName: subgroup.name,
         packages: [subgroup.packageId],
+        packageChooseCount: 1,
         optionalItems: subgroup.optionalItems || group.optionalItems,
         choose: subgroup.choose ?? group.choose,
       }
     : group;
+}
+export function groupForBooking(
+  s: DemoState,
+  patientId: string,
+  date: string,
+  context: {
+    relative?: boolean;
+    sponsorPatientId?: string;
+    company?: string;
+  } = {},
+) {
+  if (!context.relative) return applicableGroup(s, patientId, date);
+  if (
+    !s.patients.some((p) => p.id === patientId) ||
+    !context.sponsorPatientId ||
+    context.sponsorPatientId === patientId
+  )
+    return undefined;
+  const group = applicableGroup(s, context.sponsorPatientId, date);
+  if (!group || (context.company && group.company !== context.company))
+    return undefined;
+  return {
+    ...group,
+    packages: group.relativePackages?.length
+      ? group.relativePackages
+      : group.packages,
+    relativeBooking: true,
+    sponsorPatientId: context.sponsorPatientId,
+  };
+}
+export function groupDiscountPercent(group: any, relative = false) {
+  const value = Number(
+    relative
+      ? (group?.relativeDiscount ?? group?.discount ?? 100)
+      : (group?.discount ?? 100),
+  );
+  return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 100;
 }
 export function splitGroupAmount(
   group: any,
@@ -68,6 +106,11 @@ export function GroupContractWorkbench() {
   const [personal, setPersonal] = useState("肺功能");
   const [extras, setExtras] = useState("骨密度、颈动脉彩超");
   const [choose, setChoose] = useState(1);
+  const [packageChooseCount, setPackageChooseCount] = useState(1);
+  const [discount, setDiscount] = useState(100);
+  const [relativeDiscount, setRelativeDiscount] = useState(100);
+  const [relativePayment, setRelativePayment] = useState("self");
+  const [relativePackages, setRelativePackages] = useState<string[]>([]);
   const [money, setMoney] = useState(1000);
   const [message, setMessage] = useState("");
   const [subgroupName, setSubgroupName] = useState("一线员工");
@@ -95,6 +138,11 @@ export function GroupContractWorkbench() {
     setPersonal((g.personalItems || []).join("、"));
     setExtras((g.optionalItems || []).join("、"));
     setChoose(g.choose || 0);
+    setPackageChooseCount(g.packageChooseCount || 1);
+    setDiscount(g.discount ?? 100);
+    setRelativeDiscount(g.relativeDiscount ?? g.discount ?? 100);
+    setRelativePayment(g.relativePayment || "self");
+    setRelativePackages(g.relativePackages || []);
     setStartDate(g.startDate);
     setEndDate(g.endDate);
     setMessage("");
@@ -204,6 +252,16 @@ export function GroupContractWorkbench() {
           />
         </label>
       </div>
+      <label>
+        允许套餐必须选M套
+        <input
+          type="number"
+          min="1"
+          max={packages.length || 1}
+          value={packageChooseCount}
+          onChange={(e) => setPackageChooseCount(Number(e.target.value))}
+        />
+      </label>
       <h3>允许套餐</h3>
       {state.packages.map((p) => (
         <label className="check-line" key={p.id}>
@@ -219,6 +277,60 @@ export function GroupContractWorkbench() {
             }
           />
           {p.name}
+        </label>
+      ))}
+      <h3>单位折扣与亲属预约承担方式</h3>
+      <p className="muted">
+        折扣以百分比保存；不参与折扣项目仍按原价。亲属须关联有效单位员工，真实身份与支付均未验证。
+      </p>
+      <div className="form-grid">
+        <label>
+          单位执行折扣（%）
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={discount}
+            onChange={(e) => setDiscount(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          亲属执行折扣（%）
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={relativeDiscount}
+            onChange={(e) => setRelativeDiscount(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          亲属付款策略
+          <select
+            value={relativePayment}
+            onChange={(e) => setRelativePayment(e.target.value)}
+          >
+            <option value="self">享单位折扣后全额自费</option>
+            <option value="unit">单位按预算承担，超额及个人项目自费</option>
+          </select>
+        </label>
+      </div>
+      <h4>亲属专属套餐（未选沿用单位套餐）</h4>
+      {state.packages.map((pack) => (
+        <label key={pack.id} className="check-line">
+          <input
+            type="checkbox"
+            aria-label={`亲属专属套餐：${pack.name}`}
+            checked={relativePackages.includes(pack.id)}
+            onChange={(e) =>
+              setRelativePackages(
+                e.target.checked
+                  ? [...relativePackages, pack.id]
+                  : relativePackages.filter((id) => id !== pack.id),
+              )
+            }
+          />
+          {pack.name}
         </label>
       ))}
       <h3>单位名单（未选表示全员）</h3>
@@ -250,6 +362,24 @@ export function GroupContractWorkbench() {
             startDate > endDate
           )
             return setMessage("请核对名称、套餐、非负预算和日期");
+          if (
+            !Number.isInteger(packageChooseCount) ||
+            packageChooseCount < 1 ||
+            packageChooseCount > packages.length ||
+            (mode === "固定套餐" && packageChooseCount !== 1)
+          )
+            return setMessage("套餐N选M数量须在允许范围内，固定套餐只能选1套");
+          if (
+            ![discount, relativeDiscount].every(
+              (value) => Number.isFinite(value) && value >= 0 && value <= 100,
+            )
+          )
+            return setMessage("单位和亲属折扣须在 0 至 100 之间");
+          if (
+            relativePackages.length &&
+            relativePackages.length < packageChooseCount
+          )
+            return setMessage("亲属专属套餐数量不足以满足必选套数");
           const optionalItems = extras
             .split(/[、,]/)
             .map((x) => x.trim())
@@ -258,6 +388,7 @@ export function GroupContractWorkbench() {
             return setMessage("N选M数量超出自选包范围");
           const key = id || "GO-" + Date.now();
           upsert("groupOrders", {
+            ...selected,
             id: key,
             name,
             company,
@@ -266,6 +397,11 @@ export function GroupContractWorkbench() {
             startDate,
             endDate,
             packages,
+            packageChooseCount,
+            discount,
+            relativeDiscount,
+            relativePayment,
+            relativePackages,
             members,
             personalItems: personal.split(/[、,]/).filter(Boolean),
             optionalItems,

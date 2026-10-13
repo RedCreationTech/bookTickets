@@ -378,6 +378,99 @@ export function reducer(state: DemoState, action: Action): DemoState {
       message = `创建预约 ${id}`;
       break;
     }
+    case "CANCEL_PATIENT_APPOINTMENT": {
+      if (
+        !a ||
+        !p.patientId ||
+        a.patientId !== p.patientId ||
+        a.locked ||
+        !["booked", "paid"].includes(a.status)
+      )
+        return state;
+      const policy =
+        state.config.cancellationPolicy === "deleteBusiness"
+          ? "deleteBusiness"
+          : "retain";
+      const at = new Date().toISOString();
+      const removedRecords: Record<string, any[]> = {};
+      next.records = { ...state.records };
+      if (policy === "deleteBusiness") {
+        next.appointments = state.appointments.filter(
+          (order) => order.id !== a.id,
+        );
+        for (const collection of [
+          "queueTickets",
+          "printTasks",
+          "examRequests",
+          "appointmentNotifications",
+        ]) {
+          removedRecords[collection] = (state.records[collection] || []).filter(
+            (row) => row.appointmentId === a.id,
+          );
+          next.records[collection] = (state.records[collection] || []).filter(
+            (row) => row.appointmentId !== a.id,
+          );
+        }
+        next.tasks = state.tasks.filter(
+          (task) => task.appointmentId !== a.id || task.status === "已完成",
+        );
+      } else update({ status: "cancelled", cancelledAt: at });
+      const archive = {
+        id: a.id,
+        patientId: a.patientId,
+        appointment: JSON.parse(JSON.stringify(a)),
+        policy,
+        cancelledAt: at,
+        reason: p.reason || "患者主动取消（本地演示）",
+        removedRecords,
+        removedTasks: state.tasks.filter(
+          (task) => task.appointmentId === a.id && task.status !== "已完成",
+        ),
+        status: "已取消",
+      };
+      next.records.cancelledAppointmentArchive = [
+        archive,
+        ...(state.records.cancelledAppointmentArchive || []).filter(
+          (row) => row.id !== a.id,
+        ),
+      ];
+      message = `取消预约 ${a.id}，${policy === "deleteBusiness" ? "业务记录移入可恢复档案" : "保留取消记录"}；支付/退款均为本地模拟`;
+      break;
+    }
+    case "RESTORE_CANCELLED_APPOINTMENT": {
+      const archived = (state.records.cancelledAppointmentArchive || []).find(
+        (row) => row.id === p.id,
+      );
+      if (
+        !archived ||
+        archived.policy !== "deleteBusiness" ||
+        archived.restoredAt ||
+        !p.patientId ||
+        archived.patientId !== p.patientId ||
+        a
+      )
+        return state;
+      next.appointments = [
+        {
+          ...archived.appointment,
+          status: "cancelled",
+          restoredAt: new Date().toISOString(),
+        },
+        ...state.appointments,
+      ];
+      next.records = {
+        ...state.records,
+        cancelledAppointmentArchive: (
+          state.records.cancelledAppointmentArchive || []
+        ).map((row) =>
+          row.id === p.id
+            ? { ...row, restoredAt: new Date().toISOString(), status: "已恢复" }
+            : row,
+        ),
+      };
+      message = `恢复取消预约 ${p.id}供查询，不恢复叫号/打印任务，不重新收费或恢复预约资格`;
+      break;
+    }
     case "PAYMENT":
       if (!a || a.status !== "booked") return state;
       update({
@@ -531,6 +624,8 @@ export function reducer(state: DemoState, action: Action): DemoState {
         "REJECT",
         "PRINT",
         "UPDATE_APPOINTMENT",
+        "CANCEL_PATIENT_APPOINTMENT",
+        "RESTORE_CANCELLED_APPOINTMENT",
       ].includes(action.type)
     ) {
       entity = p.id || next.appointments[0]?.id;

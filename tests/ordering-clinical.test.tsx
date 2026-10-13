@@ -17,12 +17,16 @@ import {
   splitGroupAmount,
   GroupContractWorkbench,
   InvoiceLedger,
+  applicableGroup,
 } from "../src/modules/Groups";
 import { RegistrationProfile } from "../src/modules/Registration";
 import { ExamExtras, UndoExam } from "../src/modules/ClinicalExtras";
-import { Appointments, Exam } from "../src/modules/Core";
+import { Appointments, Exam, Finance } from "../src/modules/Core";
 import App from "../src/App";
-import { PackageCatalogEditor } from "../src/modules/Ordering";
+import {
+  OrderingRuleEditor,
+  PackageCatalogEditor,
+} from "../src/modules/Ordering";
 import { anonymizedBookingUsage } from "../src/store";
 import { getBookingAvailability } from "../src/bookingRules";
 import { reducer } from "../src/model";
@@ -136,8 +140,10 @@ describe("atomic ordering and clinical details", () => {
         screen.getByAltText("合成报告图片 synthetic.png"),
       ).toBeInTheDocument(),
     );
-    expect(read().appointments[0].images[0].src).toContain(
-      "data:image/png;base64,",
+    await waitFor(() =>
+      expect(read().appointments[0].images?.[0]?.src).toContain(
+        "data:image/png;base64,",
+      ),
     );
     fireEvent.click(screen.getByRole("button", { name: "删除图片" }));
     expect(read().appointments[0].images).toHaveLength(0);
@@ -251,13 +257,11 @@ describe("atomic ordering and clinical details", () => {
     wrap(<Appointments />);
     fireEvent.click(screen.getByRole("button", { name: "新建预约" }));
     let d = screen.getByRole("dialog");
-    fireEvent.change(within(d).getByLabelText("体检套餐"), {
-      target: { value: "PK02" },
-    });
-    fireEvent.click(within(d).getByRole("button", { name: "确认预约" }));
     expect(
-      within(d).getByText("所选套餐不在该单位订单允许范围"),
-    ).toBeInTheDocument();
+      within(within(d).getByLabelText("体检套餐")).queryByRole("option", {
+        name: /都市精英/,
+      }),
+    ).toBeNull();
     fireEvent.change(within(d).getByLabelText("体检套餐"), {
       target: { value: "PK01" },
     });
@@ -327,5 +331,81 @@ describe("atomic ordering and clinical details", () => {
       getBookingAvailability(s, "2026-10-13", s.appointments[0].id).used,
     ).toBe(7);
     expect(JSON.stringify(s.records.bookingUsage)).not.toContain("P002");
+  });
+  it("O18 package-choice config and unit limits persist with subgroup single-package override", () => {
+    const ui = wrap(<OrderingRuleEditor />);
+    fireEvent.change(screen.getByLabelText("小程序默认套餐必选套数"), {
+      target: { value: "2" },
+    });
+    expect(read().config.packageChooseCount).toBe(2);
+    ui.unmount();
+    wrap(<GroupContractWorkbench />);
+    fireEvent.change(screen.getByLabelText("允许套餐必须选M套"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存生效单位订单" }));
+    expect(screen.getByRole("status")).toHaveTextContent("套餐N选M数量");
+    expect(read().records.groupOrders || []).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText("允许套餐必须选M套"), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存生效单位订单" }));
+    expect(read().records.groupOrders[0].packageChooseCount).toBe(1);
+    const state = read();
+    state.records.groupOrders[0].packageChooseCount = 2;
+    state.records.groupPersonnelGroups = [
+      {
+        id: "SUB",
+        groupOrderId: state.records.groupOrders[0].id,
+        members: ["P001"],
+        packageId: "PK01",
+      },
+    ];
+    expect(applicableGroup(state, "P001").packageChooseCount).toBe(1);
+  });
+  it("O19 front desk automatically removes mutually exclusive package items and only charges retained rows", () => {
+    const state = createInitialState();
+    state.patients[0].company = "个检";
+    state.packages = [
+      {
+        id: "PK01",
+        name: "合成甲套餐",
+        price: 100,
+        tag: "演示",
+        items: ["一般检查", "合成甲"],
+      },
+      {
+        id: "PK02",
+        name: "合成乙套餐",
+        price: 200,
+        tag: "演示",
+        items: ["一般检查", "合成乙"],
+      },
+    ];
+    state.records.orderingRules = [
+      { id: "base", item: "一般检查", required: true },
+      { id: "exclusive", item: "合成甲", excludes: "合成乙" },
+    ];
+    localStorage.setItem("hongchuang.health.demo.v1", JSON.stringify(state));
+    wrap(<Appointments />);
+    fireEvent.click(screen.getByRole("button", { name: "新建预约" }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByLabelText("合成甲套餐"));
+    expect(within(dialog).getByLabelText("自动过滤项目说明")).toHaveTextContent(
+      "合成甲",
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "确认预约" }));
+    expect(read().appointments[0]).toMatchObject({
+      amount: 200,
+      items: ["一般检查", "合成乙"],
+    });
+    expect(read().appointments[0].autoFilteredItems[0].item).toBe("合成甲");
+  });
+  it("O20 the finance page mounts real invoice-reminder controls", async () => {
+    wrap(<Finance />);
+    fireEvent.click(screen.getByText("发票回款到期与业务员提醒"));
+    expect(
+      await screen.findByLabelText("发票提醒演示日期"),
+    ).toBeInTheDocument();
   });
 });

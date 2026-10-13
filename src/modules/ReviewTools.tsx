@@ -1067,17 +1067,105 @@ export function queryReportOperations(
         String(a.id).localeCompare(String(b.id)),
     );
 }
+/** A receipt does not imply that examination items have been completed. */
+export function unfinishedGuideItems(appointment: Appointment): string[] {
+  const waived = Array.isArray(appointment.waived) ? appointment.waived : [];
+  return [...new Set(appointment.items)].filter(
+    (item) =>
+      !waived.includes(item) && !String(appointment.results[item] ?? "").trim(),
+  );
+}
+const guideEligible = (appointment: Appointment) =>
+  ["checked", "in_exam", "review", "approved", "printed"].includes(
+    appointment.status,
+  );
+export function resolveGuideRecoveryCode(
+  state: DemoState,
+  input: string,
+): { appointment?: Appointment; error?: string } {
+  const code = input.trim();
+  if (!code) return { error: "请输入合成预约 ID 或体检号。" };
+  const matches = state.appointments.filter((appointment) => {
+    const identifiers = [
+      appointment.id,
+      appointment.examNo,
+      appointment.examNumber,
+    ].filter(
+      (value): value is string =>
+        typeof value === "string" && Boolean(value.trim()),
+    );
+    return identifiers.some((id) => code === id || code === `GUIDE-${id}`);
+  });
+  if (!matches.length)
+    return { error: "未找到此导检单条码，请核对合成预约 ID 或体检号。" };
+  if (matches.length > 1)
+    return { error: "此体检号匹配多个订单，请使用唯一预约 ID 或手动选择。" };
+  const appointment = matches[0];
+  if (!guideEligible(appointment))
+    return {
+      error:
+        appointment.status === "cancelled"
+          ? "此订单已取消，不能回收导检单。"
+          : "此订单尚未到检，请先完成到检登记。",
+    };
+  if (
+    appointment.guideRecovered ||
+    rows(state, "guideRecoveries").some(
+      (record) => record.appointmentId === appointment.id && active(record),
+    )
+  )
+    return {
+      error: "此订单的导检单已回收，不能重复回收；如需更正，请使用登记明细。",
+    };
+  return { appointment };
+}
+function GuidePendingNotice({
+  appointment,
+  label = "未完成检查项目提示",
+}: {
+  appointment: Appointment;
+  label?: string;
+}) {
+  const pending = unfinishedGuideItems(appointment);
+  return (
+    <div
+      className={`callout${pending.length ? " alert" : ""}`}
+      aria-label={label}
+      style={{ display: "block" }}
+    >
+      <strong>
+        {pending.length
+          ? `尚有 ${pending.length} 个未完成检查项目`
+          : "当前订单无未完成检查项目"}
+      </strong>
+      {!!pending.length && (
+        <ul>
+          {pending.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      )}
+      <p>
+        导检单回收仅登记纸单流转，不会自动完成检查或更改检查结果；已弃检项目不计入待检查清单。
+      </p>
+    </div>
+  );
+}
 function ReportOperationEditor({
   appointment,
   kind,
   record,
   cancelling,
+  recoveryMode,
+  recoveryCode,
   onClose,
 }: {
   appointment: Appointment;
   kind: ReportOperationKind;
   record?: SavedRow;
   cancelling?: boolean;
+  recoveryMode?: "manual" | "barcode";
+  recoveryCode?: string;
   onClose: () => void;
 }) {
   const { state, act } = useDemo();
@@ -1092,6 +1180,26 @@ function ReportOperationEditor({
     record?.specimenType || record?.type || SPECIMEN_TYPES[0],
   );
   const [note, setNote] = useState(cancelling ? "" : record?.note || "");
+  const [recoveryAction, setRecoveryAction] = useState<
+    "receive_only" | "receive_and_confirm"
+  >(
+    record?.recoveryAction === "receive_and_confirm"
+      ? "receive_and_confirm"
+      : "receive_only",
+  );
+  const [itemConfirmations, setItemConfirmations] = useState<
+    Record<string, string>
+  >(() =>
+    record && active(record)
+      ? Object.fromEntries(
+          (record.itemConfirmations || []).map((entry: SavedRow) => [
+            entry.item,
+            entry.disposition,
+          ]),
+        )
+      : {},
+  );
+  const guideItems = [...new Set(appointment.items)];
   const [error, setError] = useState("");
   const submitted = useRef(false);
   const label = operationLabels[kind];
@@ -1103,6 +1211,99 @@ function ReportOperationEditor({
       <p>
         {nameFor(state, appointment.id)} · {appointment.id} · 合成记录
       </p>
+      {kind === "guide" && !cancelling && (
+        <>
+          <p>
+            回收方式：
+            {(recoveryMode || record?.recoveryMode) === "barcode"
+              ? "模拟条码输入"
+              : "手动选择订单"}
+          </p>
+          <GuidePendingNotice
+            appointment={appointment}
+            label="回收确认未完成项目"
+          />
+          <Field label="导检单回收业务动作">
+            <select
+              aria-label="导检单回收业务动作"
+              value={recoveryAction}
+              onChange={(event) => {
+                setRecoveryAction(
+                  event.target.value as "receive_only" | "receive_and_confirm",
+                );
+                setError("");
+              }}
+            >
+              <option value="receive_only">仅回收导检单</option>
+              <option value="receive_and_confirm">回收导检单并确认项目</option>
+            </select>
+          </Field>
+          {recoveryAction === "receive_and_confirm" && (
+            <section aria-label="回收项目人工确认">
+              <p>
+                请逐项确认已做或未做。无分检结果的项目不能确认已做，应选“未做 /
+                待分检”；确认单只留存人工核对快照，不会生成结果、推进检查或解除锁定。
+              </p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>检查项目</th>
+                    <th>现有分检记录</th>
+                    <th>逐项人工确认</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {guideItems.map((item) => {
+                    const hasResult = Boolean(
+                      String(appointment.results[item] ?? "").trim(),
+                    );
+                    return (
+                      <tr key={item}>
+                        <td>{item}</td>
+                        <td>
+                          {hasResult ? "已有分检结果" : "未回传结果"}
+                          {appointment.waived?.includes(item)
+                            ? " · 已弃检"
+                            : ""}
+                        </td>
+                        <td>
+                          <select
+                            aria-label={`确认回收项目 ${item}`}
+                            value={itemConfirmations[item] || ""}
+                            onChange={(event) => {
+                              setItemConfirmations({
+                                ...itemConfirmations,
+                                [item]: event.target.value,
+                              });
+                              setError("");
+                            }}
+                          >
+                            <option value="">请选择确认情况</option>
+                            <option value="done" disabled={!hasResult}>
+                              已做（已有分检结果）
+                            </option>
+                            <option value="not_done">未做 / 待分检</option>
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p>
+                已确认{" "}
+                {
+                  guideItems.filter((item) =>
+                    ["done", "not_done"].includes(itemConfirmations[item]),
+                  ).length
+                }{" "}
+                / {guideItems.length}{" "}
+                项。未完成检查可明确登记为未做，无需伪造完成状态。
+              </p>
+            </section>
+          )}
+        </>
+      )}
       {!cancelling && (
         <div className="form-grid">
           <Field label={kind === "interpretation" ? "解读医生" : "登记操作人"}>
@@ -1169,25 +1370,79 @@ function ReportOperationEditor({
           if (
             appointment.status === "cancelled" ||
             (kind === "interpretation" &&
-              !["approved", "printed"].includes(appointment.status))
+              !["approved", "printed"].includes(appointment.status)) ||
+            (kind === "guide" && !cancelling && !guideEligible(appointment))
           )
             return setError("此订单当前状态不允许登记此业务。");
+          if (
+            kind === "guide" &&
+            !cancelling &&
+            recoveryAction === "receive_and_confirm"
+          ) {
+            const pending = guideItems.filter(
+              (item) => !["done", "not_done"].includes(itemConfirmations[item]),
+            );
+            if (pending.length)
+              return setError(
+                `还有 ${pending.length} 个项目未人工确认，请逐项选择已做或未做：${pending.join("、")}。`,
+              );
+            const unsupported = guideItems.filter(
+              (item) =>
+                itemConfirmations[item] === "done" &&
+                !String(appointment.results[item] ?? "").trim(),
+            );
+            if (unsupported.length)
+              return setError(
+                `以下项目没有分检结果，不能确认已做：${unsupported.join("、")}。请选未做 / 待分检，由分检工作站登记真实完成情况。`,
+              );
+          }
           const id =
             record?.id ||
             `${kind === "specimen" ? "SPEC" : kind.toUpperCase()}-${appointment.id}${kind === "specimen" ? `-${specimenType}` : ""}`;
           const existing = rows(state, operationCollections[kind]).find(
             (r) =>
               r.id === id ||
+              (kind === "guide" && r.appointmentId === appointment.id) ||
               (kind === "specimen" &&
                 r.appointmentId === appointment.id &&
                 (r.specimenType || r.type) === specimenType),
           );
-          if (!record && existing && active(existing))
+          if (
+            !record &&
+            ((existing && active(existing)) ||
+              (kind === "guide" && appointment.guideRecovered))
+          )
             return setError(
               "该订单的此项业务已登记，请查询后更正，不能重复计数。",
             );
           const next = {
-            id,
+            id: kind === "guide" ? existing?.id || id : id,
+            ...(kind === "guide"
+              ? {
+                  recoveryMode:
+                    recoveryMode || record?.recoveryMode || "manual",
+                  recoveryCode: recoveryCode ?? record?.recoveryCode ?? "",
+                  recoveryAction: cancelling
+                    ? record?.recoveryAction || "receive_only"
+                    : recoveryAction,
+                  itemConfirmations: cancelling
+                    ? record?.itemConfirmations || []
+                    : recoveryAction === "receive_and_confirm"
+                      ? guideItems.map((item) => ({
+                          item,
+                          disposition: itemConfirmations[item],
+                          hasResult: Boolean(
+                            String(appointment.results[item] ?? "").trim(),
+                          ),
+                          result: appointment.results[item] || "",
+                          waived: Boolean(appointment.waived?.includes(item)),
+                        }))
+                      : [],
+                  unfinishedItems: cancelling
+                    ? record?.unfinishedItems || []
+                    : unfinishedGuideItems(appointment),
+                }
+              : {}),
             appointmentId: appointment.id,
             patientId: appointment.patientId,
             operator: operator.trim(),
@@ -1203,7 +1458,9 @@ function ReportOperationEditor({
           submitted.current = true;
           if (
             !existing ||
-            Object.entries(next).some(([k, v]) => existing[k] !== v)
+            Object.entries(next).some(
+              ([k, v]) => JSON.stringify(existing[k]) !== JSON.stringify(v),
+            )
           ) {
             save(act, operationCollections[kind], next);
             if (kind === "interpretation")
@@ -1251,7 +1508,14 @@ export function ReportOperations({
     id: string;
     record?: SavedRow;
     cancelling?: boolean;
+    recoveryMode?: "manual" | "barcode";
+    recoveryCode?: string;
   } | null>(null);
+  const [recoveryMode, setRecoveryMode] = useState<"manual" | "barcode">(
+    "manual",
+  );
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryError, setRecoveryError] = useState("");
   const [from, setFrom] = useState(() =>
     new Date(Date.now() - 30 * DAY).toISOString().slice(0, 10),
   );
@@ -1310,7 +1574,41 @@ export function ReportOperations({
         : rows(state, operationCollections[kind]).find(
             (r) => r.appointmentId === appointment.id,
           );
-    setDialog({ kind, id: appointment.id, record: existing });
+    setRecoveryError("");
+    setDialog({
+      kind,
+      id: appointment.id,
+      record: existing,
+      ...(kind === "guide"
+        ? {
+            recoveryMode:
+              existing && active(existing)
+                ? existing.recoveryMode || "manual"
+                : "manual",
+            recoveryCode:
+              existing && active(existing) ? existing.recoveryCode || "" : "",
+          }
+        : {}),
+    });
+  };
+  const scanGuide = () => {
+    const result = resolveGuideRecoveryCode(state, recoveryCode);
+    if (result.error || !result.appointment) {
+      setRecoveryError(result.error || "无法识别此导检单。");
+      return;
+    }
+    if (appointmentId && result.appointment.id !== appointmentId) {
+      setRecoveryError("条码对应其他订单，请先切换当前订单后回收。");
+      return;
+    }
+    setRecoveryError("");
+    if (!appointmentId) setSelected(result.appointment.id);
+    setDialog({
+      kind: "guide",
+      id: result.appointment.id,
+      recoveryMode: "barcode",
+      recoveryCode: recoveryCode.trim(),
+    });
   };
   return (
     <section
@@ -1337,6 +1635,26 @@ export function ReportOperations({
                 操作人: r.operator,
                 发生时间UTC: r.performedAt,
                 标本类型: r.specimenType || "",
+                回收方式:
+                  r.kind === "guide"
+                    ? r.recoveryMode === "barcode"
+                      ? "模拟条码输入"
+                      : "手动选择订单"
+                    : "",
+                回收时未完成项目:
+                  r.kind === "guide"
+                    ? (r.unfinishedItems || []).join("、")
+                    : "",
+                回收业务动作:
+                  r.kind === "guide"
+                    ? r.recoveryAction === "receive_and_confirm"
+                      ? "回收导检单并确认项目"
+                      : "仅回收导检单"
+                    : "",
+                项目确认快照:
+                  r.kind === "guide"
+                    ? JSON.stringify(r.itemConfirmations || [])
+                    : "",
                 状态: active(r) ? "有效" : "已撤销",
                 说明: r.note || "",
                 撤销原因: !active(r) ? r.cancelReason || "" : "",
@@ -1388,15 +1706,17 @@ export function ReportOperations({
             >
               登记 / 更正报告解读
             </button>
-            <button
-              className="btn"
-              disabled={
-                !appointment || !eligible.some((a) => a.id === appointment.id)
-              }
-              onClick={() => openRegister("guide")}
-            >
-              登记 / 更正导检单回收
-            </button>
+            {recoveryMode === "manual" && (
+              <button
+                className="btn"
+                disabled={
+                  !appointment || !eligible.some((a) => a.id === appointment.id)
+                }
+                onClick={() => openRegister("guide")}
+              >
+                登记 / 更正导检单回收
+              </button>
+            )}
             <button
               className="btn"
               disabled={
@@ -1407,6 +1727,61 @@ export function ReportOperations({
               登记合成标本采集
             </button>
           </div>
+          <div className="toolbar" style={{ marginTop: 16 }}>
+            <Field label="导检单回收方式">
+              <select
+                aria-label="导检单回收方式"
+                value={recoveryMode}
+                onChange={(event) => {
+                  setRecoveryMode(event.target.value as "manual" | "barcode");
+                  setRecoveryError("");
+                  setRecoveryCode("");
+                  setDialog(null);
+                }}
+              >
+                <option value="manual">手动选择订单</option>
+                <option value="barcode">模拟条码输入</option>
+              </select>
+            </Field>
+            {recoveryMode === "barcode" && (
+              <>
+                <Field label="合成导检单条码">
+                  <input
+                    aria-label="合成导检单条码"
+                    value={recoveryCode}
+                    onChange={(event) => {
+                      setRecoveryCode(event.target.value);
+                      setRecoveryError("");
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        scanGuide();
+                      }
+                    }}
+                    placeholder="输入合成预约 ID / 体检号"
+                  />
+                </Field>
+                <button className="btn" onClick={scanGuide}>
+                  识别导检单并登记回收
+                </button>
+              </>
+            )}
+          </div>
+          {recoveryMode === "barcode" && (
+            <p>
+              红创模拟回收：输入完整预约 ID、已登记体检号或
+              GUIDE-体检号。这里只模拟条码文字匹配，未连接扫码枪或回收机。
+            </p>
+          )}
+          {recoveryError && (
+            <p className="error" role="alert">
+              {recoveryError}
+            </p>
+          )}
+          {recoveryMode === "manual" && appointment && (
+            <GuidePendingNotice appointment={appointment} />
+          )}
           <small>
             报告解读要求报告已审核；回收和标本登记要求已到检。旧版“已采样”未记载类型，不推定为任何标本。
           </small>
@@ -1554,6 +1929,30 @@ export function ReportOperations({
                   </Badge>
                   <small>
                     {r.note}
+                    {r.kind === "guide" && (
+                      <span>
+                        {" "}
+                        · 业务动作：
+                        {r.recoveryAction === "receive_and_confirm"
+                          ? "回收导检单并确认项目"
+                          : "仅回收导检单"}
+                        {r.recoveryAction === "receive_and_confirm" &&
+                          ` · 项目确认：${(r.itemConfirmations || []).map((entry: SavedRow) => `${entry.item}（${entry.disposition === "done" ? "已做" : "未做 / 待分检"}）`).join("、")}`}
+                      </span>
+                    )}
+                    {r.kind === "guide" && (
+                      <span>
+                        {" "}
+                        ·{" "}
+                        {r.recoveryMode === "barcode"
+                          ? "模拟条码回收"
+                          : "手动回收"}{" "}
+                        · 回收时未完成项目：
+                        {Array.isArray(r.unfinishedItems)
+                          ? r.unfinishedItems.join("、") || "无"
+                          : "旧记录未保存"}
+                      </span>
+                    )}
                     {!active(r) && r.cancelReason
                       ? `；撤销原因：${r.cancelReason}`
                       : ""}
@@ -1614,6 +2013,8 @@ export function ReportOperations({
           kind={dialog.kind}
           record={dialog.record}
           cancelling={dialog.cancelling}
+          recoveryMode={dialog.recoveryMode}
+          recoveryCode={dialog.recoveryCode}
           onClose={() => setDialog(null)}
         />
       )}

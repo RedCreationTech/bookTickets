@@ -11,6 +11,8 @@ export interface OrderRule {
   excludes?: string;
   enabled?: boolean;
   ruleEnabled?: boolean;
+  bodyPart?: string;
+  diseaseType?: string;
 }
 export const defaultOrderRules: OrderRule[] = [
   {
@@ -33,6 +35,7 @@ export function getOrderingIssues(
   patientId: string,
   items: string[],
   packageIds: string[] = [],
+  context: { company?: string } = {},
 ) {
   const p = s.patients.find((p) => p.id === patientId);
   const errors: string[] = [];
@@ -67,7 +70,7 @@ export function getOrderingIssues(
         (r.maxAge !== undefined && p.age > Number(r.maxAge)))
     )
       errors.push(`${pack?.name}不适用当前年龄`);
-    if (r.company && r.company !== p?.company)
+    if (r.company && r.company !== (context.company ?? p?.company))
       errors.push(`${pack?.name}仅限${r.company}`);
   }
   return [...new Set(errors)];
@@ -76,9 +79,13 @@ export function packageIsApplicable(
   s: DemoState,
   p: Patient,
   packageId: string,
+  context: { company?: string } = {},
 ) {
   const pack = s.packages.find((x) => x.id === packageId);
-  return !!pack && !getOrderingIssues(s, p.id, pack.items, [packageId]).length;
+  return (
+    !!pack &&
+    !getOrderingIssues(s, p.id, pack.items, [packageId], context).length
+  );
 }
 export function quoteOrder(
   s: DemoState,
@@ -86,6 +93,7 @@ export function quoteOrder(
   discount: number,
   lineDiscounts: Record<string, number> = {},
   extras: string[] = [],
+  excludedItems: string[] = [],
 ) {
   const prices: Record<string, number> = {};
   for (const id of ids) {
@@ -102,24 +110,27 @@ export function quoteOrder(
   for (const item of extras)
     if (!(item in prices))
       prices[item] = getOrderRules(s).find((r) => r.item === item)?.price ?? 80;
-  const rows = Object.entries(prices).map(([item, price]) => {
-    const nonDiscount = !!getOrderRules(s).find(
-      (r) => r.enabled !== false && r.ruleEnabled !== false && r.item === item,
-    )?.nonDiscount;
-    const percent = nonDiscount
-      ? 100
-      : Math.min(100, Math.max(0, lineDiscounts[item] ?? discount));
-    return {
-      item,
-      price,
-      percent,
-      nonDiscount,
-      amount: Math.round(price * percent) / 100,
-    };
-  });
+  const rows = Object.entries(prices)
+    .filter(([item]) => !excludedItems.includes(item))
+    .map(([item, price]) => {
+      const nonDiscount = !!getOrderRules(s).find(
+        (r) =>
+          r.enabled !== false && r.ruleEnabled !== false && r.item === item,
+      )?.nonDiscount;
+      const percent = nonDiscount
+        ? 100
+        : Math.min(100, Math.max(0, lineDiscounts[item] ?? discount));
+      return {
+        item,
+        price,
+        percent,
+        nonDiscount,
+        amount: Math.round(price * percent) / 100,
+      };
+    });
   return {
     rows,
-    items: Object.keys(prices),
+    items: rows.map((row) => row.item),
     original: Math.round(rows.reduce((n, r) => n + r.price, 0) * 100) / 100,
     amount: Math.round(rows.reduce((n, r) => n + r.amount, 0) * 100) / 100,
   };
@@ -129,8 +140,9 @@ export function percentFromAmount(
   ids: string[],
   target: number,
   extras: string[] = [],
+  excludedItems: string[] = [],
 ) {
-  const q = quoteOrder(s, ids, 100, {}, extras);
+  const q = quoteOrder(s, ids, 100, {}, extras, excludedItems);
   const fixed = q.rows
     .filter((r) => r.nonDiscount)
     .reduce((n, r) => n + r.price, 0);
@@ -166,5 +178,131 @@ export function resolveDependencies(s: DemoState, items: string[]) {
     items: [...resolved],
     errors: [...new Set(errors)],
     added: [...resolved].filter((i) => !items.includes(i)),
+  };
+}
+
+/** Campus restrictions are business configuration, not medical eligibility. */
+export function packageAvailableAtCampus(
+  s: DemoState,
+  packageId: string,
+  campus: string,
+) {
+  const pack = s.packages.find((row) => row.id === packageId);
+  const rule = (s.records.packageRules || []).find(
+    (row) => row.packageId === packageId,
+  );
+  const campuses = rule?.campuses ?? pack?.campuses;
+  return (
+    !!pack &&
+    (!Array.isArray(campuses) || !campuses.length || campuses.includes(campus))
+  );
+}
+
+export function getPackageOptionalBundles(s: DemoState, packageIds: string[]) {
+  return [...new Set(packageIds)].flatMap((packageId) => {
+    const pack = s.packages.find((row) => row.id === packageId);
+    const rule = (s.records.packageRules || []).find(
+      (row) => row.packageId === packageId,
+    );
+    if (!pack || !Array.isArray(rule?.optionalItems)) return [];
+    const items = [
+      ...new Set<string>(
+        rule.optionalItems
+          .map((item: unknown) => String(item).trim())
+          .filter(Boolean),
+      ),
+    ];
+    const choose = Number(rule.choose ?? 0);
+    return [
+      {
+        packageId,
+        name: pack.name,
+        items,
+        choose: Number.isInteger(choose) && choose >= 0 ? choose : 0,
+      },
+    ];
+  });
+}
+
+/** Deterministic synthetic rule: required items win, otherwise first selection wins. */
+export function normalizeOrderItems(s: DemoState, source: string[]) {
+  const rules = getOrderRules(s).filter(
+    (row) => row.enabled !== false && row.ruleEnabled !== false,
+  );
+  const ruleFor = (item: string) => rules.find((row) => row.item === item);
+  const unique: string[] = [];
+  const removed: { item: string; reason: string; keptItem?: string }[] = [];
+  const errors: string[] = [];
+  for (const item of source) {
+    if (unique.includes(item))
+      removed.push({ item, reason: "重复项目，仅保留一份" });
+    else unique.push(item);
+  }
+  const prioritized = [...unique].sort(
+    (a, b) => Number(!!ruleFor(b)?.required) - Number(!!ruleFor(a)?.required),
+  );
+  const kept: string[] = [];
+  for (const item of prioritized) {
+    const conflict = kept.find(
+      (other) =>
+        ruleFor(item)?.excludes === other || ruleFor(other)?.excludes === item,
+    );
+    if (!conflict) {
+      kept.push(item);
+      continue;
+    }
+    if (ruleFor(item)?.required && ruleFor(conflict)?.required) {
+      errors.push(`两个必检项目互斥，需人工调整：${conflict} / ${item}`);
+      kept.push(item);
+    } else
+      removed.push({
+        item,
+        keptItem: conflict,
+        reason: `与${conflict}互斥，${ruleFor(conflict)?.required ? "必检项目优先" : "先选项目优先"}`,
+      });
+  }
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const item of [...kept]) {
+      const dependency = ruleFor(item)?.requires;
+      if (
+        dependency &&
+        unique.includes(dependency) &&
+        !kept.includes(dependency)
+      ) {
+        if (ruleFor(item)?.required)
+          errors.push(`必检项目${item}的依赖${dependency}被过滤，需人工调整`);
+        else {
+          kept.splice(kept.indexOf(item), 1);
+          removed.push({ item, reason: `依赖项目${dependency}已被过滤` });
+          changed = true;
+        }
+      }
+    }
+  }
+  return {
+    items: unique.filter((item) => kept.includes(item)),
+    removed,
+    errors: [...new Set(errors)],
+  };
+}
+
+export function getItemClassification(s: DemoState, item: string) {
+  const preset: Record<string, [string, string]> = {
+    甲状腺彩超: ["颈部", "内分泌"],
+    糖化血红蛋白: ["血液", "代谢"],
+    骨密度检查: ["骨骼", "骨健康"],
+    骨密度: ["骨骼", "骨健康"],
+    腹部CT: ["腹部", "消化系统"],
+    腹部彩超: ["腹部", "消化系统"],
+    乳腺彩超: ["胸部", "乳腺健康"],
+    前列腺彩超: ["盆腔", "泌尿系统"],
+    妇科检查: ["盆腔", "妇科健康"],
+  };
+  const rule = getOrderRules(s).find((row) => row.item === item);
+  return {
+    bodyPart: rule?.bodyPart || preset[item]?.[0] || "其他部位",
+    diseaseType: rule?.diseaseType || preset[item]?.[1] || "其他类型",
   };
 }

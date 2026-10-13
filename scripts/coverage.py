@@ -232,7 +232,7 @@ gap('327-328,335,339,341,352-355',C,['Reports'],'已有JSON模板、批量本地
 reviewed('357-364',H,['Enterprise','生成分析报告'],'partial','企业页筛选单位/年龄/性别生成当前人群统计，并导出CSV数据。','不能代替完整团检报告；缺体检完成时间/婚姻/套餐/部门过滤、阳性异常选择排序、男女前十疾病/三高分析、Word输出及自动医学建议。',route='/enterprise')
 gap('365-376',C,['Dashboard'],'运营看板是总体订单/任务计数和固定趋势；未实现逐登记人/医生/科室/标本/销售/打印/解读工作量与金额统计及对应条件。',route='/dashboard')
 reviewed('386,464-465',O,['roles','scope'],'config-only','角色可记录数据范围和页面权限勾选。','未实际按角色限制报表、人员、体检类型和页面数据；没有服务端鉴权。','frontend',route='/settings')
-reviewed('400-401',H,['Enterprise','cohortLabel'],'partial','企业分析按稳定患者结构化字段展示人口属性和有限检查指标分桶，可筛选和导出。','仅有限合成字段和预设分桶，不是全量检查结果结构化科研查询；不支持如血脂异常AND血压高的复合筛选或真实结果值集。',route='/enterprise')
+reviewed('400-401',H,['Enterprise','cohortLabel'],'partial','企业分析按稳定患者结构化字段展示人口属性和有限检查指标分桶，可筛选和导出。','仅有限合成字段和预设分桶，不是全量检查结果结构化科研查询；另有科研复合筛选已支持有限AND/OR条件；仍未接入医院全量真实结果值集。',route='/enterprise')
 gap('402-403',C,['Exam'],'只有姓名头像和合成身份，未提供证件照/现场照双验证及采血分检照片比对。',route='/quality',kind='unverifiable')
 gap('407-408,417-418',C,['弃检'],'弃检仅修改订单项目；没有手写板签名、签名文档查询、关键节点签署与永久存档。',route='/quality',kind='unverifiable')
 gap('410-411',C,['Quality'],'驳回事件写日志，但没有按医生/原因/次数与错误概率统计整改。',route='/quality')
@@ -378,7 +378,7 @@ reviewed('327-328','ReviewTools',['parseReportTemplate','reportTemplateText','Re
 reviewed('352-353,369,373,376','ReviewTools',['ReportOperations','queryReportOperations','reportInterpretations','guideRecoveries'],'demonstrated','登记/更正/撤销报告解读、导检单回收及标本事件；保存人员时间，按日期/操作人/标本类型筛选并统计去重有效事件。','解读仅记录合成人员和时间，不提供医学解读；回收是本地人工登记，不代表实物回收设备；取消记录不计有效工作量。',route='/reports')
 reviewed('409','ReviewTools',['reportAgeDays','reportDeadlineDays'],'partial','从到检日（缺失用预约日）计算各订单类型超期，列表按危急/超期/时长排序。','没有分别记录报告回传、主检开始结束、总检开始结束每节点耗时；不能代替完整体检流程时效分析。',route='/review')
 reviewed('431-433','ReviewTools',['isReportOverdue','sortReviewAppointments','ReviewConfiguration'],'demonstrated','配置订单类型报告期限，实时算超期与排序，Core审核页使用同一函数进行筛选和显示。','规则为本地日期计算，不是后台积案调度或跨岗位送达；不覆盖全部节点时间。',route='/review')
-reviewed('407,418',CC,['signatureArchiveIds','execute','waivable'],'partial','固定演示文字/指针笔画留样后，可另行明确勾选执行本地弃检/核验确认/特殊领取/回收，检查角色/订单状态并关联档案。','不产生有效电子签名/永久存档，真实手写板未接入；替检确认不等于人员替换，导检单回收未含“回收并确认项目”完整策略。',route='/controls')
+reviewed('407,418',CC,['signatureArchiveIds','execute','waivable'],'partial','固定演示文字/指针笔画留样后，可另行明确勾选执行本地弃检/核验确认/特殊领取/回收，检查角色/订单状态并关联档案。','不产生有效电子签名/永久存档，真实手写板未接入；替检确认不等于人员替换，导检单回收另有逐项确认入口，仍不伪造检查结果。',route='/controls')
 reviewed('48,429-430,473',CC,['notificationTemplates','保存为当前通知模板'],'demonstrated','编辑并保存内置通知类型的正文模板，校验字段；切换/重新进入可重新套用已保存文本到逐人通知预览。','仅本地内置类型模板库，未对接真实短信网关或医院全量模板；保存模板不等于自动发送。','frontend',route='/controls')
 reviewed('476,478,480-483','Groups',['groupOrders','optionalItems','choose','mode'],'demonstrated','配置单位允许套餐、固定/限额/无限模式、项目N选M与自选包；Core开单实际限制允许套餐/选择数量并执行单位个人分摊。','套餐年龄/性别规则在Ordering中维护；同单位多订单优先级、按套餐独立自选包及复杂排期仍有限，本条只证明已写明的本地规则子集。',route='/appointments')
 reviewed('479,484','Groups',['applicableGroup','status'],'partial','开单查找生效且日期/名单匹配的单位订单，停用后不再套用。','尚不能证明所有患者/自助端自动优先单位套餐或隐藏全部关闭订单；跨端统一策略需逐端核验。',route='/appointments')
@@ -400,13 +400,13 @@ replace_reviews('7,13-14,27,32-33,34-35,37,39,110,115,119,127-128,137,270-271,27
 reviewed('7',P,['registerPerson','demoAccount','DEMO-'],'partial','校验演示称呼、DEMO手机号、成人年龄和重复标识，创建共享合成客户并加入常用列表。','不是身份证/手机号实名注册、密码登录或微信账号认证，只是浏览器合成账户演练。',route='/patient')
 reviewed('13-14',P,['referralUrl','distributorId','个人推广预约二维码'],'demonstrated','选择演示推广人员生成真实带来源参数的QR/H5链接，新预约保存distributorId，按来源统计总单及有效单。','只有本地H5归因演示，未发布全员分销微信小程序，不验证真实扫码、账号身份和服务端绩效防作弊。',route='/patient')
 reviewed('27',P,['patientCommonPeople','saveCommon','我的常用体检人'],'demonstrated','新增合成体检人并收藏到当前演示账户常用列表，可移除关联而保留既有体检档案。','账户与关系是本地模拟，无家庭授权、实名验证或真实跨账户访问隔离。',route='/patient')
-reviewed('32-35,37,39',P,['activeGroup','splitGroupAmount','groupSplit'],'partial','H5读取有效单位订单/名单/允许套餐和项目自选数量，项目按预算及个人承担标记分摊入单，亲属开关真实约束。','套餐N选M、单位专属折扣与亲属单位付款策略仍未完整实现；没有真实交易拆分和退款。',route='/patient')
-reviewed('110',C,['packageIsApplicable','getOrderRules','sex'],'demonstrated','开单套餐及规则附加项目根据当前客户性别/套餐适用规则过滤，提交仍校验适用性。','使用有限合成适用规则，不能证明院方医学适应证完整性；互斥仍是报错阻止，不自动决定保留哪项。',route='/appointments')
+reviewed('32-35,37,39',P,['activeGroup','splitGroupAmount','groupSplit'],'partial','H5读取有效单位订单/名单/允许套餐和项目自选数量，项目按预算及个人承担标记分摊入单，亲属开关真实约束。','套餐N选M、单位/亲属折扣与付款策略已按共享配置执行；额度/选项仍基于套餐和项目组合，没有真实交易拆分和退款。',route='/patient')
+reviewed('110',C,['packageIsApplicable','getOrderRules','sex'],'demonstrated','开单套餐及规则附加项目根据当前客户性别/套餐适用规则过滤，提交仍校验适用性。','使用有限合成适用规则，不能证明院方医学适应证完整性；多套餐已有可显式使用的自动互斥整理；双必检冲突仍须人工处理。',route='/appointments')
 reviewed('115,128','Groups',['groupPersonnelGroups','subgroup','packageId'],'demonstrated','单位订单创建人员分组与组套餐，成员互斥校验；新开单匹配单位及人员组，自动带入该组套餐并保存组名。','分组是本地ID关系；不验证医院人员主数据、跨单位并发或真实费用业务。',route='/appointments')
 reviewed('119','Registration',['bookingQuestionnaires','preExamHistory','sourceId'],'partial','读取患者端保存的合成病史/用药/家族史及问卷回答，显式带入客户检前资料并随开单保存；未填写字段保持空。','目前需要点击带入，非全部历史数据自动汇聚；真实医学问卷、原始病历接口和完整下游提醒仍有限。',route='/appointments')
 reviewed('127,137','Groups',['members','groupPersonnelGroups','splitGroupAmount'],'partial','维护单位及人员组成员、专属套餐和个人项目，预算超额自动分个人。','名单选择不是完整人员基础资料就地维护；没有全部套餐内换项/弃检价差重算策略。',route='/appointments')
 reviewed('270-271,273,276',H,['RiskManagement','followupLocks','mergeKey','riskLevels'],'demonstrated','维护实际用于标签的等级名称/颜色，演示操作者认领锁定并确认解锁；同订单多异常合并一条任务，保存关联ID且同集合去重。','锁仅限制本地界面操作，无真实认证/跨用户原子锁；合并按选中集合，不验证医学风险分层。',route='/health')
-reviewed('386,464-465','src/store.tsx',['customRoleId','allowedPatientIds','allowedCampus','examTypes'],'partial','自定义角色实际过滤共享hook返回的患者、订单和关联任务，按指定客户/院区/体检类型限制当前工作区可见数据。','浏览器可修改存储；records等其他集合未统一做数据隔离，不是服务端访问控制或完整系统数据范围保障。','frontend',route='/settings')
+reviewed('386,464-465','src/store.tsx',['customRoleId','allowedPatientIds','allowedCampus','examTypes'],'partial','自定义角色实际过滤共享hook返回的患者、订单和关联任务，按指定客户/院区/体检类型限制当前工作区可见数据。','浏览器可修改存储；records与审计按患者/订单、归档订单同范围及发票关联过滤，资源容量使用匿名全局汇总；仍基于已知本地字段，不是服务端访问控制。','frontend',route='/settings')
 reviewed('462,716',O,['StaffPolicyWorkspace','minDiscount','permissions'],'partial','人员关联自定义角色，在专用操作模拟器校验权限、体检类型和折扣下限；共享角色可供App读取。','模拟器通过不会执行实际审核/收费；各业务动作仍需分别验证实际权限消费，不能据此声称全系统鉴权完成。','frontend',route='/settings')
 reviewed('463','App',['customRoleId','menuPaths','role.paths.includes(route)'],'demonstrated','选择预置或自定义角色后实际过滤导航，并对不允许的路由显示无权限；可退出自定义角色。','仅前端路由守卫，本地用户可自行改配置；不构成生产认证或服务端接口授权。','frontend',route='/settings')
 reviewed('470-471','ReviewTools',['ReviewTerm','advice','matchReviewText'],'demonstrated','维护异常词条与对应合成建议，后续文字匹配和建议生成真实消费保存内容。','词条未含完整临床字典/专家共识，必须人工医学审核，不构成自动诊断。',route='/review')
@@ -433,16 +433,54 @@ reviewed('187-188','Groups',['groupPersonnelName','groupSplit','导出团检项�
 reviewed('440,456-457',O,['CrmSummary','contractId','paymentType','monthly'],'demonstrated','按客户ID关联合同，登记计划/实际回款并限制不超剩余应收；实际回款更新合同余额，月份统计同时按年度和业务员筛选。','只登记本地合成财务事实，不执行真实转账、发票或支付渠道对账。',route='/services')
 reviewed('439,451,458-461',O,['CrmSummary','overdue','year','person'],'partial','年度及业务员过滤合同金额、完成率、月回款与逾期合同，客户/合同/活动通过ID关联。','合同台账不是全部体检订单进度；完整拜访/项目审批绩效与跨系统财务数据仍不全，真实人员权限与认领锁另验。',route='/services')
 reviewed('678',O,['readAsDataURL','上传商品图片','删除图片'],'demonstrated','校验本地图像类型/大小，读取内容保存到商品，显示实际预览并可删除。','仅浏览器合成媒体，不是服务器图片存储、CDN或医疗敏感图片处理。','frontend',route='/commerce')
-reviewed('753,755',O,['menuPaths','allowedPatientIds','激活此自定义角色'],'partial','角色配置可选择实际菜单、客户/院区/类型范围，激活后App路由和共享数据视图实际消费。','只配置现有路由集合，不创建任意新页面；按钮/字段资源配置未全面生效，records等集合没有完整数据隔离，非服务端鉴权。','frontend',route='/settings')
+reviewed('753,755',O,['menuPaths','allowedPatientIds','激活此自定义角色'],'partial','角色配置可选择实际菜单、客户/院区/类型范围，激活后App路由和共享数据视图实际消费。','只配置现有路由集合，不创建任意新页面；按钮/字段资源配置未全面生效，records及审计已有患者/订单/归档快照/发票关联过滤和匿名容量汇总；原始浏览器存储仍可查看修改，非服务端鉴权。','frontend',route='/settings')
 
 # Final per-item checks against the frozen components, without group-wide upgrades.
 replace_reviews('8-9,34-35,287,492,516-517,539')
 reviewed('8-9',P,['upcoming.results','currentTickets','pt-guide-list'],'demonstrated','电子导检列出该订单检查项目，分检结果改变完成状态；当前队列票据同步显示叫号/过号和诊室。','检查进度为共享浏览器状态；路线楼层及等待分钟仍为示例，不是微信原生或跨用户实时医院导检。',route='/patient')
-reviewed('34-35',P,['activeExtras.length !== Number(activeGroup.choose','groupQuote','bookingExtras'],'demonstrated','单位项目自选按配置数量校验，套餐外加项真实入单，并按共享项目价格计算总金额及单位/个人分摊。','仅本地合成订单与金额规则；套餐N选M与单位专属折扣仍有限，没有真实支付拆分和退款事务。',route='/patient')
+reviewed('34-35',P,['activeExtras.length !== Number(activeGroup.choose','groupQuote','bookingExtras'],'demonstrated','单位项目自选按配置数量校验，套餐外加项真实入单，并按共享项目价格计算总金额及单位/个人分摊。','仅本地合成订单与金额规则；套餐N选M及折扣另有共享配置；没有真实支付拆分和退款事务。',route='/patient')
 reviewed('287','ReviewTools',['reviewAssignments','reviewWorkload','分配给'],'demonstrated','从有排班的主检/总检医生选择当前待审核订单受理人，保存分配日期和记录，重复分配受限，工作量即时重算。','仅本地人工指派与合成工作量，不证明服务端并发抢单、真实医生身份或医院绩效口径。',route='/review')
 reviewed('492',P,['registerPerson',"view === 'reports'",'reportId'],'partial','可注册合成体检人并查看所选已审核历史报告，演示身份切换用于访问样例资料。','没有真实登录/账号认证，也没有注册登录或查看报告触发的自动消息；本项与消息中心的正式业务关系待澄清。',route='/patient')
 reviewed('516,539',Q,['visibleQueues','t.status === "missed"','t.status === "done"'],'demonstrated','按业务队列/所属科室统计当前候检和叫号、过号、完成票据数量，并显示已检名单。','本演示将源文过检按过号理解，需院方确认；统计单位为本地票据，未验证真实人次去重、跨终端或临床完成口径。',route='/queue')
 reviewed('517',Q,['visibleQueues','q.name','q.department'],'demonstrated','按队列名称或科室名称筛选队列列表，并可联合开启/关闭状态筛选。','仅本地名称包含匹配；不代表人数上下限、VIP类型等全部高级查询。','frontend',route='/queue')
+
+# Final accepted-source increment: scoped UI interactions, not production integrations.
+replace_reviews('12,33,151,176,187-188,255,403,497,499,518-519,546')
+reviewed('12',P,['satisfactionQuestions','submitSatisfaction','patientSatisfaction'],'demonstrated','完成五维必答评分及可选合成建议，按患者/订单保存一次问卷，防重复提交，切换订单及刷新可回看。','问卷题目为演示服务体验调查；没有医院正式问卷版本、后台分析或真实身份认证。',route='/patient')
+reviewed('33',P,['packageChooseCount','selectedPackageIds','groupQuote'],'demonstrated','按全局或单位优先配置多选套餐，严格校验N选M数量，项目去重计价并复用单位个人分摊；人员组指定单套餐优先。','仅本地合成套餐/金额；组合仍受互斥规则约束，不证明临床套餐有效性、后端并发或真实交易。',route='/patient')
+reviewed('151,187-188','SettlementDetails',['buildSettlementRows','settlementSubtotals','pendingRefund','packageCatalogComplete'],'demonstrated','按订单pricing及groupSplit展示总额/单位/个人/待缴/待退、项目承担及弃检金额，按单位/日期/人员组筛选，统计组人数与套餐/外加项/自费小计并导出CSV。','比例分摊是明确的本地模拟口径，缺收款或价格证据标未登记；当前套餐并集用于分类，非历史版本证明。弃检金额不自动退款，没有真实收款/对账。',route='/finance')
+reviewed('176','ReviewTools',['unfinishedGuideItems','GuidePendingNotice','resolveGuideRecoveryCode'],'demonstrated','手选订单或输入合成条码定位已到检订单，回收前列出未检项目，排除已弃检项，保存回收方式/人员/时间及未检快照，拒绝重复回收。','回收是本地登记，不连接扫码枪/回收机；不会自动完成检查结果或执行纸张回收。',route='/reports')
+reviewed('255','ReviewTools',['recoveryMode','GuidePendingNotice','guideRecoveries'],'partial','提供手选订单与模拟条码定位两种回收入口，显示未检项目并记录回收。','尚无原文“仅回收”与“回收并确认项目”两种业务策略；手选/条码只是定位方式，不能据此认定第二种项目确认行为。',route='/reports')
+reviewed('403',C,['IdentityPhotoViewer appointmentId={a.id}'],'partial','分检订单详情实际加载共享身份核验组件，显示两幅抽象证件/现场示意图及当前订单人工核验结论。','不是实际前台登记照片，尚未证明独立采血全流程均展示同一照片；无身份读取、摄像头或人脸识别。',route='/exam')
+reviewed('497',CC,['imageData','readAsDataURL','portalPosters'],'demonstrated','上传512KB以内PNG/JPEG/WebP，实际预览并维护海报标题/状态/发布时间/排序；患者页只展示已发布合规图像。','仅浏览器保存合成栅格图，拒绝SVG/GIF及远程图片；无服务器媒体库、微信发布或真实海报版权审查。','frontend',route='/controls')
+reviewed('499',CC,['safePortalUrl','portalLinks'],'demonstrated','新增编辑并校验不含凭据的HTTPS链接，保存发布状态；患者页提供主动点击的新窗口锚点并隔离opener。','不自动访问第三方网站，不验证第三方内容/可用性；本地配置不等于微信原生友情链接发布。','frontend',route='/controls')
+reviewed('518',Q,['waitingMin','waitingMax','validRange','visibleQueues'],'partial','队列名称/科室/状态联合候检人数上下限筛选，校验非负整数及上下限顺序。','仍缺过号人数、已检人数上下限及队列类型筛选，不能把候检过滤当完整高级查询。','frontend',route='/queue')
+reviewed('519',Q,['queueBottleneckMinutes','pendingCount','瓶颈队列'],'demonstrated','队列表显示科室、等待/过号/已检数量，并以候检人数乘服务分钟和可配置阈值显示瓶颈标记及计算过程。','瓶颈判定为透明本地演示公式，不是经院方验证的拥塞模型或最优调度。',route='/queue')
+reviewed('546',Q,['queueResumeSlips','resumeToken','QRCodeSVG'],'partial','暂停活动票据并生成唯一QR凭条，保存原因和原科室；模拟输入码恢复至原队列末尾，已用/无效/关闭科室不重复核销。','只有凭条预览，无浏览器打印动作或纸张条码输出；实际扫码与外设打印仍未验证。',route='/queue')
+
+# Locked extension scope: only the 22 published items and three earlier corrections.
+replace_reviews('21,23,29,42,37,39,113,482,99,175,120,196,401,424-426,508,510,515,525,553,568,255,518,546')
+reviewed('21',P,['bodyPartFilter','diseaseFilter','getItemClassification'],'demonstrated','医院项目规则维护部位和疾病类型；患者端按两类联合筛选，勾选项目实际入单并计价。','分类为有限合成字典，不代表医学适应证；停用/性别/必检约束仍需遵守，无医院主数据接口。','frontend',route='/patient')
+reviewed('23',P,['packageAvailableAtCampus','applicablePackages'],'demonstrated','按共享院区套餐配置过滤可选项，切换院区使不适用旧选择失效，Core提交也校验院区。','院区为合成字典，本地过滤不是跨院区后台资源/账户隔离。','frontend',route='/patient')
+reviewed('29,42','src/model.ts',['CANCEL_PATIENT_APPOINTMENT','cancelledAppointmentArchive','RESTORE_CANCELLED_APPOINTMENT'],'demonstrated','配置保留或删除业务视图策略；仅本人未锁定且未开始体检订单可取消，删除时归档订单和限定关联业务，保留财务/审计；可恢复为取消历史而不恢复有效预约。','删除是可恢复本地归档，不作永久清除；只清指定队列/打印/申请/预约通知及未完任务，真实退款与后端业务一致性未验证。',route='/patient')
+reviewed('37,39',P,['groupDiscountPercent','relativePayment','sponsorPatientId'],'demonstrated','非单位亲属关联有效员工，使用配置的亲属套餐及折扣；切换自费或单位承担策略，按折后金额/预算/个人项目计算分摊并入单。','员工/亲属关系仅合成ID关联，没有真实授权或身份核验；付款是本地金额记录，单位预算并非真实扣款。',route='/patient')
+reviewed('113','src/orderingRules.ts',['normalizeOrderItems','必检项目优先','excludedItems'],'demonstrated','多套餐自动去重及互斥整理，必检优先否则先选优先，显示移除原因并去除对应计价行；双必检互斥报错，依赖被过滤的非必检项一并移除。','确定性整理仅演示规则，不替院方作医疗取舍；H5提供开关，关闭后仍校验冲突，后台并发/临床有效性未验证。',route='/appointments')
+reviewed('482','src/orderingRules.ts',['getPackageOptionalBundles','packageId','optionalItems'],'demonstrated','每个套餐维护独立自选包及必选数，切套餐不带旧选择；多套餐分别校验数量，共同项目只计价一次，H5和Core消费同一配置。','自选包是本地业务规则，无医院套餐版本/真实结算接口；不证明医学组合有效。',route='/patient')
+reviewed('99','RegistrationConsents',['photoDeclined','photoDeclineSignatureId','registrationConsents'],'demonstrated','订单登记弃拍确认，显式同意后保存固定DEMO留样、类型/人/时及关联ID；取消不写入，同类型/双击防重复。','只有固定合成留样，非真实手写签字、法律签章或身份认证；不采集真实照片/签名。',route='/appointments')
+reviewed('175','RegistrationConsents',['consentTypes','弃检签字','职业病签字'],'partial','分别登记弃检、知情书、检查结束、职业病及弃拍确认类型，保存各自DEMO留样，可查询且不推进临床流程。','原文要求签字板对接；目前没有签字板/驱动或真实电子签名，仅前端多类型留样，不能认定硬件或法律效力满足。','unverifiable',route='/appointments')
+reviewed('120','RegistrationConsents',['PastHistoryNotice','pastMedicalHistory','medicalHistoryReads'],'demonstrated','登记页保存自定义合成既往史，分检详情读取并提示医生，确认阅读保存当前版本快照；不同版本可重新核对。','仅合成文本及演示角色，本地阅读记录不是真实医学评估或认证医嘱。',route='/exam')
+reviewed('196','InvoiceReminder',['invoiceDueDate','paymentDueDate','invoiceReminders'],'demonstrated','按实际本地发票开票日加账期或指定日标记回款时间，推进演示日期仅给选定业务员弹到期提醒；关联回款扣余额，全额/作废不提醒，查看状态按日去重。','页面内合成业务员提示，不是后台定时催收、短信、税务系统或真实资金；回款仅本地登记。',route='/finance')
+reviewed('401','ResearchFilters',['evaluateResearchCriteria','AND','OR','RESEARCH_EXPORT_FIELDS'],'demonstrated','编辑多个指标/比较符/阈值，以AND或OR组合筛选，展示逐项数值及判定，缺失保留未知，CSV与当前表格同源。','有限合成结构化指标与教育科研条件，不是临床诊断/异常阈值或医院全量科研库。','frontend',route='/enterprise')
+reviewed('424-425',CC,['deriveStationNotifications','NOTICE-REJECT-','NOTICE-OVERDUE-'],'demonstrated','推进显式演示时钟，从真实本地REJECT快照和分类报告周期生成岗位通知；按来源去重，可筛类型/岗位/未读并保存已读状态。','站内消息仅本地集合，岗位和收件人是演示字段；无后台事件总线、真实跨用户送达或认证消息权限。',route='/controls')
+reviewed('426',CC,['NOTICE-BIRTHDAY-','NOTICE-HOLIDAY-','notificationScanKey'],'partial','显式推进UTC时钟时按有记录生日和内置三个公历节日生成一次本地祝福及模拟短信日志；缺生日不补造，跳日只匹配目标日。','没有后台自动发送或SMS网关，模拟送达不是真实回执；未含完整节假日历/农历规则。','unverifiable',route='/controls')
+reviewed('508',Q,['FocusedQueueProgress','queueFocusIds','完成进度'],'demonstrated','配置关注科室，按实际保留票据显示候检/过号/暂停/完成数及完成比例。','分母不含清空票据，口径是队列记录而非唯一患者或临床完成；不是自动优化模型。',route='/queue')
+reviewed('510',Q,['ultrasoundNumber','queuePatientPreferences'],'demonstrated','保存客户固定超声号并校验格式和重复，姓名脱敏后仍显示超声号，重排/叫号保持不变。','固定号仅本地合成识别信息，不是实名身份凭证或院方编号接口。',route='/queue')
+reviewed('515,568',Q,['GuideUsers','guideSessions','hasGuideQueueAccess'],'demonstrated','维护导检用户/医生角色、启停与可操作队列，建立/退出本地会话；统计实际在线演示医生，停用即时退出并限制叫号/入队。','本地用户和会话为模拟，不是真实登录认证或服务端权限；浏览器状态可修改，不保证分布式会话安全。',route='/queue')
+reviewed('525',Q,['GuideClock','guideSchedules','guideScheduleRunKey'],'partial','保存每天开关计划，显式推进演示时钟按含起点/不含终点及跨午夜规则执行，关闭时暂停呼叫，相同时间计划不重复写入。','没有后台定时器，页面不操作不会持续调度；不能认定生产自动定时或物理屏幕控制满足。',route='/queue')
+reviewed('553',Q,['pronunciation','spokenText','queuePatientPreferences'],'partial','为客户保存模拟读音字符串，后续叫号日志spokenText实际使用该配置而非姓名默认值。','未播放真实语音，没有多音字语音合成/音响测试；文字替换不证明实际读音正确。','unverifiable',route='/queue')
+reviewed('255','ReviewTools',['recoveryAction','receive_and_confirm','itemConfirmations'],'demonstrated','回收业务可选仅回收或回收并逐项确认，后一种逐项必选已做/未做且无结果不得确认已做；保存确认快照，手选/模拟扫码独立选择。','确认只记录人工核对，不伪造检查结果或改审核/锁定状态；纸张回收/扫码硬件未接入。',route='/reports')
+reviewed('518',Q,['passedMin','completedMin','queueType','inRange'],'demonstrated','联合队列类型/状态/名称与候检、过号、已检各人数上下限筛选，非法负数/逆序范围拦截。','源文过检按演示过号口径处理；只统计当前本地票据，无真实跨终端同步。','frontend',route='/queue')
+reviewed('546',Q,['queueResumeSlips','resumedTokens','pauseBusy','window.print()'],'partial','暂停生成唯一QR凭条并可调用浏览器打印；打印或取消不核销；模拟输入码一次性恢复原科室队尾，同批双击暂停/恢复不重复记录。','浏览器打印调用不是实物条码输出或扫码器验收；实体打印取消/失败无设备回执，原文实机能力仍需另验。',route='/queue')
 
 # Automated test references describe only the exact asserted browser-DOM or
 # reducer subset. Results belong in the runner report; MC acceptance remains open.
@@ -606,6 +644,58 @@ AUTO_TESTS += [
  ('18','tests/devices.test.tsx','医院维护项目可在 H5 加选并按维护价格计费'),
  ('18','tests/devices.test.tsx','自助机读取相同项目及价格'),
  ('287','tests/review-tools.test.tsx','RT01 / T0286 T0288 saves date schedules'),
+]
+
+AUTO_TESTS += [
+ ('12','tests/devices.test.tsx','满意度五个维度必答'),
+ ('33','tests/devices.test.tsx','N选M严格计数'),
+ ('33','tests/devices.test.tsx','单位套餐选择数量优先于全局配置'),
+ ('497','tests/control-center.test.tsx','validates image types and size'),
+ ('497','tests/devices.test.tsx','门户显示已发布本地栅格海报'),
+ ('499','tests/devices.test.tsx','HTTPS友情链接可手动打开'),
+ ('151,187-188','tests/settlement-details.test.tsx','reconciles unit and personal line allocations'),
+ ('151','tests/settlement-details.test.tsx','does not invent pricing or paid amounts'),
+ ('188','tests/settlement-details.test.tsx','filters the actual order population'),
+ ('187-188','tests/settlement-details.test.tsx','classifies de-duplicated pricing'),
+ ('176,373','tests/review-tools.test.tsx','RT23 / T0176 T0373 manual recovery'),
+ ('176,373','tests/review-tools.test.tsx','RT24 / T0176 T0373 barcode mode'),
+ ('518-519','tests/queue-controls.test.tsx','filters by real waiting-count bounds'),
+ ('546','tests/queue-controls.test.tsx','issues a unique QR slip'),
+]
+
+AUTO_TESTS += [
+ ('21','tests/booking-extension.test.tsx','T0021 医院分类配置被患者筛选'),
+ ('23','tests/booking-extension.test.tsx','T0023 院区切换'),
+ ('29,42','tests/booking-extension.test.tsx','T0029/T0042 删除策略'),
+ ('29,42','tests/booking-extension.test.tsx','T0029/T0042 H5 明确删除策略'),
+ ('37','tests/booking-extension.test.tsx','T0037 非单位亲属关联有效员工'),
+ ('39','tests/booking-extension.test.tsx','T0039 单位承担策略'),
+ ('113','tests/booking-extension.test.tsx','T0113 重复与互斥自动整理'),
+ ('113','tests/booking-extension.test.tsx','T0113 双必检互斥不能静默删除'),
+ ('482','tests/booking-extension.test.tsx','T0482 多套餐各自满足必选数'),
+ ('99','tests/registration-consents.test.tsx','B01 photo refusal has explicit consent'),
+ ('175','tests/registration-consents.test.tsx','B02 all requested signature categories'),
+ ('120','tests/registration-consents.test.tsx','B04 custom synthetic medical history persists'),
+ ('196','tests/research-reminders.test.tsx','opens a targeted popup when demo time'),
+ ('196','tests/research-reminders.test.tsx','saves invoice-based due dates'),
+ ('401','tests/research-reminders.test.tsx','uses three-valued AND/OR'),
+ ('401','tests/research-reminders.test.tsx','exports the exact filtered rows'),
+ ('424-425','tests/control-center.test.tsx','creates source-backed rejection and overdue station notifications'),
+ ('426','tests/control-center.test.tsx','matches birthdays and built-in holidays'),
+ ('508','tests/queue-controls.test.tsx','tracks configured focused departments'),
+ ('510,553','tests/queue-controls.test.tsx','preserves fixed ultrasound numbers'),
+ ('515,568','tests/queue-controls.test.tsx','enforces guide-user queue scopes'),
+ ('525','tests/queue-controls.test.tsx','executes queue schedules against an explicit clock'),
+ ('255','tests/review-tools.test.tsx','RT31 / T0255 receive-and-confirm'),
+ ('255','tests/review-tools.test.tsx','RT30 / T0255 receive-only'),
+ ('518','tests/queue-controls.test.tsx','combines queue type and actual passed/completed'),
+ ('546','tests/queue-controls.test.tsx','opens browser printing for the slip'),
+ ('546','tests/queue-controls.test.tsx','guards pause and resume against two synchronous clicks'),
+]
+
+AUTO_TESTS += [
+ ('29,42,386,464-465,753,755','tests/registration-consents.test.tsx','B07 cancelled archived orders'),
+ ('29,42,386,464-465,753,755','tests/registration-consents.test.tsx','B08 archived order snapshots'),
 ]
 
 CLARIFICATIONS = {
@@ -809,7 +899,7 @@ def validate(rows: list[dict], source: list[dict] | None = None) -> list[str]:
 
 def render_csv(rows: list[dict]) -> str:
     keys = ['id','clause','title','subitem','star','sourcePage','sourceLine','sourceModule','text','route','interaction','status','classification','evidence','boundary','test','testStatus','automatedTest','testProcedure']
-    out=io.StringIO(); writer=csv.DictWriter(out, fieldnames=keys); writer.writeheader(); writer.writerows({k:r[k] for k in keys} for r in rows)
+    out=io.StringIO(); writer=csv.DictWriter(out, fieldnames=keys, lineterminator='\n'); writer.writeheader(); writer.writerows({k:r[k] for k in keys} for r in rows)
     return '\ufeff'+out.getvalue()
 
 
@@ -890,14 +980,14 @@ def render_boundaries(rows: list[dict]) -> str:
 
 ## 尚未补齐的前端交互
 
-partial与config-only不能都归因为后端或硬件依赖。例如，仍缺完整满意度问卷（T0012）、套餐N选M（T0033）、部分财务明细与分组小计（T0151、T0187–T0188）、回收导检单时提示未检项/两种回收方式（T0176、T0255）、检查录音采集（T0215，已有音频文件导入）、在采血/分检界面显示登记双照（T0403）、人数上下限高级队列查询/瓶颈标识（T0518–T0519）、暂停检查凭条恢复（T0546）等。另有文字海报/友情链接尚未成为完整图片发布/可用外链（T0497、T0499）。这些是具体业务交互缺口，不能仅靠相关页面入口或通用CRUD抵销。
+partial与config-only不能都归因为后端或硬件依赖。固定扩展清单中的分类加项、院区套餐、取消归档策略、亲属付款、多套餐互斥、自选包、既往史提示、财务提醒和组合科研筛选现已补充对应本地交互。回收逐项确认、完整人数筛选和浏览器凭条打印亦已补充。仍有明确边界：音频文件导入不是诊室声音录制（T0215）；双照为抽象示意且独立采血链路未证（T0403）；真实/完整AI报告解读未实现（T0354）。通知/队列时钟仅显式推进，真实送达、后台调度及语音/签字板不因有前端配置而通过。其余partial和config-only的逐项缺口继续保留矩阵，本轮只复核锁定22项及3处纠偏，没有宣称消除全部前端缺口。
 
 明确负向证据的子项清点与partial总数不同：同一项可能同时涉及前端、临床、接口和待澄清要求，未将其强行自动分成互斥缺口总量。未完句/疑问句和真实设备依赖仍按原文保留，详见逐项矩阵。
 
 ## 数据、隐私与权限
 
 - 只用虚构演示数据。本地状态和浏览器存储能被当前用户查看、编辑或清除，不是安全数据库，也不是可靠的医院档案保存机制。不要录入真实患者、身份证、照片、病历、联系方式或支付凭据。
-- UI角色切换、菜单隐藏、折扣输入校验和本地日志不是服务端鉴权。已有前端菜单守卫及患者/院区/体检类型范围过滤；records等数据集合尚未统一隔离。生产还需身份认证、服务端数据范围控制、接口授权和审计。
+- UI角色切换、菜单隐藏、折扣输入校验和本地日志不是服务端鉴权。已有前端菜单守卫及患者/院区/体检类型范围过滤；records和审计已按患者/订单关联过滤，取消归档及关联发票回款也遵守患者/院区/类型范围，库存及预约容量使用匿名全局汇总；规则基于已知本地字段，原始浏览器存储和患者/自助入口仍非安全隔离边界。生产还需身份认证、服务端数据范围控制、接口授权和审计。
 - 本地日志可演示谁、何时、什么动作；不等于不可篡改、永久保存、签章或完整跨系统追溯。刷新保持仅对具体使用持久化的模块成立，未逐项测试的状态不宣称可靠持久化。
 - 浏览器临时文件、导出和打印应使用演示数据。生产需落实访问控制、脱敏、保密及测试数据制度；源文没有确定等保级别、RPO、RTO或统一性能阈值，本项目不擅自补写。
 - 健康档案可读取并保存本地PDF/TXT/CSV演示文件（每份512KB以内、最多4份）；这属于浏览器内文件处理，不是安全服务器上传、患者文件存储或医学解析。
@@ -905,10 +995,10 @@ partial与config-only不能都归因为后端或硬件依赖。例如，仍缺�
 ## 服务与专项质控中心
 
 - /controls 提供独立通知、替检人工核验、签名留样、驳回统计、门户/导检配置与密码演练入口。入口统计只要求本条至少一个子项可定位，不掩盖该条其他子项仍缺失；请逐项阅读矩阵。
-- 通知从共享演示订单和有限异常规则生成，支持逐对象预览、批量本地记录、模拟失败/重试与操作历史。没有短信、电话或站内消息对外发送，也没有自动事件触发或前一天调度。内置通知类型的正文可保存为本地模板库并重复套用；仍不代表医院全量模板或真实自动发送。
+- 通知从共享演示订单和有限异常规则生成，支持逐对象预览、批量本地记录、模拟失败/重试与操作历史。没有短信、电话或站内消息对外发送，显式推进演示时钟可生成驳回/超期及生日/节日事件，但无后台自动运行或前一天调度。内置通知类型的正文可保存为本地模板库并重复套用；仍不代表医院全量模板或真实自动发送。
 - 替检核验仅使用两幅固定抽象SVG示意图及人工一致/不一致记录，没有实际身份证照片、摄像头、活体或人脸识别。签名只允许固定演示文字或随意笔画，本地可查询预览，并可另行显式确认执行受角色/状态限制的演示弃检、领取或回收；不提供法律效力、防篡改或永久保存。请勿输入真实生物信息或签名。
 - 驳回统计确实读取本地REJECT快照，但记录医生是订单责任医生，不一定等于原分检执行人；主检/总检合并。原因占比的分母为筛选后驳回事件数，不能当作临床错误发生概率。
-- 门户内容、海报摘要、菜单、科室/区域/诊室使用分域配置；患者H5已读取启用内容，科室/区域/诊室与业务队列也已联动；海报仍为文字卡、友情链接不外访，真实微信发布/医院导航/完整导检用户管理及无缝接口仍按T项列缺口。
+- 门户内容、海报摘要、菜单、科室/区域/诊室使用分域配置；患者H5已读取启用内容，科室/区域/诊室与业务队列也已联动；已支持本地栅格海报和主动点击HTTPS链接，真实微信发布/医院导航/导检用户已联动本地队列权限，真实认证及无缝接口仍按T项列缺口。
 - 密码表单仅校验DEMO测试字符串，成功后清空输入，不保存输入值，只保留演练完成标志/时间/强度；不修改真实密码或认证权限，不验证安全存储或生产密码策略。
 - 演示指南包含实际36秒H.264、1280×720视频、中文字幕和六章节定位。已检查媒体元数据及抽帧，自动测试只验证DOM媒体引用/章节时间/关闭。短片为流程示意，不是实际界面操作录屏、复杂操作完整教学或浏览器播放/视觉验收证据。
 

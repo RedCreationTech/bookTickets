@@ -701,7 +701,9 @@ describe("单位排期、时钟、问卷与门户配置闭环", () => {
     ];
     localStorage.setItem(STORAGE, JSON.stringify(s));
     renderPortal("patient", "#/patient?group=xingchen-2026");
-    expect(screen.getByLabelText("亲属预约（专属价自费）")).toBeDisabled();
+    expect(
+      screen.getByLabelText("亲属预约（单位折扣及承担规则）"),
+    ).toBeDisabled();
     expect(screen.getByRole("button", { name: "确认预约" })).toBeDisabled();
   });
   it("必填问卷阻止H5预约，完成后写入问卷答案且推荐关闭不加项目", () => {
@@ -886,7 +888,9 @@ describe("单位排期、时钟、问卷与门户配置闭环", () => {
       "测试帮助链接",
     ])
       expect(screen.getByText(text)).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "测试帮助链接" })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "访问 测试帮助链接（外部网站）" }),
+    ).toHaveAttribute("href", "https://example.invalid/demo");
   });
 });
 
@@ -1137,5 +1141,364 @@ describe("共享医院项目字典的患者端消费", () => {
     click("创建模拟预约");
     expect(state().appointments[0].items).toContain("演示新增检查");
     expect(state().appointments[0].amount).toBe(528);
+  });
+});
+
+describe("最终患者端问卷、多套餐与门户媒体", () => {
+  const surveyLabels = [
+    "预约流程是否清晰便捷",
+    "工作人员服务是否耐心友善",
+    "体检环境与导检标识是否清晰",
+    "检查说明与报告沟通是否易懂",
+    "本次整体服务体验是否满意",
+  ];
+  function fillSatisfaction() {
+    surveyLabels.forEach((label, index) =>
+      fireEvent.change(screen.getByLabelText(label), {
+        target: { value: String(index + 1) },
+      }),
+    );
+  }
+  it("满意度五个维度必答，双击仅保存一次并在刷新后回看原结果", () => {
+    const first = renderPortal("patient", "#/patient");
+    click("查看消息");
+    click("提交满意度问卷");
+    expect(state().records.patientSatisfaction || []).toHaveLength(0);
+    expect(screen.getByRole("status").textContent).toContain("全部 5 道必答");
+    fillSatisfaction();
+    fireEvent.change(screen.getByLabelText("合成改进建议（选填）"), {
+      target: { value: "合成建议：完善院内导检标识" },
+    });
+    const submit = screen.getByRole("button", { name: "提交满意度问卷" });
+    reactAct(() => {
+      fireEvent.click(submit);
+      fireEvent.click(submit);
+    });
+    expect(state().records.patientSatisfaction).toHaveLength(1);
+    const record = state().records.patientSatisfaction[0];
+    expect(record.average).toBe(3);
+    expect(record.scores).toEqual({
+      booking: 1,
+      service: 2,
+      environment: 3,
+      communication: 4,
+      overall: 5,
+    });
+    expect(record.suggestion).toBe("合成建议：完善院内导检标识");
+    expect(record.appointmentId).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "提交满意度问卷" })).toBeNull();
+    first.unmount();
+    renderPortal("patient", "#/patient");
+    click("查看消息");
+    expect(
+      screen.getByRole("region", { name: "满意度问卷已提交结果" }),
+    ).toHaveTextContent("平均评分：3 / 5");
+    expect(state().records.patientSatisfaction).toHaveLength(1);
+  });
+  it("不同订单独立评价，切换后评分重置，建议允许留空", () => {
+    const s = createInitialState();
+    s.appointments = [
+      { ...s.appointments[0], id: "SURVEY-A", patientId: "P001" },
+      { ...s.appointments[0], id: "SURVEY-B", patientId: "P001" },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    click("查看消息");
+    fillSatisfaction();
+    click("提交满意度问卷");
+    fireEvent.change(screen.getByLabelText("评价体验订单"), {
+      target: { value: "SURVEY-B" },
+    });
+    expect(screen.getByLabelText(surveyLabels[0])).toHaveValue("");
+    fillSatisfaction();
+    click("提交满意度问卷");
+    expect(state().records.patientSatisfaction).toHaveLength(2);
+    expect(
+      state()
+        .records.patientSatisfaction.map(
+          (row: { appointmentId: string }) => row.appointmentId,
+        )
+        .sort(),
+    ).toEqual(["SURVEY-A", "SURVEY-B"]);
+    expect(state().records.patientSatisfaction[0].suggestion).toBe("");
+  });
+  it("N选M严格计数，已选套餐限额，重叠检查项目去重计价", () => {
+    const s = createInitialState();
+    s.appointments = [];
+    s.config.packageChooseCount = 2;
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    expect(screen.getByText(/已选 1\/2 个/)).toBeTruthy();
+    expect(screen.getByLabelText("简单预约，仅预约到院时间")).toBeDisabled();
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments).toHaveLength(0);
+    expect(screen.getByRole("status").textContent).toContain("需选择 2 个套餐");
+    click(/都市精英体检/);
+    click(/全维深度体检/);
+    expect(screen.getByRole("status").textContent).toContain(
+      "最多选择 2 个套餐",
+    );
+    expect(screen.getByText(/已选 2\/2 个/)).toBeTruthy();
+    click("确认预约");
+    const order = state().appointments[0];
+    expect(order.packageIds).toEqual(["PK01", "PK02"]);
+    expect(order.packageChooseCount).toBe(2);
+    expect(order.items).toHaveLength(new Set(order.items).size);
+    expect(order.items).toHaveLength(8);
+    expect(order.amount).toBe(899);
+    expect(order.pricing).toHaveLength(8);
+    expect(
+      order.pricing.reduce(
+        (sum: number, row: { amount: number }) => sum + row.amount,
+        0,
+      ),
+    ).toBeCloseTo(order.amount);
+  });
+  it("单位套餐选择数量优先于全局配置并复用去重后的单位个人分摊", () => {
+    const s = createInitialState();
+    s.appointments = [];
+    s.config.packageChooseCount = 3;
+    s.records.groupOrders = [
+      {
+        id: "GO-MULTI",
+        company: "星辰科技",
+        mode: "限额自选",
+        budget: 800,
+        packages: ["PK01", "PK02"],
+        optionalItems: [],
+        choose: 0,
+        packageChooseCount: 2,
+        status: "生效",
+        startDate: "2026-01-01",
+        endDate: "2027-12-31",
+      },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient?group=xingchen-2026");
+    expect(screen.getByText(/2 选 2，已选 1\/2/)).toBeTruthy();
+    click(/都市精英体检/);
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments[0].packageIds).toEqual(["PK01", "PK02"]);
+    expect(state().appointments[0].groupSplit).toEqual({
+      unit: 800,
+      personal: 99,
+    });
+  });
+  it("组合套餐默认自动过滤互斥项目并保留原因", () => {
+    const s = createInitialState();
+    s.appointments = [];
+    s.config.packageChooseCount = 2;
+    s.packages = [
+      {
+        id: "MULTI-A",
+        name: "合成组合甲",
+        price: 200,
+        tag: "演示",
+        items: ["一般检查", "合成甲"],
+      },
+      {
+        id: "MULTI-B",
+        name: "合成组合乙",
+        price: 300,
+        tag: "演示",
+        items: ["一般检查", "合成乙"],
+      },
+    ];
+    s.records.orderingRules = [
+      { id: "base", item: "一般检查", price: 99, required: true },
+      { id: "exclude", item: "合成甲", price: 100, excludes: "合成乙" },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    click(/合成组合乙/);
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments).toHaveLength(1);
+    expect(state().appointments[0].items).toEqual(["一般检查", "合成甲"]);
+    expect(state().appointments[0].itemFiltering).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ item: "合成乙", keptItem: "合成甲" }),
+      ]),
+    );
+    expect(state().appointments[0].amount).toBe(250);
+  });
+  it("门户显示已发布本地栅格海报，危险格式、未来、草稿和停用图片均不加载", () => {
+    const s = createInitialState();
+    const imageData =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlZkAAAAASUVORK5CYII=";
+    const poster = {
+      id: "POSTER-1",
+      name: "合成体检海报",
+      imageData,
+      alt: "本地合成健康海报",
+      status: "已发布",
+      enabled: true,
+      date: "2020-01-01",
+      order: 1,
+      target: "预约体检",
+    };
+    s.records.portalPosters = [
+      poster,
+      {
+        ...poster,
+        id: "P2",
+        name: "危险海报",
+        alt: "危险海报",
+        imageData: "data:image/svg+xml;base64,PHN2Zy8+",
+      },
+      {
+        ...poster,
+        id: "P3",
+        name: "未来海报",
+        alt: "未来海报",
+        date: "2099-01-01",
+      },
+      {
+        ...poster,
+        id: "P4",
+        name: "草稿海报",
+        alt: "草稿海报",
+        status: "草稿",
+      },
+      {
+        ...poster,
+        id: "P5",
+        name: "停用海报",
+        alt: "停用海报",
+        enabled: false,
+      },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    expect(
+      screen.getByRole("img", { name: "本地合成健康海报" }),
+    ).toHaveAttribute("src", imageData);
+    ["危险海报", "未来海报", "草稿海报", "停用海报"].forEach((name) =>
+      expect(screen.queryByRole("img", { name })).toBeNull(),
+    );
+    click("查看海报：合成体检海报");
+    expect(screen.getByRole("button", { name: "确认预约" })).toBeTruthy();
+  });
+  it("HTTPS友情链接可手动打开且隔离新窗口，危险协议和带凭据链接无href", () => {
+    const s = createInitialState();
+    s.records.portalLinks = [
+      {
+        id: "LINK-OK",
+        name: "合成帮助站",
+        url: "https://example.org/help",
+        status: "已发布",
+      },
+      {
+        id: "LINK-JS",
+        name: "危险脚本站",
+        url: "javascript:alert(1)",
+        status: "已发布",
+      },
+      {
+        id: "LINK-HTTP",
+        name: "非安全站",
+        url: "http://example.org",
+        status: "已发布",
+      },
+      {
+        id: "LINK-CREDENTIAL",
+        name: "含凭据站",
+        url: "https://demo:password@example.org",
+        status: "已发布",
+      },
+      {
+        id: "LINK-OFF",
+        name: "停用站",
+        url: "https://example.org",
+        status: "已发布",
+        enabled: false,
+      },
+    ];
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    click(/中心介绍 · 医院位置/);
+    const link = screen.getByRole("link", {
+      name: "访问 合成帮助站（外部网站）",
+      hidden: true,
+    });
+    expect(link).toHaveAttribute("href", "https://example.org/help");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveAttribute("referrerpolicy", "no-referrer");
+    expect(
+      document.querySelectorAll(
+        'a[href^="javascript:"], a[href^="http:"], a[href*="password"]',
+      ),
+    ).toHaveLength(0);
+    expect(screen.queryByText("停用站")).toBeNull();
+  });
+});
+
+describe("套餐数量配置即时生效边界", () => {
+  function ConfigSwitch() {
+    const { act } = useDemo();
+    return (
+      <button
+        onClick={() =>
+          act({ type: "UPDATE_CONFIG", payload: { packageChooseCount: 1 } })
+        }
+      >
+        测试切回单套餐配置
+      </button>
+    );
+  }
+  it("切回单套餐配置后清除多选对计价及提交的影响", () => {
+    const s = createInitialState();
+    s.appointments = [];
+    s.config.packageChooseCount = 2;
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    render(
+      <DemoProvider>
+        <Patient />
+        <ConfigSwitch />
+        <Probe />
+      </DemoProvider>,
+    );
+    click("开启健康计划");
+    click(/都市精英体检/);
+    expect(screen.getByText(/已选 2\/2 个/)).toBeTruthy();
+    click("测试切回单套餐配置");
+    expect(screen.queryByText(/套餐 N 选 M/)).toBeNull();
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments[0].packageIds).toEqual(["PK01"]);
+    expect(state().appointments[0].packageChooseCount).toBe(1);
+    expect(state().appointments[0].amount).toBe(399);
+  });
+  it("线上停售导致套餐不足时不可绕过数量要求", () => {
+    const s = createInitialState();
+    s.appointments = [];
+    s.config.packageChooseCount = 2;
+    s.records.packageRules = ["PK02", "PK03", "PK04"].map((packageId) => ({
+      packageId,
+      onlineEnabled: false,
+    }));
+    localStorage.setItem(STORAGE, JSON.stringify(s));
+    renderPortal("patient", "#/patient");
+    click("开启健康计划");
+    expect(screen.getByText(/可选线上套餐不足以满足必选数量/)).toBeTruthy();
+    fireEvent.click(
+      screen.getByLabelText("已阅读预约须知，确认本次为本地模拟预约"),
+    );
+    click("确认预约");
+    expect(state().appointments).toHaveLength(0);
+    expect(screen.getByRole("status").textContent).toContain("需选择 2 个套餐");
   });
 });

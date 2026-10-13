@@ -24,7 +24,6 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
-  Star,
   Stethoscope,
   UserRound,
   Users,
@@ -38,9 +37,17 @@ import {
   packageIsApplicable,
   getOrderRules,
   quoteOrder,
+  packageAvailableAtCampus,
+  getPackageOptionalBundles,
+  normalizeOrderItems,
+  getItemClassification,
 } from "../orderingRules";
 import { deriveQueueDefinitions } from "./Queue";
-import { applicableGroup, splitGroupAmount } from "./Groups";
+import {
+  groupForBooking,
+  groupDiscountPercent,
+  splitGroupAmount,
+} from "./Groups";
 import {
   getBookingAvailability,
   getOnlineExtraCatalog,
@@ -111,6 +118,53 @@ const meanings: Record<string, string> = {
   骨密度: "了解骨量及骨密度情况",
   肺功能: "了解肺通气功能相关指标",
 };
+const satisfactionQuestions = [
+  { key: "booking", label: "预约流程是否清晰便捷" },
+  { key: "service", label: "工作人员服务是否耐心友善" },
+  { key: "environment", label: "体检环境与导检标识是否清晰" },
+  { key: "communication", label: "检查说明与报告沟通是否易懂" },
+  { key: "overall", label: "本次整体服务体验是否满意" },
+] as const;
+const satisfactionSuggestions = [
+  "无额外演示建议",
+  "合成建议：增加预约时段提示",
+  "合成建议：完善院内导检标识",
+  "合成建议：增加报告说明示例",
+];
+function safePortalLink(value: unknown) {
+  if (
+    typeof value !== "string" ||
+    !/^https:\/\//i.test(value) ||
+    [...value].some(
+      (character) =>
+        character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127,
+    )
+  )
+    return "";
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      !!url.hostname
+      ? url.href
+      : "";
+  } catch {
+    return "";
+  }
+}
+function safePosterImage(value: unknown) {
+  if (
+    typeof value !== "string" ||
+    !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)
+  )
+    return "";
+  const data = value.split(",")[1];
+  const bytes =
+    (data.length * 3) / 4 -
+    (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0);
+  return data.length % 4 === 0 && bytes <= 512 * 1024 ? value : "";
+}
 const upcomingDate = () => {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -176,33 +230,114 @@ export default function Patient() {
   const inGroupFlow =
     view === "group" ||
     (["compare", "questionnaire"].includes(view) && bookingReturn === "group");
+  const [groupRelative, setGroupRelative] = useState(false);
+  const [sponsorPatientId, setSponsorPatientId] = useState(
+    state.patients[0]?.id || "",
+  );
+  const eligibleSponsors = state.patients.filter(
+    (person) => person.company === groupCompany,
+  );
+  const effectiveSponsorId = eligibleSponsors.some(
+    (person) => person.id === sponsorPatientId,
+  )
+    ? sponsorPatientId
+    : eligibleSponsors[0]?.id || "";
   const activeGroup = inGroupFlow
-    ? applicableGroup(state, patient.id, date)
+    ? groupForBooking(state, patient.id, date, {
+        relative: groupRelative,
+        sponsorPatientId: effectiveSponsorId,
+        company: groupCompany,
+      })
     : undefined;
+  const packageScope =
+    groupRelative && activeGroup ? { company: activeGroup.company } : {};
+  const [campus, setCampus] = useState(state.config.campus || "中心院区");
   const groupContractBlocked =
     inGroupFlow &&
     (state.records.groupOrders || []).some((g) => g.company === groupCompany) &&
     (!activeGroup || activeGroup.company !== groupCompany);
   const [packageId, setPackageId] = useState(state.packages[0]?.id || "");
-  const bookingExtras = getOnlineExtraCatalog(
-    state,
-    patient.id,
-    activeGroup ? activeGroup.optionalItems || [] : undefined,
-  ).filter(
-    (extra) =>
-      !state.packages
-        .find((pack) => pack.id === packageId)
-        ?.items.includes(extra.name),
+  const [packageSelection, setPackageSelection] = useState<string[]>([
+    state.packages[0]?.id || "",
+  ]);
+  const rawPackageCount = Number(
+    activeGroup?.packageChooseCount ?? state.config.packageChooseCount ?? 1,
   );
+  const packageChooseCount =
+    Number.isInteger(rawPackageCount) && rawPackageCount > 0
+      ? rawPackageCount
+      : 1;
+  const multiPackageMode = packageChooseCount > 1;
   const applicablePackages = state.packages.filter(
     (p) =>
       (!activeGroup || activeGroup.packages?.includes(p.id)) &&
-      packageIsApplicable(state, patient, p.id) &&
+      packageIsApplicable(state, patient, p.id, packageScope) &&
+      packageAvailableAtCampus(state, p.id, campus) &&
       (state.records.packageRules || []).find((r) => r.packageId === p.id)
         ?.onlineEnabled !== false &&
       p.onlineEnabled !== false,
   );
-  const selectedPackage = applicablePackages.find((p) => p.id === packageId);
+  const selectedPackageIds = (
+    multiPackageMode ? packageSelection : [packageId]
+  ).filter(
+    (id, index, ids) =>
+      ids.indexOf(id) === index &&
+      applicablePackages.some((pack) => pack.id === id),
+  );
+  const selectedPackages = applicablePackages.filter((pack) =>
+    selectedPackageIds.includes(pack.id),
+  );
+  const selectedPackage = selectedPackages[0];
+  const basePackageItems = [
+    ...new Set(selectedPackages.flatMap((pack) => pack.items)),
+  ];
+  const selectedPackageKey = selectedPackageIds.join("|");
+  const packageBundles = getPackageOptionalBundles(state, selectedPackageIds);
+  const [bundleSelections, setBundleSelections] = useState<
+    Record<string, string[]>
+  >({});
+  const hasPackageBundles = packageBundles.length > 0;
+  const bundleCatalog = getOnlineExtraCatalog(
+    state,
+    patient.id,
+    packageBundles.flatMap((bundle) => bundle.items),
+  );
+  const globalExtras = getOnlineExtraCatalog(
+    state,
+    patient.id,
+    activeGroup
+      ? hasPackageBundles
+        ? []
+        : activeGroup.optionalItems || []
+      : undefined,
+  );
+  const bookingExtras = [
+    ...new Map(
+      [...globalExtras, ...bundleCatalog].map((extra) => [extra.name, extra]),
+    ).values(),
+  ].filter((extra) => !basePackageItems.includes(extra.name));
+  const activeBundles = packageBundles.map((bundle) => ({
+    ...bundle,
+    eligibleItems: bundle.items.filter((item) =>
+      bookingExtras.some((extra) => extra.name === item),
+    ),
+  }));
+  const [bodyPartFilter, setBodyPartFilter] = useState("");
+  const [diseaseFilter, setDiseaseFilter] = useState("");
+  const [autoFilterMutual, setAutoFilterMutual] = useState(
+    state.config.autoFilterMutualItems !== false,
+  );
+  const genericExtras = bookingExtras.filter(
+    (extra) =>
+      !packageBundles.some((bundle) => bundle.items.includes(extra.name)),
+  );
+  const displayedExtras = genericExtras.filter((extra) => {
+    const classification = getItemClassification(state, extra.name);
+    return (
+      (!bodyPartFilter || classification.bodyPart === bodyPartFilter) &&
+      (!diseaseFilter || classification.diseaseType === diseaseFilter)
+    );
+  });
   const requiredItems = getOrderRules(state)
     .filter((r) => r.required && r.enabled !== false && r.ruleEnabled !== false)
     .map((r) => r.item);
@@ -212,11 +347,10 @@ export default function Patient() {
     if (!slots.some((slot) => slot.time === time))
       setTime(slots[0]?.time || "");
   }, [state.config.timeSlots]);
-  const [campus, setCampus] = useState(state.config.campus || "中心院区");
   const [simple, setSimple] = useState(false);
   useEffect(() => {
-    if (activeGroup) setSimple(false);
-  }, [activeGroup?.id]);
+    if (activeGroup || multiPackageMode) setSimple(false);
+  }, [activeGroup?.id, multiPackageMode]);
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [excludedItems, setExcludedItems] = useState<string[]>([]);
   const bookingSubmitted = useRef(false);
@@ -225,15 +359,41 @@ export default function Patient() {
   const displayPrices =
     state.config.showPrices !== false &&
     !["不显示", "不显示价格"].includes(state.config.priceMode);
-  const baseItems = (selectedPackage?.items || []).filter(
+  const baseItems = basePackageItems.filter(
     (item) => !excludedItems.includes(item),
   );
   const activeExtras =
     allowAdd && !simple
-      ? selectedExtras.filter((name) =>
-          bookingExtras.some((extra: { name: string }) => extra.name === name),
-        )
+      ? [
+          ...new Set([
+            ...selectedExtras.filter((name) =>
+              genericExtras.some((extra) => extra.name === name),
+            ),
+            ...activeBundles.flatMap((bundle) =>
+              (bundleSelections[bundle.packageId] || []).filter((name) =>
+                bundle.eligibleItems.includes(name),
+              ),
+            ),
+          ]),
+        ]
       : [];
+  const unfilteredItems = [
+    ...selectedPackages
+      .flatMap((pack) => pack.items)
+      .filter((item) => !excludedItems.includes(item)),
+    ...activeExtras,
+  ];
+  const normalizedItems = normalizeOrderItems(state, unfilteredItems);
+  const applyAutomaticFiltering =
+    selectedPackageIds.length > 1 && autoFilterMutual;
+  const submittedItems = applyAutomaticFiltering
+    ? normalizedItems.items
+    : [...new Set(unfilteredItems)];
+  const mutuallyExcludedItems = applyAutomaticFiltering
+    ? [...new Set(unfilteredItems)].filter(
+        (item) => !submittedItems.includes(item),
+      )
+    : [];
   const availability = getBookingAvailability(state, date, undefined, {
     patientId: patient?.id,
     company: groupCompany,
@@ -247,12 +407,10 @@ export default function Patient() {
   useEffect(() => {
     setExcludedItems(
       state.config.defaultSelected === false
-        ? (selectedPackage?.items || []).filter(
-            (item) => !requiredItems.includes(item),
-          )
+        ? basePackageItems.filter((item) => !requiredItems.includes(item))
         : [],
     );
-  }, [packageId, state.config.defaultSelected]);
+  }, [selectedPackageKey, state.config.defaultSelected]);
   const [compare, setCompare] = useState<string[]>(
     state.packages.slice(0, 2).map((p) => p.id),
   );
@@ -282,10 +440,26 @@ export default function Patient() {
   );
   const [groupCode, setGroupCode] = useState("DEMO2026");
   const [groupMode, setGroupMode] = useState("定额自选");
-  const [groupRelative, setGroupRelative] = useState(false);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
-  const [rating, setRating] = useState(0);
+  const [surveyOrderId, setSurveyOrderId] = useState("");
+  const surveyOrders = orders.filter((order) => order.status !== "cancelled");
+  const surveyAppointmentId = surveyOrders.some(
+    (order) => order.id === surveyOrderId,
+  )
+    ? surveyOrderId
+    : surveyOrders[0]?.id || "";
+  const satisfactionId = `SAT-${patient?.id}-${surveyAppointmentId || "portal"}`;
+  const satisfactionResult = (state.records.patientSatisfaction || []).find(
+    (row) => row.id === satisfactionId,
+  );
+  const [surveyScores, setSurveyScores] = useState<Record<string, number>>({});
+  const [surveySuggestion, setSurveySuggestion] = useState("");
+  const surveySubmitted = useRef(new Set<string>());
+  useEffect(() => {
+    setSurveyScores({});
+    setSurveySuggestion("");
+  }, [satisfactionId]);
   const [healthDays, setHealthDays] = useState<string[]>([]);
   const [cart, setCart] = useState(0);
   const [article, setArticle] = useState("体检前，这些准备请记好");
@@ -343,14 +517,99 @@ export default function Patient() {
   const addPrice = bookingExtras
     .filter((e) => activeExtras.includes(e.name))
     .reduce((sum, e) => sum + e.price, 0);
-  const groupQuote = activeGroup
-    ? quoteOrder(state, [packageId], 100, {}, activeExtras)
-    : null;
+  const compositeBaseQuote =
+    activeGroup || multiPackageMode
+      ? quoteOrder(
+          state,
+          selectedPackageIds,
+          groupDiscountPercent(activeGroup, groupRelative),
+          {},
+          activeExtras,
+          mutuallyExcludedItems,
+        )
+      : null;
+  const compositeRows = compositeBaseQuote?.rows.map((row) => {
+    const extra = bookingExtras.find(
+      (item) => item.name === row.item && activeExtras.includes(item.name),
+    );
+    return extra
+      ? {
+          ...row,
+          price: extra.price,
+          amount: Math.round(extra.price * row.percent) / 100,
+        }
+      : row;
+  });
+  const groupQuote =
+    compositeBaseQuote && compositeRows
+      ? {
+          ...compositeBaseQuote,
+          rows: compositeRows,
+          amount:
+            Math.round(
+              compositeRows.reduce((sum, row) => sum + row.amount, 0) * 100,
+            ) / 100,
+        }
+      : null;
   const total = groupQuote
     ? groupQuote.amount
     : (simple ? 0 : selectedPackage?.price || 0) + addPrice;
+  const selectBookingPackage = (id: string) => {
+    if (!multiPackageMode) {
+      setPackageId(id);
+      setPackageSelection([id]);
+      return;
+    }
+    if (selectedPackageIds.includes(id))
+      setPackageSelection(selectedPackageIds.filter((value) => value !== id));
+    else if (selectedPackageIds.length < packageChooseCount)
+      setPackageSelection([...selectedPackageIds, id]);
+    else tell(`本模式最多选择 ${packageChooseCount} 个套餐，请先取消已选套餐`);
+  };
+  const submitSatisfaction = () => {
+    if (satisfactionResult || surveySubmitted.current.has(satisfactionId))
+      return tell("此体验已提交问卷，可直接回看结果");
+    if (
+      satisfactionQuestions.some(
+        (question) =>
+          !Number.isInteger(surveyScores[question.key]) ||
+          surveyScores[question.key] < 1 ||
+          surveyScores[question.key] > 5,
+      )
+    )
+      return tell("请完成全部 5 道必答评分题");
+    if (surveySuggestion && !satisfactionSuggestions.includes(surveySuggestion))
+      return tell("请选择有效的合成建议");
+    surveySubmitted.current.add(satisfactionId);
+    act({
+      type: "UPSERT_RECORD",
+      payload: {
+        collection: "patientSatisfaction",
+        record: {
+          id: satisfactionId,
+          patientId: patient.id,
+          appointmentId: surveyAppointmentId,
+          scores: { ...surveyScores },
+          suggestion: surveySuggestion,
+          average:
+            Math.round(
+              (satisfactionQuestions.reduce(
+                (sum, question) => sum + surveyScores[question.key],
+                0,
+              ) /
+                5) *
+                100,
+            ) / 100,
+          status: "已提交",
+          submittedAt: getBookingNow(state).toISOString(),
+          source: "H5合成满意度问卷",
+        },
+      },
+    });
+    tell("满意度问卷已保存，可回看本次结果");
+  };
   const groupCharge = activeGroup
-    ? groupRelative
+    ? groupRelative && activeGroup.relativePayment !== "unit"
       ? { unit: 0, personal: total }
       : splitGroupAmount(activeGroup, groupQuote?.rows || [])
     : {
@@ -360,12 +619,34 @@ export default function Patient() {
   const createOrder = (isGroup = false) => {
     if (bookingSubmitted.current) return;
     if (!consent) return tell("请先确认已阅读预约须知");
-    if (activeGroup && simple)
-      return tell("单位订单必须选择已配置的体检套餐，不能使用简单预约");
+    if ((activeGroup || multiPackageMode) && simple)
+      return tell("当前预约模式必须选择已配置的体检套餐，不能使用简单预约");
     if (groupContractBlocked)
       return tell("当前体检人不在单位订单有效名单或预约日期内");
-    if (activeGroup && activeExtras.length !== Number(activeGroup.choose || 0))
+    if (
+      activeGroup &&
+      !hasPackageBundles &&
+      activeExtras.length !== Number(activeGroup.choose || 0)
+    )
       return tell(`单位自选项目需选择 ${Number(activeGroup.choose || 0)} 项`);
+    if (!simple && selectedPackageIds.length !== packageChooseCount)
+      return tell(
+        `本模式需选择 ${packageChooseCount} 个套餐，当前已选 ${selectedPackageIds.length} 个`,
+      );
+    for (const bundle of activeBundles) {
+      const chosen = (bundleSelections[bundle.packageId] || []).filter(
+        (name) =>
+          bundle.eligibleItems.includes(name) &&
+          activeExtras.includes(name) &&
+          submittedItems.includes(name),
+      );
+      if (chosen.length !== bundle.choose)
+        return tell(
+          `${bundle.name}自选包需选择 ${bundle.choose} 项，当前有效 ${chosen.length} 项`,
+        );
+    }
+    if (applyAutomaticFiltering && normalizedItems.errors.length)
+      return tell(normalizedItems.errors.join("；"));
     if (!patient || (!simple && !selectedPackage))
       return tell("请选择体检人和套餐");
     if (!availability.allowed) return tell(availability.error);
@@ -381,8 +662,9 @@ export default function Patient() {
       : getOrderingIssues(
           state,
           patient.id,
-          [...baseItems, ...activeExtras],
-          [packageId],
+          submittedItems,
+          selectedPackageIds,
+          packageScope,
         );
     if (itemIssues.length) return tell(itemIssues.join("；"));
     if (!simple && baseItems.length + activeExtras.length === 0)
@@ -390,6 +672,7 @@ export default function Patient() {
     if (
       isGroup &&
       !activeGroup &&
+      !hasPackageBundles &&
       groupMode === "N 选 M" &&
       allowAdd &&
       activeExtras.length !== 2
@@ -400,12 +683,34 @@ export default function Patient() {
       type: "CREATE_APPOINTMENT",
       payload: {
         patientId: patient.id,
-        packageId: simple ? "simple" : packageId,
+        packageId: simple ? "simple" : selectedPackageIds[0],
+        packageIds: simple ? [] : selectedPackageIds,
+        packageChooseCount: simple ? 0 : packageChooseCount,
         date,
         time,
         campus,
         amount: total,
-        items: [...(simple ? [] : baseItems), ...activeExtras],
+        items: simple ? [] : submittedItems,
+        itemFiltering: applyAutomaticFiltering ? normalizedItems.removed : [],
+        packageOptionalSelections: Object.fromEntries(
+          activeBundles.map((bundle) => [
+            bundle.packageId,
+            (bundleSelections[bundle.packageId] || []).filter(
+              (item) =>
+                activeExtras.includes(item) && submittedItems.includes(item),
+            ),
+          ]),
+        ),
+        relativeBooking: isGroup && groupRelative,
+        sponsorPatientId:
+          isGroup && groupRelative ? effectiveSponsorId : undefined,
+        groupDiscount: isGroup
+          ? groupDiscountPercent(activeGroup, groupRelative)
+          : 100,
+        relativePayment:
+          isGroup && groupRelative
+            ? activeGroup?.relativePayment || "self"
+            : undefined,
         results: {},
         conclusion: "",
         source: isGroup ? "H5团检" : "H5个检",
@@ -421,7 +726,9 @@ export default function Patient() {
           )?.answers || [],
         groupBudget: isGroup
           ? activeGroup
-            ? Number(activeGroup.budget) || groupCharge.unit
+            ? Number.isFinite(Number(activeGroup.budget))
+              ? Number(activeGroup.budget)
+              : groupCharge.unit
             : 800
           : 0,
         groupOrderId: isGroup ? activeGroup?.id : undefined,
@@ -567,7 +874,11 @@ export default function Patient() {
   };
   const publicRows = (key: string) =>
     (state.records[key] || [])
-      .filter((row) => ["已启用", "已发布", "已通过"].includes(row.status))
+      .filter(
+        (row) =>
+          row.enabled !== false &&
+          ["已启用", "已发布", "已通过"].includes(row.status),
+      )
       .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
   const hospital = {
     name: "红创 · 健康中心",
@@ -601,6 +912,11 @@ export default function Patient() {
     : baseServices;
   const portalContent = publicRows("portalBanners").filter(
     (row) => !row.date || row.date <= bookingDateOffset(state),
+  );
+  const portalPosters = publicRows("portalPosters").filter(
+    (row) =>
+      (!row.date || row.date <= bookingDateOffset(state)) &&
+      safePosterImage(row.imageData),
   );
   const configuredArticle = portalContent.find((row) => row.name === article);
   const serviceNames = state.records.portalServices
@@ -706,6 +1022,39 @@ export default function Patient() {
                   <ChevronRight size={16} />
                 </button>
               </div>
+              {portalPosters.length > 0 && (
+                <section className="pt-stacked" aria-label="医院图片海报">
+                  {portalPosters.map((row) => (
+                    <button
+                      key={row.id}
+                      className="pt-card"
+                      style={{
+                        padding: 0,
+                        overflow: "hidden",
+                        width: "100%",
+                        textAlign: "left",
+                      }}
+                      onClick={() => go(portalTarget(row.target))}
+                      aria-label={`查看海报：${row.name}`}
+                    >
+                      <img
+                        src={safePosterImage(row.imageData)}
+                        alt={row.alt || row.name}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          maxHeight: 320,
+                          objectFit: "contain",
+                          background: "#eef6f5",
+                        }}
+                      />
+                      <span style={{ display: "block", padding: "12px 18px" }}>
+                        {row.name} · {row.target || "中心介绍"}
+                      </span>
+                    </button>
+                  ))}
+                </section>
+              )}
               {portalContent.length > 0 && (
                 <section className="pt-stacked">
                   {portalContent.map((row) => (
@@ -807,6 +1156,7 @@ export default function Patient() {
                     key={p.id}
                     onClick={() => {
                       setPackageId(p.id);
+                      setPackageSelection([p.id]);
                       go("booking");
                     }}
                   >
@@ -986,9 +1336,22 @@ export default function Patient() {
                 <details className="pt-note" key={row.id}>
                   <summary>{row.name}</summary>
                   <p>{row.description}</p>
-                  <p>{row.url}</p>
+                  {safePortalLink(row.url) ? (
+                    <a
+                      className="pt-text-button"
+                      href={safePortalLink(row.url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      referrerPolicy="no-referrer"
+                    >
+                      访问 {row.name}（外部网站）
+                    </a>
+                  ) : (
+                    <p>链接格式不安全，已禁用访问。</p>
+                  )}
                   <small>
-                    仅展示配置的链接信息，演示不会自动访问外部网站。
+                    仅在您主动点击后打开 HTTPS
+                    外部网站，请勿提交真实健康或身份信息。
                   </small>
                 </details>
               ))}
@@ -1046,7 +1409,9 @@ export default function Patient() {
                           {activeGroup
                             ? `${activeGroup.name || activeGroup.id} · ${activeGroup.mode} · 单位预算 ${activeGroup.mode === "无限额" ? "不限" : `¥${activeGroup.budget}`}`
                             : "单位额度 ¥800 / 人，超额自费。"}
-                          亲属预约按全额自费演示。
+                          {activeGroup
+                            ? ` · 单位折扣 ${groupDiscountPercent(activeGroup)}%；亲属付款按已配置策略执行。`
+                            : "亲属预约按全额自费演示。"}
                         </p>
                       </div>
                     </div>
@@ -1097,7 +1462,7 @@ export default function Patient() {
                     <input
                       type="checkbox"
                       checked={simple}
-                      disabled={!!activeGroup}
+                      disabled={!!activeGroup || multiPackageMode}
                       onChange={(e) => setSimple(e.target.checked)}
                     />{" "}
                     简单预约，仅预约到院时间
@@ -1112,17 +1477,36 @@ export default function Patient() {
                           placeholder="搜索套餐名称"
                         />
                       </div>
+                      {multiPackageMode && (
+                        <p className="pt-note" role="note">
+                          套餐 N 选 M：{applicablePackages.length} 选{" "}
+                          {packageChooseCount}，已选 {selectedPackageIds.length}
+                          /{packageChooseCount}{" "}
+                          个。重复检查项目按共享定价规则去重计费。
+                        </p>
+                      )}
+                      {multiPackageMode &&
+                        applicablePackages.length < packageChooseCount && (
+                          <p className="pt-note">
+                            可选线上套餐不足以满足必选数量，请联系体检中心调整配置。
+                          </p>
+                        )}
                       <div className="pt-package-options">
                         {applicablePackages
                           .filter((p) => p.name.includes(query))
                           .map((p) => (
                             <div
-                              className={`pt-package-option ${p.id === packageId ? "selected" : ""}`}
+                              className={`pt-package-option ${selectedPackageIds.includes(p.id) ? "selected" : ""}`}
                               key={p.id}
                             >
-                              <button onClick={() => setPackageId(p.id)}>
+                              <button
+                                aria-pressed={selectedPackageIds.includes(p.id)}
+                                onClick={() => selectBookingPackage(p.id)}
+                              >
                                 <span className="pt-radio">
-                                  {p.id === packageId && <Check size={13} />}
+                                  {selectedPackageIds.includes(p.id) && (
+                                    <Check size={13} />
+                                  )}
                                 </span>
                                 <span>
                                   <b>{p.name}</b>
@@ -1174,24 +1558,82 @@ export default function Patient() {
                         <input
                           type="checkbox"
                           disabled={
+                            !groupRelative &&
                             unitSchedules.find(
                               (row) => row.company === groupCompany,
                             )?.allowRelatives === false
                           }
-                          checked={
-                            groupRelative &&
-                            unitSchedules.find(
-                              (row) => row.company === groupCompany,
-                            )?.allowRelatives !== false
-                          }
-                          onChange={(e) => setGroupRelative(e.target.checked)}
+                          checked={groupRelative}
+                          onChange={(e) => {
+                            if (
+                              e.target.checked &&
+                              unitSchedules.find(
+                                (row) => row.company === groupCompany,
+                              )?.allowRelatives === false
+                            )
+                              return tell("该单位已关闭亲属预约");
+                            setGroupRelative(e.target.checked);
+                          }}
                         />{" "}
-                        亲属预约（专属价自费）
+                        亲属预约（单位折扣及承担规则）
                       </label>
+                    </div>
+                  )}
+                  {view === "group" && groupRelative && (
+                    <div className="pt-note">
+                      <label>
+                        关联单位员工（合成）
+                        <select
+                          value={effectiveSponsorId}
+                          onChange={(e) => setSponsorPatientId(e.target.value)}
+                        >
+                          {eligibleSponsors.map((person) => (
+                            <option key={person.id} value={person.id}>
+                              {person.name} · {person.company}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <p>
+                        请在上方选择与员工不同的实际合成亲属体检人。
+                        {activeGroup
+                          ? `亲属折扣 ${groupDiscountPercent(activeGroup, true)}%；${activeGroup.relativePayment === "unit" ? "单位按预算承担，超额及个人项目自费" : "优惠后全额自费"}`
+                          : "请选择有效员工、亲属身份及单位订单日期。"}
+                      </p>
                     </div>
                   )}
                   {!simple && (
                     <>
+                      {multiPackageMode && (
+                        <label className="pt-check-row">
+                          <input
+                            type="checkbox"
+                            checked={autoFilterMutual}
+                            onChange={(e) =>
+                              setAutoFilterMutual(e.target.checked)
+                            }
+                          />
+                          自动过滤重复与互斥项目（必检优先，其余先选优先）
+                        </label>
+                      )}
+                      {applyAutomaticFiltering &&
+                        (normalizedItems.removed.length > 0 ||
+                          normalizedItems.errors.length > 0) && (
+                          <div
+                            className="pt-note"
+                            aria-label="项目自动过滤说明"
+                          >
+                            {normalizedItems.removed.map((row, index) => (
+                              <p key={`${row.item}-${index}`}>
+                                {row.item}：{row.reason}
+                                {row.keptItem ? `；保留 ${row.keptItem}` : ""}
+                              </p>
+                            ))}
+                            {normalizedItems.errors.map((error) => (
+                              <p key={error}>{error}</p>
+                            ))}
+                          </div>
+                        )}
                       <h3 className="pt-subheading">套餐检查项目</h3>
                       <p className="pt-muted">
                         {allowRemove
@@ -1199,7 +1641,7 @@ export default function Patient() {
                           : "当前配置不允许取消套餐项目。"}
                       </p>
                       <div className="pt-item-checks">
-                        {selectedPackage?.items.map((item) => (
+                        {basePackageItems.map((item) => (
                           <label key={item}>
                             <input
                               type="checkbox"
@@ -1234,7 +1676,49 @@ export default function Patient() {
                             groupMode === "N 选 M" && <small>3 选 2</small>
                           ))}
                       </h3>
-                      {bookingExtras.map(
+                      <div className="pt-form-grid">
+                        <label>
+                          按检查部位添加
+                          <select
+                            value={bodyPartFilter}
+                            onChange={(e) => setBodyPartFilter(e.target.value)}
+                          >
+                            <option value="">全部部位</option>
+                            {[
+                              ...new Set(
+                                genericExtras.map(
+                                  (extra) =>
+                                    getItemClassification(state, extra.name)
+                                      .bodyPart,
+                                ),
+                              ),
+                            ].map((part) => (
+                              <option key={part}>{part}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          按疾病类型添加
+                          <select
+                            value={diseaseFilter}
+                            onChange={(e) => setDiseaseFilter(e.target.value)}
+                          >
+                            <option value="">全部类型</option>
+                            {[
+                              ...new Set(
+                                genericExtras.map(
+                                  (extra) =>
+                                    getItemClassification(state, extra.name)
+                                      .diseaseType,
+                                ),
+                              ),
+                            ].map((type) => (
+                              <option key={type}>{type}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      {displayedExtras.map(
                         (e: {
                           name: string;
                           price: number;
@@ -1263,6 +1747,61 @@ export default function Patient() {
                           </label>
                         ),
                       )}
+                      {activeBundles.map((bundle) => (
+                        <fieldset className="pt-note" key={bundle.packageId}>
+                          <legend>{bundle.name} · 独立自选包</legend>
+                          <p>
+                            {bundle.eligibleItems.length} 选 {bundle.choose}
+                            ，已选{" "}
+                            {
+                              (bundleSelections[bundle.packageId] || []).filter(
+                                (item) =>
+                                  activeExtras.includes(item) &&
+                                  bundle.eligibleItems.includes(item),
+                              ).length
+                            }
+                            /{bundle.choose}；跨包同项目只计价一次。
+                          </p>
+                          {bundle.eligibleItems.map((item) => (
+                            <label key={item} className="pt-check-row">
+                              <input
+                                type="checkbox"
+                                aria-label={`${bundle.name}自选包：${item}`}
+                                disabled={!allowAdd}
+                                checked={
+                                  !!bundleSelections[
+                                    bundle.packageId
+                                  ]?.includes(item)
+                                }
+                                onChange={(e) => {
+                                  const current = (
+                                    bundleSelections[bundle.packageId] || []
+                                  ).filter((name) =>
+                                    bundle.eligibleItems.includes(name),
+                                  );
+                                  if (
+                                    e.target.checked &&
+                                    current.length >= bundle.choose
+                                  )
+                                    return tell(
+                                      `${bundle.name}自选包最多选择 ${bundle.choose} 项`,
+                                    );
+                                  setBundleSelections({
+                                    ...bundleSelections,
+                                    [bundle.packageId]: e.target.checked
+                                      ? [...current, item]
+                                      : current.filter((name) => name !== item),
+                                  });
+                                }}
+                              />
+                              {item}
+                              {displayPrices
+                                ? ` · ¥${bookingExtras.find((extra) => extra.name === item)?.price ?? 0}`
+                                : ""}
+                            </label>
+                          ))}
+                        </fieldset>
+                      ))}
                       {!allowAdd && (
                         <p className="pt-note">
                           当前配置不允许增加套餐外项目。
@@ -1455,7 +1994,8 @@ export default function Patient() {
                             <button
                               className="pt-secondary"
                               onClick={() => {
-                                setPackageId(p.id);
+                                if (!selectedPackageIds.includes(p.id))
+                                  selectBookingPackage(p.id);
                                 go(bookingReturn);
                               }}
                             >
@@ -1605,7 +2145,12 @@ export default function Patient() {
                       </h3>
                       {recommendationEnabled ? (
                         <>
-                          <p>基础套餐：{selectedPackage?.name}</p>
+                          <p>
+                            基础套餐：
+                            {selectedPackages
+                              .map((pack) => pack.name)
+                              .join(" + ")}
+                          </p>
                           <p>
                             可向医生咨询：
                             {recommendedBookingItems(answers).join("、") ||
@@ -1652,6 +2197,33 @@ export default function Patient() {
                   </button>
                 </div>
               )}
+              {(state.records.cancelledAppointmentArchive || [])
+                .filter(
+                  (record) =>
+                    record.patientId === patient.id &&
+                    record.policy === "deleteBusiness" &&
+                    !record.restoredAt,
+                )
+                .map((record) => (
+                  <section className="pt-card" key={record.id}>
+                    <h3>已移除业务的取消预约 · {record.id}</h3>
+                    <p>
+                      取消时间 {record.cancelledAt} ·
+                      审计与财务记录保留。恢复后仅为已取消历史记录，不恢复排队、打印任务或预约资格，不重新收费。
+                    </p>
+                    <button
+                      className="pt-secondary"
+                      onClick={() =>
+                        act({
+                          type: "RESTORE_CANCELLED_APPOINTMENT",
+                          payload: { id: record.id, patientId: patient.id },
+                        })
+                      }
+                    >
+                      恢复取消记录供查询
+                    </button>
+                  </section>
+                ))}
               {orders.map((a) => (
                 <section className="pt-card pt-order" key={a.id}>
                   <div className="pt-order-top">
@@ -1663,8 +2235,13 @@ export default function Patient() {
                     </span>
                   </div>
                   <h3>
-                    {state.packages.find((p) => p.id === a.packageId)?.name ||
-                      "个性化 / 简单预约"}
+                    {(a.packageIds?.length
+                      ? state.packages
+                          .filter((pack) => a.packageIds.includes(pack.id))
+                          .map((pack) => pack.name)
+                          .join(" + ")
+                      : state.packages.find((p) => p.id === a.packageId)
+                          ?.name) || "个性化 / 简单预约"}
                   </h3>
                   <p>
                     <UserRound size={15} /> {patient.name} <MapPin size={15} />{" "}
@@ -1698,6 +2275,8 @@ export default function Patient() {
                           </button>
                           <button
                             className="pt-text-button"
+                            disabled={!!a.locked}
+                            title={a.locked ? "订单已锁定，不可取消" : ""}
                             onClick={() => setCancelId(a.id)}
                           >
                             取消预约
@@ -2213,33 +2792,103 @@ export default function Patient() {
               >
                 提交留言
               </button>
-              <h3 className="pt-subheading">本次体验，您还满意吗？</h3>
-              <div className="pt-stars">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    aria-label={`${n} 星`}
-                    onClick={() => setRating(n)}
-                  >
-                    <Star fill={n <= rating ? "currentColor" : "none"} />
+              <h3 className="pt-subheading">服务满意度问卷</h3>
+              <p className="pt-note">
+                合成体验问卷：五道评分均为必答，1 分为很不满意，5
+                分为非常满意。每位体检人每份订单仅提交一次，本地保存后可回看。
+              </p>
+              <label className="pt-field">
+                评价体验订单
+                <select
+                  value={surveyAppointmentId}
+                  onChange={(e) => setSurveyOrderId(e.target.value)}
+                >
+                  {surveyOrders.length ? (
+                    surveyOrders.map((order) => (
+                      <option key={order.id} value={order.id}>
+                        {order.date} · {order.id}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">门户浏览体验（无订单）</option>
+                  )}
+                </select>
+              </label>
+              {satisfactionResult ? (
+                <section
+                  className="pt-info-banner"
+                  aria-label="满意度问卷已提交结果"
+                  style={{ display: "block" }}
+                >
+                  <h3>
+                    <CheckCircle2 size={20} /> 本次满意度问卷已提交
+                  </h3>
+                  <p>
+                    提交时间：{satisfactionResult.submittedAt} · 平均评分：
+                    {satisfactionResult.average} / 5
+                  </p>
+                  {satisfactionQuestions.map((question) => (
+                    <p key={question.key}>
+                      {question.label}：
+                      {satisfactionResult.scores?.[question.key]} 分
+                    </p>
+                  ))}
+                  <p>合成建议：{satisfactionResult.suggestion || "未填写"}</p>
+                  <small>已保存结果仅供本地演示，重复提交已关闭。</small>
+                </section>
+              ) : (
+                <div>
+                  {satisfactionQuestions.map((question, index) => (
+                    <label
+                      className="pt-survey-option"
+                      key={question.key}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
+                    >
+                      <span>
+                        {index + 1}. {question.label}{" "}
+                        <b aria-hidden="true">*</b>
+                      </span>
+                      <select
+                        required
+                        aria-label={question.label}
+                        value={surveyScores[question.key] || ""}
+                        onChange={(e) =>
+                          setSurveyScores({
+                            ...surveyScores,
+                            [question.key]: Number(e.target.value),
+                          })
+                        }
+                      >
+                        <option value="">请选择评分</option>
+                        {[1, 2, 3, 4, 5].map((score) => (
+                          <option key={score} value={score}>
+                            {score} 分
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                  <label className="pt-field">
+                    合成改进建议（选填）
+                    <select
+                      value={surveySuggestion}
+                      onChange={(e) => setSurveySuggestion(e.target.value)}
+                    >
+                      <option value="">暂不填写</option>
+                      {satisfactionSuggestions.map((suggestion) => (
+                        <option key={suggestion}>{suggestion}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="pt-primary" onClick={submitSatisfaction}>
+                    提交满意度问卷
                   </button>
-                ))}
-              </div>
-              <button
-                className="pt-secondary"
-                disabled={!rating}
-                onClick={() => {
-                  act({
-                    type: "ADD_AUDIT",
-                    payload: {
-                      message: `${patient.name} 提交满意度评价 ${rating} 星`,
-                    },
-                  });
-                  tell(`感谢您的 ${rating} 星评价，已记录。`);
-                }}
-              >
-                提交评价
-              </button>
+                </div>
+              )}
             </section>
           )}
           {view === "profile" && (
@@ -2654,7 +3303,10 @@ export default function Patient() {
           >
             <h2>确认取消这次预约？</h2>
             <p>
-              取消后保留演示订单与操作记录，已付订单仅记录模拟取消，不发生真实退款。
+              {state.config.cancellationPolicy === "deleteBusiness"
+                ? "取消后从业务列表移除此订单及限定关联记录，保留可恢复归档与审计；不影响其他体检人。"
+                : "取消后保留演示订单与操作记录。"}
+              已付订单仅记录模拟取消，不发生真实退款。
             </p>
             <div className="pt-modal-actions">
               <button className="pt-secondary" onClick={() => setCancelId("")}>
@@ -2663,9 +3315,19 @@ export default function Patient() {
               <button
                 className="pt-primary"
                 onClick={() => {
+                  const order = state.appointments.find(
+                    (row) =>
+                      row.id === cancelId && row.patientId === patient.id,
+                  );
+                  if (
+                    !order ||
+                    order.locked ||
+                    !["booked", "paid"].includes(order.status)
+                  )
+                    return tell("当前订单不可取消，请刷新订单状态");
                   act({
-                    type: "UPDATE_APPOINTMENT",
-                    payload: { id: cancelId, status: "cancelled" },
+                    type: "CANCEL_PATIENT_APPOINTMENT",
+                    payload: { id: cancelId, patientId: patient.id },
                   });
                   setCancelId("");
                   tell("预约已取消，操作记录已保留");
