@@ -12,6 +12,10 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "video:ep01": "playwright test -c scripts/video/playwright.config.ts",
+    "video:ep01:fast": "TOUR_FAST=1 playwright test -c scripts/video/playwright.config.ts",
+    "video:voice": "node scripts/video/make-voiceover.mjs",
+    "video:build": "node scripts/video/build-ep01.mjs",
     "format": "prettier --write src tests e2e *.ts *.js README.md"
   },
   "dependencies": {

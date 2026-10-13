@@ -186,7 +186,30 @@
 
 > 更正说明：上一轮口头结论中「星标数量写死 10、实际 14」的说法不准确 —— 10 是星标条款位置数、14 是拆分核对项数，两者都对，现已在界面上并列显示以消除歧义。
 
-## 6. 可复用素材
+## 6. 自动录屏工程（第 1 集已产出）
+
+| 命令 | 作用 |
+| --- | --- |
+| `npm run dev` | 先起本地服务（录制脚本复用已运行的 dev server） |
+| `npm run video:voice` | 用 macOS `say`（Tingting zh_CN）逐句预生成配音，输出 `artifacts/video/tts/schedule.json`（**每句真实时长**）|
+| `npm run video:ep01` | 驱动真实 UI 跑完 12 个分镜。加 `TOUR_CDP=1 TOUR_W=1920 TOUR_H=960` 走 CDP 抓帧出 1080p；不加则用 Playwright 自带录屏（800×500）|
+| `npm run video:ep01:fast` | 秒级干跑，用于改选择器（`TOUR_STOP_AT=<分镜id>` 只跑到某一幕）|
+| `npm run video:build` | 合成成片：帧序列 → 25fps → 补底部字幕带 → libass 烧字幕 → 混入配音 → `artifacts/video/ep01-hd.mp4`；同时产出逐字稿、`srt`/`vtt`/`ass`、章节表 |
+
+- **画面不遮挡**：界面里不再画任何解说文字。按 1920×960 采集，ffmpeg `pad` 出 120px 底部字幕带，章节角标与最多两行字幕由 `docs/video/ep01.ass`（libass + PingFang SC）落在带内；左上角那条「合成数据 · 纯前端演示」水印已删除。
+- **配音与字幕同源**：`ep01.srt` / `ep01.ass` 的时间轴取自每句 AIFF 的实测时长（`afinfo`），不按字数估算；每幕画面时长自动补足到该幕配音结束。
+- **光标**：CDP 抓帧不含系统光标，页面内挂一个跟随真实 `mousemove`/`mousedown` 的箭头层（`#tour-overlay`，`pointer-events:none`、`aria-hidden`），点击处带一圈扩散高亮。
+- **响度**：逐句 `loudnorm=I=-16:TP=-1.5`，混音后 `alimiter=limit=0.9`；成片实测 mean −18.0 dB、峰值 −3.4 dBFS。
+- 断言一律走 `body > :not(#tour-overlay)`：弹窗是 portal 到 `body` 的，按 `#root` 收窄会漏判；不排除光标层则会被旁白文本撞成 strict 双命中。
+- 填充阶段只静置、不滚动，避免画面上下抖动。
+- `TOUR_SHOTS=1` 在 `artifacts/video/frames/` 输出每幕静帧，用于快速核对画面。
+- 当前成片：`artifacts/video/ep01-hd.mp4`，**6 分 02 秒 / 1920×1080 / H.264 + AAC**，12 幕连续，配音内嵌。
+- 采集说明：Playwright 自带录屏固定降采样到 800×500（`recordVideo.size` 不生效），1080p 因此走 CDP `Page.startScreencast`。它是"有重绘才推帧"的变帧率采集，静止期不产生帧，由 `tpad` 复制末帧补齐到配音结束；实测动作段约 25fps。
+- 依赖：ffmpeg 用 `~/tools/ffmpeg/ffmpeg`（evermeet.cx 静态构建，含 libx264 / libvpx / libass / libfreetype）。构建脚本按 `FFMPEG` → `~/tools/ffmpeg` → `PATH` → homebrew → Playwright 自带 的顺序自动探测。
+- 第 2–6 集复用同一套骨架：每集一份 `epNN-script.json` + 一个 tour spec；患者端一集需把视口改成 390×844。
+
+## 7. 可复用素材
+
 
 - `public/media/workflow-guide.mp4` / `workflow-poster.png` / `workflow-captions.vtt`：6 步 36 秒静音流程示意（入口：后台左下「演示指南」）。
 - `scripts/create_training_video.py`：重新生成上述示意短片与字幕（`CJK_FONT` 可指定字体）。它是流程示意，**不是 UI 录屏**，正片仍需实机录制。

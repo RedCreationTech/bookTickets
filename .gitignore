@@ -1,5 +1,6 @@
 node_modules/
 dist/
+artifacts/
 playwright-report/
 test-results/
 *.log
@@ -9,3 +10,5 @@ test-results/
 *.tsbuildinfo
 __pycache__/
 *.pyc
+
+.DS_Store
