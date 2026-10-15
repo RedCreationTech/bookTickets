@@ -317,7 +317,7 @@ export default function App() {
         <div className="sidebar-bottom">
           <div className="demo-label">
             <ShieldCheck size={15} />
-            纯前端演示环境
+            演示环境
           </div>
           <p>合成数据 · 非真实诊疗系统</p>
           <button onClick={() => setHelp(true)}>
