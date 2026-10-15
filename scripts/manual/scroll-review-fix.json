@@ -1,0 +1,65 @@
+[
+ {
+  "image": "5-1",
+  "label": "",
+  "over": 3900,
+  "view": 783,
+  "hiddenPct": 498,
+  "extra": 3,
+  "note": "超出 3900px（约 5.0 屏），补 3 张"
+ },
+ {
+  "image": "5-2",
+  "label": "",
+  "over": 1439,
+  "view": 783,
+  "hiddenPct": 184,
+  "extra": 3,
+  "note": "超出 1439px（约 1.8 屏），补 3 张"
+ },
+ {
+  "image": "5-3",
+  "label": "",
+  "over": 3832,
+  "view": 783,
+  "hiddenPct": 489,
+  "extra": 3,
+  "note": "超出 3832px（约 4.9 屏），补 3 张"
+ },
+ {
+  "image": "5-4",
+  "label": "",
+  "over": 1823,
+  "view": 783,
+  "hiddenPct": 233,
+  "extra": 3,
+  "note": "超出 1823px（约 2.3 屏），补 3 张"
+ },
+ {
+  "image": "5-6",
+  "label": "",
+  "over": 1060,
+  "view": 783,
+  "hiddenPct": 135,
+  "extra": 2,
+  "note": "超出 1060px（约 1.4 屏），补 2 张"
+ },
+ {
+  "image": "5-12",
+  "label": "",
+  "over": 1268,
+  "view": 783,
+  "hiddenPct": 162,
+  "extra": 2,
+  "note": "超出 1268px（约 1.6 屏），补 2 张"
+ },
+ {
+  "image": "5-13",
+  "label": "",
+  "over": 574,
+  "view": 783,
+  "hiddenPct": 73,
+  "extra": 1,
+  "note": "超出 574px（约 0.7 屏），补 1 张"
+ }
+]

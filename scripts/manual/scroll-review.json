@@ -1,0 +1,747 @@
+[
+ {
+  "image": "2-1",
+  "label": "首页",
+  "over": 863,
+  "view": 812,
+  "hiddenPct": 106,
+  "extra": 2,
+  "note": "超出 863px（约 1.1 屏），补 2 张"
+ },
+ {
+  "image": "2-2",
+  "label": "预约",
+  "over": 1612,
+  "view": 783,
+  "hiddenPct": 206,
+  "extra": 3,
+  "note": "超出 1612px（约 2.1 屏），补 3 张"
+ },
+ {
+  "image": "2-3",
+  "label": "导检",
+  "over": 1686,
+  "view": 783,
+  "hiddenPct": 215,
+  "extra": 3,
+  "note": "超出 1686px（约 2.2 屏），补 3 张"
+ },
+ {
+  "image": "2-4",
+  "label": "报告",
+  "over": 566,
+  "view": 783,
+  "hiddenPct": 72,
+  "extra": 1,
+  "note": "超出 566px（约 0.7 屏），补 1 张"
+ },
+ {
+  "image": "2-5",
+  "label": "我的",
+  "over": 1860,
+  "view": 783,
+  "hiddenPct": 238,
+  "extra": 3,
+  "note": "超出 1860px（约 2.4 屏），补 3 张"
+ },
+ {
+  "image": "3",
+  "label": "",
+  "over": 203,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "4",
+  "label": "",
+  "over": 225,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-1",
+  "label": "",
+  "over": 7962,
+  "view": 783,
+  "hiddenPct": 1017,
+  "extra": 3,
+  "note": "超出 7962px（约 10.2 屏），补 3 张"
+ },
+ {
+  "image": "5-2",
+  "label": "",
+  "over": 1439,
+  "view": 783,
+  "hiddenPct": 184,
+  "extra": 3,
+  "note": "超出 1439px（约 1.8 屏），补 3 张"
+ },
+ {
+  "image": "5-3",
+  "label": "",
+  "over": 3832,
+  "view": 783,
+  "hiddenPct": 489,
+  "extra": 3,
+  "note": "超出 3832px（约 4.9 屏），补 3 张"
+ },
+ {
+  "image": "5-4",
+  "label": "",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-5",
+  "label": "",
+  "over": 1387,
+  "view": 783,
+  "hiddenPct": 177,
+  "extra": 2,
+  "note": "超出 1387px（约 1.8 屏），补 2 张"
+ },
+ {
+  "image": "5-6",
+  "label": "",
+  "over": 1060,
+  "view": 783,
+  "hiddenPct": 135,
+  "extra": 2,
+  "note": "超出 1060px（约 1.4 屏），补 2 张"
+ },
+ {
+  "image": "5-7-1",
+  "label": "客户健康档案",
+  "over": 469,
+  "view": 783,
+  "hiddenPct": 60,
+  "extra": 1,
+  "note": "超出 469px（约 0.6 屏），补 1 张"
+ },
+ {
+  "image": "5-7-2",
+  "label": "干预随访",
+  "over": 2302,
+  "view": 783,
+  "hiddenPct": 294,
+  "extra": 3,
+  "note": "超出 2302px（约 2.9 屏），补 3 张"
+ },
+ {
+  "image": "5-7-3",
+  "label": "风险评估",
+  "over": 749,
+  "view": 783,
+  "hiddenPct": 96,
+  "extra": 2,
+  "note": "超出 749px（约 1.0 屏），补 2 张"
+ },
+ {
+  "image": "5-7-4",
+  "label": "健康计划",
+  "over": 931,
+  "view": 783,
+  "hiddenPct": 119,
+  "extra": 2,
+  "note": "超出 931px（约 1.2 屏），补 2 张"
+ },
+ {
+  "image": "5-7-5",
+  "label": "方案与词条",
+  "over": 1339,
+  "view": 783,
+  "hiddenPct": 171,
+  "extra": 2,
+  "note": "超出 1339px（约 1.7 屏），补 2 张"
+ },
+ {
+  "image": "5-7-6",
+  "label": "人群分组",
+  "over": 843,
+  "view": 783,
+  "hiddenPct": 108,
+  "extra": 2,
+  "note": "超出 843px（约 1.1 屏），补 2 张"
+ },
+ {
+  "image": "5-7-7",
+  "label": "异常与随访规则",
+  "over": 567,
+  "view": 783,
+  "hiddenPct": 72,
+  "extra": 1,
+  "note": "超出 567px（约 0.7 屏），补 1 张"
+ },
+ {
+  "image": "5-8-1",
+  "label": "人群健康分析",
+  "over": 1167,
+  "view": 783,
+  "hiddenPct": 149,
+  "extra": 2,
+  "note": "超出 1167px（约 1.5 屏），补 2 张"
+ },
+ {
+  "image": "5-8-2",
+  "label": "科研复合筛选",
+  "over": 417,
+  "view": 783,
+  "hiddenPct": 53,
+  "extra": 1,
+  "note": "超出 417px（约 0.5 屏），补 1 张"
+ },
+ {
+  "image": "5-8-3",
+  "label": "工作单位管理",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-8-4",
+  "label": "工作分组",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-8-5",
+  "label": "家庭客户",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-9-1",
+  "label": "服务订单",
+  "over": 338,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-9-2",
+  "label": "服务项目审核",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-9-3",
+  "label": "快速咨询抢单",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-9-4",
+  "label": "医生团队",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-9-5",
+  "label": "CRM 客户",
+  "over": 734,
+  "view": 783,
+  "hiddenPct": 94,
+  "extra": 2,
+  "note": "超出 734px（约 0.9 屏），补 2 张"
+ },
+ {
+  "image": "5-9-6",
+  "label": "合同与回款",
+  "over": 802,
+  "view": 783,
+  "hiddenPct": 102,
+  "extra": 2,
+  "note": "超出 802px（约 1.0 屏），补 2 张"
+ },
+ {
+  "image": "5-9-7",
+  "label": "拜访与业务计划",
+  "over": 802,
+  "view": 783,
+  "hiddenPct": 102,
+  "extra": 2,
+  "note": "超出 802px（约 1.0 屏），补 2 张"
+ },
+ {
+  "image": "5-9-8",
+  "label": "客户订单进度",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-9-9",
+  "label": "服务批量维护",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-9-10",
+  "label": "服务财务与余额",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-9-11",
+  "label": "我的团队关系",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-10-1",
+  "label": "商品与库存",
+  "over": 270,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-10-2",
+  "label": "商城订单",
+  "over": 270,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-10-3",
+  "label": "财务结算",
+  "over": 607,
+  "view": 783,
+  "hiddenPct": 78,
+  "extra": 1,
+  "note": "超出 607px（约 0.8 屏），补 1 张"
+ },
+ {
+  "image": "5-10-4",
+  "label": "物流与运费",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-10-5",
+  "label": "店铺与消费码",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-10-6",
+  "label": "团购与预约规则",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-10-7",
+  "label": "商品评价",
+  "over": 134,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-10-8",
+  "label": "交易与预约模拟",
+  "over": 664,
+  "view": 783,
+  "hiddenPct": 85,
+  "extra": 1,
+  "note": "超出 664px（约 0.8 屏），补 1 张"
+ },
+ {
+  "image": "5-10-9",
+  "label": "换货库存处理",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-10-10",
+  "label": "商品属性选项",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-10-11",
+  "label": "商城财务与余额",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-11-1",
+  "label": "健康内容",
+  "over": 270,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-11-2",
+  "label": "咨询与消息",
+  "over": 270,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-11-3",
+  "label": "健康广场与活动",
+  "over": 1101,
+  "view": 783,
+  "hiddenPct": 141,
+  "extra": 2,
+  "note": "超出 1101px（约 1.4 屏），补 2 张"
+ },
+ {
+  "image": "5-11-4",
+  "label": "好友与服务关系",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-11-5",
+  "label": "内容与通知分类",
+  "over": 270,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-11-6",
+  "label": "已发短信邮件",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-12",
+  "label": "",
+  "over": 1268,
+  "view": 783,
+  "hiddenPct": 162,
+  "extra": 2,
+  "note": "超出 1268px（约 1.6 屏），补 2 张"
+ },
+ {
+  "image": "5-13",
+  "label": "",
+  "over": 15953,
+  "view": 783,
+  "hiddenPct": 2037,
+  "extra": 3,
+  "note": "超出 15953px（约 20.4 屏），补 3 张"
+ },
+ {
+  "image": "5-14-1",
+  "label": "客户工单2",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-14-2",
+  "label": "投诉处理",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-14-3",
+  "label": "服务订单纠纷",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-14-4",
+  "label": "商城订单纠纷",
+  "over": 202,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-14-5",
+  "label": "订单关联介入",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-14-6",
+  "label": "检前检中留言",
+  "over": 12,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-15",
+  "label": "",
+  "over": 174,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-1",
+  "label": "预约规则",
+  "over": 594,
+  "view": 783,
+  "hiddenPct": 76,
+  "extra": 1,
+  "note": "超出 594px（约 0.8 屏），补 1 张"
+ },
+ {
+  "image": "5-16-2",
+  "label": "机构与企业",
+  "over": 281,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-3",
+  "label": "人员与资质",
+  "over": 2047,
+  "view": 783,
+  "hiddenPct": 261,
+  "extra": 3,
+  "note": "超出 2047px（约 2.6 屏），补 3 张"
+ },
+ {
+  "image": "5-16-4",
+  "label": "角色与权限",
+  "over": 2115,
+  "view": 783,
+  "hiddenPct": 270,
+  "extra": 3,
+  "note": "超出 2115px（约 2.7 屏），补 3 张"
+ },
+ {
+  "image": "5-16-5",
+  "label": "系统与标准字典",
+  "over": 553,
+  "view": 783,
+  "hiddenPct": 71,
+  "extra": 1,
+  "note": "超出 553px（约 0.7 屏），补 1 张"
+ },
+ {
+  "image": "5-16-6",
+  "label": "健康业务配置",
+  "over": 553,
+  "view": 783,
+  "hiddenPct": 71,
+  "extra": 1,
+  "note": "超出 553px（约 0.7 屏），补 1 张"
+ },
+ {
+  "image": "5-16-7",
+  "label": "设备与接口",
+  "over": 349,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-8",
+  "label": "菜单与页面元素",
+  "over": 349,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-9",
+  "label": "系统信息与帮助",
+  "over": 281,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-10",
+  "label": "套餐适用与团检规则",
+  "over": 213,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-11",
+  "label": "体检项目与模板",
+  "over": 553,
+  "view": 783,
+  "hiddenPct": 71,
+  "extra": 1,
+  "note": "超出 553px（约 0.7 屏），补 1 张"
+ },
+ {
+  "image": "5-16-12",
+  "label": "机构人员归属",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-13",
+  "label": "字典分类管理",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-14",
+  "label": "设备库存台账",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-15",
+  "label": "实际页面权限",
+  "over": 0,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-16-16",
+  "label": "患者预约规则",
+  "over": 538,
+  "view": 783,
+  "hiddenPct": 69,
+  "extra": 1,
+  "note": "超出 538px（约 0.7 屏），补 1 张"
+ },
+ {
+  "image": "5-16-17",
+  "label": "操作审计",
+  "over": 18011,
+  "view": 650,
+  "hiddenPct": 2771,
+  "extra": 3,
+  "note": "超出 18011px（约 27.7 屏），补 3 张"
+ },
+ {
+  "image": "5-17-1",
+  "label": "通知工作台",
+  "over": 780,
+  "view": 783,
+  "hiddenPct": 100,
+  "extra": 2,
+  "note": "超出 780px（约 1.0 屏），补 2 张"
+ },
+ {
+  "image": "5-17-2",
+  "label": "事件与祝福",
+  "over": 2049,
+  "view": 783,
+  "hiddenPct": 262,
+  "extra": 3,
+  "note": "超出 2049px（约 2.6 屏），补 3 张"
+ },
+ {
+  "image": "5-17-3",
+  "label": "替检核验",
+  "over": 1424,
+  "view": 783,
+  "hiddenPct": 182,
+  "extra": 3,
+  "note": "超出 1424px（约 1.8 屏），补 3 张"
+ },
+ {
+  "image": "5-17-4",
+  "label": "签名档案",
+  "over": 347,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-17-5",
+  "label": "驳回质控",
+  "over": 443,
+  "view": 783,
+  "hiddenPct": 57,
+  "extra": 1,
+  "note": "超出 443px（约 0.6 屏），补 1 张"
+ },
+ {
+  "image": "5-17-6",
+  "label": "门户与导检配置",
+  "over": 345,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-17-7",
+  "label": "密码演练",
+  "over": 127,
+  "view": 783,
+  "extra": 0,
+  "note": "一屏内完整"
+ },
+ {
+  "image": "5-17-8",
+  "label": "单位排期",
+  "over": 1047,
+  "view": 783,
+  "hiddenPct": 134,
+  "extra": 2,
+  "note": "超出 1047px（约 1.3 屏），补 2 张"
+ },
+ {
+  "image": "5-17-9",
+  "label": "异常等级展示",
+  "over": 572,
+  "view": 783,
+  "hiddenPct": 73,
+  "extra": 1,
+  "note": "超出 572px（约 0.7 屏），补 1 张"
+ }
+]

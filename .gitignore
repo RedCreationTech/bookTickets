@@ -11,4 +11,10 @@ test-results/
 __pycache__/
 *.pyc
 
+# 用户使用手册成品（图片与 docx 只留本地，生成脚本与中间数据在 scripts/manual/）
+docs/guides/images/
+docs/guides/*.docx
+docs/guides/*.pdf
+scripts/manual/.shots*/
+
 .DS_Store
